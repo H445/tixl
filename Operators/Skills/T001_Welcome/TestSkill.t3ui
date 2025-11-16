@@ -1,0 +1,73 @@
+{
+  "Id": "123a1ff1-2935-4d9a-880f-897a7f8885ad"/*TestSkill*/,
+  "Description": "An interactive playground that illustrates various methods to animate things in Tooll.\n\n[Value]",
+  "SymbolTags": "3",
+  "InputUis": [],
+  "SymbolChildUis": [
+    {
+      "ChildId": "4bac9437-4979-487b-9b8c-0e9b48331ced"/*Layer2d*/,
+      "Position": {
+        "X": 1449.9647,
+        "Y": 2109.47
+      }
+    },
+    {
+      "ChildId": "60bd8291-7fcf-401c-a0c5-a7981b4404d5"/*Time*/,
+      "Position": {
+        "X": 1309.9647,
+        "Y": 2144.4702
+      }
+    },
+    {
+      "ChildId": "71509e3e-5644-4c08-955b-3ce178ecbaa4"/*LoadImage*/,
+      "Position": {
+        "X": 1449.9647,
+        "Y": 2350.795
+      }
+    },
+    {
+      "ChildId": "74fe0f85-9724-49f5-b358-211cc742408f"/*RenderTarget*/,
+      "Position": {
+        "X": 1589.9647,
+        "Y": 2109.47
+      }
+    },
+    {
+      "ChildId": "75f735c0-5354-49b6-860b-518557023656"/*RoundedRect*/,
+      "Position": {
+        "X": 1530.309,
+        "Y": 1831.0265
+      }
+    },
+    {
+      "ChildId": "967503b9-24d5-4264-83ac-053b8fbd8f3a"/*LoadImage*/,
+      "Position": {
+        "X": 1596.6401,
+        "Y": 2400.952
+      }
+    },
+    {
+      "ChildId": "cd49a76a-c5fc-48c2-9259-db7a801a49fc"/*ImageResult*/,
+      "Position": {
+        "X": 1818.0054,
+        "Y": 2119.088
+      }
+    },
+    {
+      "ChildId": "de17e3f3-f79c-4648-9689-27d7187dc711"/*RoundedRect*/,
+      "Position": {
+        "X": 1413.7909,
+        "Y": 2215.799
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "23bc598c-e87d-4993-9e09-b4676e302e61"/*ColorBuffer*/,
+      "Position": {
+        "X": 2313.1882,
+        "Y": 2089.812
+      }
+    }
+  ]
+}

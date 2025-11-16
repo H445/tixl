@@ -31,6 +31,36 @@
 - 
 - [ ] Complete import T3-project window?
 
+
+# Skill Quest
+
+- [ ] Design for HUB, title, etc.
+- [ ] serialize user progress
+- [ ] Model for a level progression map (JSON?)
+- [ ] List zones and levels with status
+- [ ] model for user progress
+- [ ] introduce "playmode" with a custom layout
+  - [ ] override layout switching etc. in playmode
+- [ ] add state machine for playmode (design flow in figma first)
+  - [ ] Intro page
+  - [ ] Play level tutorial
+  - [ ] Level completed
+  - [ ] Tips and time out?
+- [ ] Difficulty modes (start with simple user settings)
+- [ ] Create TiXL learning project
+- [ ] Create PlayResult-Op
+- [ ] Implement some kind of back-channel so PlayResult-Op can send events to the editor
+- [ ] Tour-Points (Should probably be orthogonal from SkillQuest)
+  - [ ] extend model
+  - [ ] add user-settings for "Skip tours"
+  - [ ] show tour indicator near the op name and description.
+  - [ ] save tour-progress for SymbolId in user settings (maybe with -1 as completed or canceled)
+  - [ ] Implement tour mode with popup / continue / back, etc. 
+- Add some kind of dropdown mode to switch between gradient presets.
+- Save gradient presets of symbol child op
+
+- Add CustomUi for [Time]
+
 # Asset-Lib
 - [x] Undo/Do for changing
 - [x] Indicate hidden file reference for selected op
@@ -43,8 +73,8 @@
   - [x] Collapse all
   - [x] Context menu
     - [ ] File Selections 
-    - [ ] Action...
-      - [ ] Review in Explorer
+    - [x] Action...
+      - [x] Reveal in Explorer
       - [ ] Edit externally
       - [ ] Delete
       - [ ] Add to graph -> Create and select op
