@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using T3.Editor.Gui;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Windows.Layouts;
 using T3.Editor.Gui.Windows.Output;
@@ -26,21 +25,30 @@ internal static class SkillQuestStates
               Enter: context =>
                      {
                          Debug.Assert(context.OpenedProject != null);
-
-                         context.PreviousUiState = UiState.KeepUiState();
-
-                         LayoutHandling.LoadAndApplyLayoutOrFocusMode(LayoutHandling.Layouts.SkillQuest);
-
-                         // Pin output
-                         if (ProjectView.Focused != null)
+                         
+                         if (ProjectView.Focused == null)
                          {
-                             var rootInstance = context.OpenedProject.Structure.GetRootInstance();
-                             var outputWindow = OutputWindow.GetPrimaryOutputWindow();
-                             outputWindow?.Pinning.PinInstance(rootInstance);
+                             context.StateMachine.SetState(Inactive,context);
+                             return;
                          }
 
+                         // Keep and apply a new UI state
+                         context.PreviousUiState = UiState.KeepUiState();
+                         LayoutHandling.LoadAndApplyLayoutOrFocusMode(LayoutHandling.Layouts.SkillQuest);
+
+                         if (!OutputWindow.TryGetPrimaryOutputWindow(out var outputWindow))
+                         {
+                             UiState.ApplyUiState(context.PreviousUiState);
+                             context.StateMachine.SetState(Inactive,context);
+                         }
+                         
                          UiState.HideAllUiElements();
+                         
+                         // Pin output
+                         var rootInstance = context.OpenedProject.Structure.GetRootInstance();
+                         outputWindow.Pinning.PinInstance(rootInstance);
                      },
+              
               Update: context => { },
               Exit: _ => { }
              );

@@ -301,7 +301,6 @@ internal class EditorSymbolPackage : SymbolPackage
 
         try
         {
-            
             if (HomeSymbolId == Guid.Empty)
                 return false;
 

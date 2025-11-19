@@ -16,9 +16,10 @@ internal record struct State<T>(Action<T> Enter=null,
 /// </summary>
 internal sealed class StateMachine<T>
 {
-    public StateMachine( State<T> defaultState)
+    public StateMachine( Type statesClass,State<T> defaultState)
     {
         _currentState = defaultState;
+        _states = statesClass;
     }
 
     public void UpdateAfterDraw(T c)
@@ -40,12 +41,10 @@ internal sealed class StateMachine<T>
     /// <summary>
     /// Sadly, since states are defined as fields, we need to use reflection to infer their short names... 
     /// </summary>
-    private static string GetMatchingStateFieldName(Type staticClassType, State<T> state)
+    private string GetStateName(State<T> state)
     {
-        if (!staticClassType.IsClass || !staticClassType.IsAbstract || !staticClassType.IsSealed)
-            throw new ArgumentException("Provided type must be a static class.", nameof(staticClassType));
 
-        var fields = staticClassType.GetFields(  BindingFlags.NonPublic|BindingFlags.Static);
+        var fields = _states.GetFields(  BindingFlags.NonPublic|BindingFlags.Static);
     
         foreach (var field in fields)
         {
@@ -55,7 +54,6 @@ internal sealed class StateMachine<T>
             var fieldValue = (State<T>)field.GetValue(null)!;
             if (fieldValue.Equals(state))
             {
-                //return field.ToString();
                 return field.Name;
             }
         }
@@ -66,5 +64,11 @@ internal sealed class StateMachine<T>
     private State<T> _currentState;
     public float StateTime => (float) (ImGui.GetTime() - _stateEnterTime);
     private double _stateEnterTime;
+    private readonly Type _states;
     public State<T> CurrentState => _currentState;
+
+    public override string ToString()
+    {
+        return $"{_states.Name} [{GetStateName(_currentState)}]";
+    }
 }

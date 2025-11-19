@@ -71,7 +71,7 @@ internal sealed class GraphUiContext
         ItemMovement = new MagItemMovement(this, view, Layout, projectView.NodeSelection);
         Placeholder = new PlaceholderCreation();
         //EditCommentDialog = new EditCommentDialog();
-        StateMachine = new StateMachine<GraphUiContext>(GraphStates.Default);// needs to be initialized last
+        StateMachine = new StateMachine<GraphUiContext>(typeof(GraphStates), GraphStates.Default);// needs to be initialized last
     }
 
     internal readonly ProjectView ProjectView;

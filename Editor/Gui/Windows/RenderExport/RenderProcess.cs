@@ -47,8 +47,7 @@ internal static class RenderProcess
     /// </remarks>
     public static void Update()
     {
-        var outputWindow = OutputWindow.GetPrimaryOutputWindow();
-        if (outputWindow == null)
+        if (!OutputWindow.TryGetPrimaryOutputWindow(out var outputWindow))
         {
             State = States.NoOutputWindow;
             return;

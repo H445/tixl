@@ -83,6 +83,8 @@ public static partial class T3Ui
         // Complete frame
         SingleValueEdit.StartNextFrame();
 
+        SkillQuest.SkillManager.PostUpdate();
+
         FrameStats.CompleteFrame();
         TriggerGlobalActionsFromKeyBindings();
 

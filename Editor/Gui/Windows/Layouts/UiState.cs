@@ -14,31 +14,37 @@ internal static class UiState
 {
     internal static void ToggleFocusMode()
     {
+            
         var activeComponents = ProjectView.Focused;
         if (activeComponents == null)
             return;
 
         var shouldBeFocusMode = !UserSettings.Config.FocusMode;
 
-        var outputWindow = OutputWindow.GetPrimaryOutputWindow();
+        if (!OutputWindow.TryGetPrimaryOutputWindow(out var oldOutputWindow))
+            return;
 
-        if (shouldBeFocusMode && outputWindow != null)
+        if (shouldBeFocusMode)
         {
-            outputWindow.Pinning.TryGetPinnedOrSelectedInstance(out var instance, out _);
+            oldOutputWindow.Pinning.TryGetPinnedOrSelectedInstance(out var instance, out _);
             activeComponents.GraphImageBackground.OutputInstance = instance;
         }
 
         UserSettings.Config.FocusMode = shouldBeFocusMode;
         UserSettings.Config.ShowToolbar = shouldBeFocusMode;
+        
         ToggleAllUiElements();
+        
         LayoutHandling.LoadAndApplyLayoutOrFocusMode(shouldBeFocusMode
                                                          ? LayoutHandling.Layouts.FocusMode
                                                          : (LayoutHandling.Layouts)UserSettings.Config.WindowLayoutIndex);
 
-        outputWindow = OutputWindow.GetPrimaryOutputWindow();
-        if (!shouldBeFocusMode && outputWindow != null)
+        if (!OutputWindow.TryGetPrimaryOutputWindow(out var newOutputWindow))
+            return;
+        
+        if (!shouldBeFocusMode)
         {
-            outputWindow.Pinning.PinInstance(activeComponents.GraphImageBackground.OutputInstance, activeComponents);
+            newOutputWindow.Pinning.PinInstance(activeComponents.GraphImageBackground.OutputInstance, activeComponents);
             activeComponents.GraphImageBackground.ClearBackground();
         }
     }

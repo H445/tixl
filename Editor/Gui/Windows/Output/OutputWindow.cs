@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Diagnostics.CodeAnalysis;
 using ImGuiNET;
 using T3.Core.DataTypes;
 using T3.Core.Operator;
@@ -37,7 +38,7 @@ internal sealed class OutputWindow : Window
     {
         foreach (var i in OutputWindowInstances)
         {
-            if (!(i is OutputWindow outputWindow))
+            if (i is not OutputWindow outputWindow)
                 continue;
 
             if (!i.Config.Visible)
@@ -56,9 +57,23 @@ internal sealed class OutputWindow : Window
     //     }
     // }
 
-    public static OutputWindow? GetPrimaryOutputWindow()
+    public static bool TryGetPrimaryOutputWindow([NotNullWhen(true)] out OutputWindow outputWindow)
     {
-        return GetVisibleInstances().FirstOrDefault();
+        foreach (var window in OutputWindowInstances)
+        {
+            if (!window.Config.Visible)
+                continue;
+
+            if (window is not OutputWindow outputWindow2)
+                 continue;
+
+            outputWindow = outputWindow2;
+            return true;
+
+        }
+
+        outputWindow = null;
+        return false;
     }
 
     public Texture2D? GetCurrentTexture()
@@ -201,10 +216,10 @@ internal sealed class OutputWindow : Window
         {
             ImGui.SameLine();
 
-            var showGizmos = _evaluationContext.ShowGizmos != GizmoVisibility.Off;
+            var showGizmos = EvaluationContext.ShowGizmos != GizmoVisibility.Off;
             if (CustomComponents.ToggleIconButton(ref showGizmos, Icon.Grid, Vector2.One * ImGui.GetFrameHeight()))
             {
-                _evaluationContext.ShowGizmos = showGizmos
+                EvaluationContext.ShowGizmos = showGizmos
                                                     ? GizmoVisibility.On
                                                     : GizmoVisibility.Off;
             }
@@ -214,11 +229,11 @@ internal sealed class OutputWindow : Window
         }
 
         // Gizmo Transform mode
-        if (_evaluationContext.ShowGizmos != GizmoVisibility.Off)
+        if (EvaluationContext.ShowGizmos != GizmoVisibility.Off)
         {
             var size = Vector2.One * ImGui.GetFrameHeight(); // Calculate before pushing font
 
-            var icon = _evaluationContext.TransformGizmoMode switch
+            var icon = EvaluationContext.TransformGizmoMode switch
                            {
                                TransformGizmoModes.None   => "" + (char)Icon.Hidden,
                                TransformGizmoModes.Select => "" + (char)Icon.Pipette,
@@ -237,20 +252,20 @@ internal sealed class OutputWindow : Window
 
             if (ImGui.BeginPopup("_TransformGizmoSelection"))
             {
-                if (CustomComponents.DrawMenuItem((int)Icon.Move, "Move", isChecked: _evaluationContext.TransformGizmoMode == TransformGizmoModes.Move))
+                if (CustomComponents.DrawMenuItem((int)Icon.Move, "Move", isChecked: EvaluationContext.TransformGizmoMode == TransformGizmoModes.Move))
                 {
-                    _evaluationContext.TransformGizmoMode = TransformGizmoModes.Move;
+                    EvaluationContext.TransformGizmoMode = TransformGizmoModes.Move;
                 }
 
                 if (CustomComponents.DrawMenuItem((int)Icon.Rotate, "Rotate",
-                                                  isChecked: _evaluationContext.TransformGizmoMode == TransformGizmoModes.Rotate))
+                                                  isChecked: EvaluationContext.TransformGizmoMode == TransformGizmoModes.Rotate))
                 {
-                    _evaluationContext.TransformGizmoMode = TransformGizmoModes.Rotate;
+                    EvaluationContext.TransformGizmoMode = TransformGizmoModes.Rotate;
                 }
 
-                if (CustomComponents.DrawMenuItem((int)Icon.Scale, "Scale", isChecked: _evaluationContext.TransformGizmoMode == TransformGizmoModes.Scale))
+                if (CustomComponents.DrawMenuItem((int)Icon.Scale, "Scale", isChecked: EvaluationContext.TransformGizmoMode == TransformGizmoModes.Scale))
                 {
-                    _evaluationContext.TransformGizmoMode = TransformGizmoModes.Scale;
+                    EvaluationContext.TransformGizmoMode = TransformGizmoModes.Scale;
                 }
 
                 ImGui.EndPopup();
@@ -359,12 +374,11 @@ internal sealed class OutputWindow : Window
     }
 
     /// <summary>
-    /// Update content with an <see cref="EvaluationContext"/> and use the DrawImplementation for the given type to draw it. 
+    /// Update content with an <see cref="Core.Operator.EvaluationContext"/> and use the DrawImplementation for the given type to draw it. 
     /// </summary>
     private Type? UpdateAndDrawOutput(Instance? instanceForOutput, Instance?instanceForEvaluation = null)
     {
-        if (instanceForEvaluation == null)
-            instanceForEvaluation = instanceForOutput;
+        instanceForEvaluation ??= instanceForOutput;
 
         if (instanceForEvaluation == null || instanceForEvaluation.Outputs.Count <= 0)
             return null;
@@ -382,17 +396,17 @@ internal sealed class OutputWindow : Window
         }
 
         // Prepare context
-        _evaluationContext.Reset();
-        _evaluationContext.BypassCameras = _camSelectionHandling.BypassCamera;
-        _evaluationContext.RequestedResolution = _selectedResolution.ComputeResolution();
+        EvaluationContext.Reset();
+        EvaluationContext.BypassCameras = _camSelectionHandling.BypassCamera;
+        EvaluationContext.RequestedResolution = _selectedResolution.ComputeResolution();
 
         // Set camera
         if (_camSelectionHandling.CameraForRendering != null)
         {
-            _evaluationContext.SetViewFromCamera(_camSelectionHandling.CameraForRendering);
+            EvaluationContext.SetViewFromCamera(_camSelectionHandling.CameraForRendering);
         }
 
-        _evaluationContext.BackgroundColor = _backgroundColor;
+        EvaluationContext.BackgroundColor = _backgroundColor;
 
         const string overrideSampleVariableName = "OverrideMotionBlurSamples";
 
@@ -402,12 +416,12 @@ internal sealed class OutputWindow : Window
             var samples = RenderSettings.Current.OverrideMotionBlurSamples;
             if (samples >= 0)
             {
-                _evaluationContext.IntVariables[overrideSampleVariableName] = samples;
+                EvaluationContext.IntVariables[overrideSampleVariableName] = samples;
             }
         }
         else
         {
-            _evaluationContext.IntVariables.Remove(overrideSampleVariableName);
+            EvaluationContext.IntVariables.Remove(overrideSampleVariableName);
         }
 
         // Ugly hack to hide final target
@@ -415,7 +429,7 @@ internal sealed class OutputWindow : Window
         {
             ImGui.BeginChild("hidden", Vector2.One);
             {
-                evaluatedOutputUi.DrawValue(evalOutput, _evaluationContext, Config.Title);
+                evaluatedOutputUi.DrawValue(evalOutput, EvaluationContext, Config.Title);
             }
             ImGui.EndChild();
 
@@ -429,12 +443,12 @@ internal sealed class OutputWindow : Window
                 return null;
 
             // Render!
-            viewOutputUi.DrawValue(viewOutput, _evaluationContext, Config.Title, recompute: false);
+            viewOutputUi.DrawValue(viewOutput, EvaluationContext, Config.Title, recompute: false);
             return viewOutputUi.Type;
         }
 
         // Render!
-        evaluatedOutputUi.DrawValue(evalOutput, _evaluationContext, Config.Title);
+        evaluatedOutputUi.DrawValue(evalOutput, EvaluationContext, Config.Title);
         return evalOutput.ValueType;
     }
 
@@ -451,7 +465,7 @@ internal sealed class OutputWindow : Window
     public ViewSelectionPinning Pinning { get; } = new();
 
     private System.Numerics.Vector4 _backgroundColor = new(0.1f, 0.1f, 0.1f, 1.0f);
-    private readonly EvaluationContext _evaluationContext = new();
+    internal readonly EvaluationContext EvaluationContext = new();
     private readonly ImageOutputCanvas _imageCanvas = new();
     private readonly CameraSelectionHandling _camSelectionHandling;
     private static int _instanceCounter;

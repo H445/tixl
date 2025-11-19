@@ -1,18 +1,12 @@
 ﻿#nullable enable
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using T3.Core.UserData;
-using T3.Editor.Gui;
-using T3.Editor.Gui.Interaction;
-using T3.Editor.Gui.MagGraph.Ui;
 using T3.Editor.Gui.Window;
 using T3.Editor.Gui.UiHelpers;
-using T3.Editor.Gui.Windows.Layouts;
 using T3.Editor.Gui.Windows.Output;
 using T3.Editor.SkillQuest.Data;
 using T3.Editor.UiModel;
 using T3.Editor.UiModel.ProjectHandling;
-using T3.Serialization;
 
 namespace T3.Editor.SkillQuest;
 
@@ -28,14 +22,44 @@ internal static partial class SkillManager
 
     internal static void Update()
     {
-        var playmodeEnded = _context.GraphView is { Destroyed: true };
-        if (_stateMachine.CurrentState != SkillQuestStates.Inactive && playmodeEnded)
+        var playmodeEnded = _context.ProjectView?.GraphView is { Destroyed: true };
+        if (_context.StateMachine.CurrentState != SkillQuestStates.Inactive && playmodeEnded)
         {
-            _stateMachine.SetState(SkillQuestStates.Inactive, _context);
+            _context.StateMachine.SetState(SkillQuestStates.Inactive, _context);
         }
 
-        _stateMachine.UpdateAfterDraw(_context);
+        _context.StateMachine.UpdateAfterDraw(_context);
     }
+
+    /// <summary>
+    /// This is called after processing of a frame and can be used to access the output evaluation context
+    /// </summary>
+    public static void PostUpdate()
+    {
+        
+        if (_context.StateMachine.CurrentState != SkillQuestStates.Playing)
+            return;
+
+        if (!OutputWindow.TryGetPrimaryOutputWindow(out var outputWindow))
+        {
+            Log.Warning("Can't find output window for playmode?!");
+            return;
+        }
+
+        if (!outputWindow.EvaluationContext.FloatVariables.TryGetValue(PlayModeProgressVariableId, out var progress))
+        {
+            Log.Warning($"Can't find progress variable '{PlayModeProgressVariableId}' after evaluation?");
+            return;
+        }
+
+        if (_context.StateMachine.StateTime > 1 && progress >= 1.0f)
+        {
+            ExitPlayMode();
+        }
+    }
+
+
+    private const string PlayModeProgressVariableId = "_PlayModeProgress";
 
     private static void InitializeLevels()
     {
@@ -67,7 +91,7 @@ internal static partial class SkillManager
         return true;
     }
 
-    public static bool TryGetSkillsProject([NotNullWhen(true)] out EditableSymbolProject? skillProject)
+    private static bool TryGetSkillsProject([NotNullWhen(true)] out EditableSymbolProject? skillProject)
     {
         skillProject = null;
         foreach (var p in EditableSymbolProject.AllProjects)
@@ -82,7 +106,7 @@ internal static partial class SkillManager
         return false;
     }
 
-    public static void StartGame(GraphWindow graphWindow, QuestLevel activeLevel)
+    public static void StartPlayMode(GraphWindow graphWindow, QuestLevel activeLevel)
     {
         if (!TryGetSkillsProject(out var skillProject))
             return;
@@ -99,14 +123,33 @@ internal static partial class SkillManager
         graphWindow.TrySetToProject(openedProject);
         _context.OpenedProject = openedProject;
 
-        if (graphWindow.ProjectView?.GraphView is not MagGraphView magGraphView)
-            return;
+        // if (graphWindow.ProjectView?.GraphView is not MagGraphView magGraphView)
+        //     return;
 
-        _context.GraphView = magGraphView;
-
-        _stateMachine.SetState(SkillQuestStates.Playing, _context);
+        _context.ProjectView = graphWindow.ProjectView;
+        _context.StateMachine.SetState(SkillQuestStates.Playing, _context);
     }
 
-    private static readonly SkillQuestContext _context = new();
-    private static readonly StateMachine<SkillQuestContext> _stateMachine = new(SkillQuestStates.Inactive);
+    private static void ExitPlayMode()
+    {
+        Debug.Assert(_context.OpenedProject != null);
+        
+        if(!_context.OpenedProject.Package.SymbolUis.TryGetValue(_context.OpenedProject.Package.HomeSymbolId, out var homeSymbolId))
+        {
+            Log.Warning($"Can't find symbol to revert changes?");
+            return;
+        }
+        _context.ProjectView?.Close();
+        _context.OpenedProject.Package.Reload(homeSymbolId);
+        _context.StateMachine.SetState(SkillQuestStates.Inactive, _context);
+    }
+
+    
+    private static readonly SkillQuestContext _context = new()
+                                                             {
+                                                                 StateMachine = new
+                                                                     StateMachine<SkillQuestContext>(typeof(SkillQuestStates),
+                                                                                                     SkillQuestStates.Inactive
+                                                                                                    ),
+                                                             };
 }

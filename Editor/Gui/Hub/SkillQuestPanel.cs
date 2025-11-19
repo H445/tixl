@@ -46,7 +46,7 @@ internal static class SkillQuestPanel
                     ImGui.SameLine(0, 10);
                     if (ImGui.Button("Start"))
                     {
-                        SkillManager.StartGame(window, activeLevel);
+                        SkillManager.StartPlayMode(window, activeLevel);
                     }
                 }
                 ImGui.EndChild();
