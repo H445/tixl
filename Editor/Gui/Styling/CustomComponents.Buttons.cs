@@ -100,6 +100,14 @@ internal static partial class CustomComponents
         return modified;
     }
 
+    public static bool TransparentIconButton(Icon icon, Vector2 size, ButtonStates state = ButtonStates.Normal)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Button, Color.Transparent.Rgba);
+        var result = IconButton(icon, size, state);
+        ImGui.PopStyleColor();
+        return result;
+    }
+    
     public static bool IconButton(Icon icon, Vector2 size, ButtonStates state = ButtonStates.Normal)
     {
         if (size == Vector2.Zero)

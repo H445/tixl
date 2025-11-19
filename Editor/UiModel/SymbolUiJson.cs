@@ -7,6 +7,7 @@ using T3.Core.Model;
 using T3.Core.Operator;
 using T3.Editor.Gui.OutputUi;
 using T3.Editor.UiModel.InputsAndTypes;
+using T3.Editor.UiModel.Selection;
 using T3.Serialization;
 
 // ReSharper disable AssignNullToNotNullAttribute
@@ -33,6 +34,7 @@ internal static class SymbolUiJson
             WriteOutputUis(symbolUi, writer);
             WriteAnnotations(symbolUi, writer);
             WriteLinks(symbolUi, writer);
+            WriteTourPoints(symbolUi, writer);
             writer.WriteEndObject();
         }
         catch (Exception e)
@@ -199,6 +201,30 @@ internal static class SymbolUiJson
         writer.WriteEndArray();
     }
 
+    private static void WriteTourPoints(SymbolUi symbolUi, JsonTextWriter writer)
+    {
+        if (symbolUi.TourPoints.Count == 0)
+            return;
+
+        writer.WritePropertyName(JsonKeys.TourPoints);
+        writer.WriteStartArray();
+
+        foreach (var tourPoint in symbolUi.TourPoints)
+        {
+            writer.WriteStartObject();
+            writer.WriteObject(JsonKeys.Id, tourPoint.Id.ToString());
+            writer.WriteObject(JsonKeys.ChildId, tourPoint.ChildId.ToString());
+            writer.WriteObject(JsonKeys.Title, tourPoint.Title ?? string.Empty);
+            
+            if(tourPoint.Style != TourPoint.Styles.Comment)
+                writer.WriteObject(JsonKeys.Style, tourPoint.Style);
+            
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+    }
+    
     internal static bool TryReadSymbolUiExternal(JToken mainObject, Symbol symbol, [NotNullWhen(true)] out SymbolUi? symbolUi)
     {
         symbolUi = null;
@@ -282,6 +308,7 @@ internal static class SymbolUiJson
 
         var annotationDict = ReadAnnotations(mainObject);
         var linksDict = ReadLinks(mainObject);
+        var tourPoints = ReadTourPoints(mainObject);
 
         IEnumerable<JToken> symbolChildUiJsonEnumerable;
         if (TryGetJArray(JsonKeys.SymbolChildUis, mainObject, symbol, out var symbolChildUiJson))
@@ -299,6 +326,7 @@ internal static class SymbolUiJson
                                 outputs: outputDict,
                                 annotations: annotationDict,
                                 links: linksDict,
+                                tourPoints: tourPoints,
                                 updateConsistency: false);
 
         var descriptionEntry = mainObject[JsonKeys.Description];
@@ -492,6 +520,44 @@ internal static class SymbolUiJson
         return linkDict;
     }
 
+    
+    private static List<TourPoint> ReadTourPoints(JToken token)
+    {
+        var tourPoints = new List<TourPoint>();
+
+        var tourPointsToken = token[JsonKeys.TourPoints];
+        if (tourPointsToken is not JArray tourPointsArray)
+            return tourPoints;
+
+        foreach (var tourPointEntry in tourPointsArray)
+        {
+            if (!Enum.TryParse<TourPoint.Styles>(tourPointEntry[JsonKeys.Style]?.Value<string>(), out var style))
+                style = TourPoint.Styles.Comment;
+
+            if (!JsonUtils.TryGetGuid(tourPointEntry[JsonKeys.Id], out var id))
+            {
+                Log.Warning("Skipping tour point with missing or invalid id");
+                continue;
+            }
+
+            if (!JsonUtils.TryGetGuid(tourPointEntry[JsonKeys.ChildId], out var childId))
+            {
+                Log.Warning("Skipping tour point with missing or invalid id");
+                continue;
+            }
+
+            tourPoints.Add(new TourPoint
+                               {
+                                   Id = id,
+                                   ChildId = childId,
+                                   Title = tourPointEntry[JsonKeys.Title]?.Value<string>() ?? string.Empty,
+                                   Style = style,
+                               });
+        }
+
+        return tourPoints;
+    }
+    
     internal static Vector2 GetVec2OrDefault(JToken? token)
     {
         return token == null ? default : (Vector2)_jsonToVector2(token);
@@ -520,6 +586,7 @@ internal static class SymbolUiJson
         public const string LinkType = nameof(LinkType);
         public const string LinkUrl = nameof(LinkUrl);
         public const string SymbolTags = nameof(SymbolTags);
+        public const string TourPoints = nameof(TourPoints);
     }
 
     private static readonly Func<JToken, object> _jsonToVector2 = JsonToTypeValueConverters.Entries[typeof(Vector2)];

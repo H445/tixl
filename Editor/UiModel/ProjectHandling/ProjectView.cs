@@ -143,7 +143,7 @@ internal sealed partial class ProjectView
                 var parentSymbolId = composition.Instance.Parent.Symbol.Id;
                 _duplicateSymbolDialog.ShowNextFrame(); // actually shows this frame
                 _duplicateSymbolDialog.Draw(symbolGuid: parentSymbolId,
-                                            selectedChildUis: [symbolChildUi],
+                                            selectedChildUis2: [symbolChildUi],
                                             nameSpace: ref _dupeReadonlyNamespace,
                                             newTypeName: ref _dupeReadonlyName,
                                             description: ref _dupeReadonlyDescription,

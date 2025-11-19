@@ -298,11 +298,14 @@ internal sealed class GraphWindow : Windows.Window
         }
         drawList.ChannelsMerge();
 
-        if (ProjectView?.InstView != null)
-            _editDescriptionDialog.Draw(ProjectView.InstView.Symbol);
+        // if (ProjectView?.InstView != null)
+        //     _editDescriptionDialog.Draw(ProjectView.InstView.Symbol);
+        //
+
     }
     #endregion
 
     private IGraphView? GraphCanvas => ProjectView?.GraphView;
-    private static readonly EditSymbolDescriptionDialog _editDescriptionDialog = new();
+    // private static readonly EditSymbolDescriptionDialog _editDescriptionDialog = new();
+    // private static readonly EditTourPointsDialog _editTourPointsDialog = new();
 }

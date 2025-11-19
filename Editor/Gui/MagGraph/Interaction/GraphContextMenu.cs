@@ -1,6 +1,7 @@
 ﻿using ImGuiNET;
 using T3.Core.DataTypes;
 using T3.Core.SystemUi;
+using T3.Editor.Gui.Graph.Dialogs;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.Interaction.Variations;
@@ -87,6 +88,12 @@ internal static class GraphContextMenu
         {
             context.EditCommentDialog.ShowNextFrame();
         }
+
+        if (ImGui.MenuItem("Edit Tour Points"))
+        {
+            EditTourPointsDialog.ShowNextFrame();
+        }
+
         
         if (ImGui.MenuItem("Align select left",
                            UserActions.AlignSelectionLeft.ListShortcuts(),

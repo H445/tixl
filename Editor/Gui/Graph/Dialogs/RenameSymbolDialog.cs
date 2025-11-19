@@ -11,10 +11,12 @@ namespace T3.Editor.Gui.Dialogs;
 
 internal sealed class RenameSymbolDialog : ModalDialog
 {
-    internal void Draw(List<SymbolUi.Child> selectedChildUis, ref string name)
+    internal void Draw(IEnumerable<SymbolUi.Child> selectedChildUis2, ref string name)
     {
         if (BeginDialog("Rename symbol"))
         {
+            var selectedChildUis = selectedChildUis2.ToList();
+            
             if (selectedChildUis.Count != 1)
             {
                 Log.Warning("Can't use RenameSymbolDialog without selected operator");

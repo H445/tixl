@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using T3.Core.Operator;
 using T3.Editor.Gui.Dialogs;
+using T3.Editor.Gui.Graph.Dialogs;
 using T3.Editor.Gui.MagGraph.Interaction;
 using T3.Editor.Gui.MagGraph.Model;
 using T3.Editor.Gui.MagGraph.Ui;
@@ -225,27 +226,29 @@ internal sealed class GraphUiContext
         
         if (projectView.CompositionInstance != null)
         {
-            var symbol = projectView.InstView!.Symbol;
+            var compositionSymbol = projectView.InstView!.Symbol;
             if (projectView.CompositionInstance != projectView.RootInstance 
-                && !symbol.SymbolPackage.IsReadOnly)
+                && !compositionSymbol.SymbolPackage.IsReadOnly)
             {
-                results |= AddInputDialog.Draw(symbol);
-                results |= AddOutputDialog.Draw(symbol);
+                results |= AddInputDialog.Draw(compositionSymbol);
+                results |= AddOutputDialog.Draw(compositionSymbol);
             }
             
-            results |= DuplicateSymbolDialog.Draw(symbol.Id, 
-                                                  projectView.NodeSelection.GetSelectedChildUis().ToList(), 
+            results |= DuplicateSymbolDialog.Draw(compositionSymbol.Id, 
+                                                  projectView.NodeSelection.GetSelectedChildUis(), 
                                                   ref NameSpaceForDialogEdits,
                                                   ref SymbolNameForDialogEdits,
                                                   ref SymbolDescriptionForDialog);
             
             
-            results |= CombineToSymbolDialog.Draw(symbol.Id, projectView,
+            results |= CombineToSymbolDialog.Draw(compositionSymbol.Id, projectView,
                                                   ref NameSpaceForDialogEdits,
                                                   ref SymbolNameForDialogEdits,
                                                   ref SymbolDescriptionForDialog);
             
-            RenameSymbolDialog.Draw(projectView.NodeSelection.GetSelectedChildUis().ToList(), 
+            results |= EditTourPointsDialog.Draw(compositionSymbol, projectView);
+            
+            RenameSymbolDialog.Draw(projectView.NodeSelection.GetSelectedChildUis(), 
                                              ref SymbolNameForDialogEdits);
             
             if(results != ChangeSymbol.SymbolModificationResults.Nothing)

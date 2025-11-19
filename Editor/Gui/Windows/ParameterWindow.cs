@@ -88,7 +88,9 @@ internal sealed class ParameterWindow : Window
         instance = null; //allow to unload of instance type in case a recompilation occurs
         
         // Draw dialogs
-        OperatorHelp.EditDescriptionDialog.Draw(symbol); // TODO: This is probably not required...
+        OperatorHelp.EditDescriptionDialog.Draw(symbol); 
+        
+        
         RenameInputDialog.Draw();
 
         if (!symbol.TryGetOrCreateInstance(path, parentSymbol, out instance))

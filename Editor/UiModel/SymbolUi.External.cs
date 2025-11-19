@@ -1,6 +1,7 @@
 using T3.Core.Operator;
 using T3.Editor.Gui.OutputUi;
 using T3.Editor.UiModel.InputsAndTypes;
+using T3.Editor.UiModel.Selection;
 
 namespace T3.Editor.UiModel;
 
@@ -121,7 +122,13 @@ public sealed partial class SymbolUi
             var clonedLink = link.Clone();
             links.Add(clonedLink.Id, clonedLink);
         }
+        
+        var tourPoints = new List<TourPoint>(TourPoints.Count);
+        foreach (var tp in TourPoints)
+        {
+            tourPoints.Add(tp.Clone());
+        }
 
-        return new SymbolUi(newSymbol, _ => [], inputUis, outputUis, annotations, links, hasIdMap);
+        return new SymbolUi(newSymbol, _ => [], inputUis, outputUis, annotations, links, tourPoints, hasIdMap);
     }
 }
