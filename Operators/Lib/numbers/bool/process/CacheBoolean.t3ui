@@ -9,32 +9,10 @@
         "X": -200.0,
         "Y": 0.0
       }
-    },
-    {
-      "InputId": "6ad5037f-09b2-4fb5-b23b-5ea9d341ee6f"/*Mode*/,
-      "Position": {
-        "X": -200.0,
-        "Y": 225.0
-      }
-    },
-    {
-      "InputId": "d8004f81-346f-44b2-8900-d8b12efd37cf"/*Freeze*/,
-      "Relevancy": "Relevant",
-      "Position": {
-        "X": -200.0,
-        "Y": 180.0
-      }
     }
   ],
   "SymbolChildUis": [],
   "OutputUis": [
-    {
-      "OutputId": "6bf9a717-8043-4d56-a1d6-a82dc410ddb4"/*TimeSinceFreeze*/,
-      "Position": {
-        "X": 0.0,
-        "Y": 200.0
-      }
-    },
     {
       "OutputId": "b0fa6fed-3478-493a-98b8-f4e680dc936e"/*Result*/,
       "Position": {
