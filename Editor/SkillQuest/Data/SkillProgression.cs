@@ -6,19 +6,6 @@ using T3.Serialization;
 
 namespace T3.Editor.SkillQuest.Data;
 
-// Maybe useful for later structuring
-// public sealed class QuestZone
-// {
-//     public string Title = string.Empty;
-//     public List<QuestTopic> Topics = [];
-//     
-//     
-//     public static List<QuestZone> CreateZones()
-//     {
-//
-//
-// }
-
 /// <summary>
 /// The state of the active user progress for serialization to settings.
 /// </summary>

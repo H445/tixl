@@ -1,0 +1,191 @@
+{
+  "Zones": [
+    {
+      "Id": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+      "Title": "_undefined",
+      "Topics": [
+        {
+          "Id": "6493fa07-2741-4712-b02f-e3f9e795b658",
+          "Title": "Welcome",
+          "Levels": [
+            {
+              "Title": "Welcome to the Skill Quest",
+              "SymbolId": "c0065a1d-091a-4fc4-ad36-4430b90d29d4"
+            },
+            {
+              "Title": "Stack Attack",
+              "SymbolId": "bd3f2fa7-48f7-4ca3-8c32-92fe0d9e3fff"
+            },
+            {
+              "Title": "Get outta there!",
+              "SymbolId": "468cafa2-d5ef-46f3-b0b7-626cdb0322cf"
+            },
+            {
+              "Title": "Take that value!",
+              "SymbolId": "123a1ff1-2935-4d9a-880f-897a7f8885ad"
+            },
+            {
+              "Title": "Speed it up!",
+              "SymbolId": "4f9eb54f-1b81-4a6b-a842-f80c423e5843"
+            },
+            {
+              "Title": "Welcome to the Skill Quest",
+              "SymbolId": "c0065a1d-091a-4fc4-ad36-4430b90d29d4"
+            },
+            {
+              "Title": "Stack Attack",
+              "SymbolId": "bd3f2fa7-48f7-4ca3-8c32-92fe0d9e3fff"
+            },
+            {
+              "Title": "Get outta there!",
+              "SymbolId": "468cafa2-d5ef-46f3-b0b7-626cdb0322cf"
+            },
+            {
+              "Title": "Take that value!",
+              "SymbolId": "123a1ff1-2935-4d9a-880f-897a7f8885ad"
+            },
+            {
+              "Title": "Speed it up!",
+              "SymbolId": "4f9eb54f-1b81-4a6b-a842-f80c423e5843"
+            },
+            {
+              "Title": "Welcome to the Skill Quest",
+              "SymbolId": "c0065a1d-091a-4fc4-ad36-4430b90d29d4"
+            },
+            {
+              "Title": "Stack Attack",
+              "SymbolId": "bd3f2fa7-48f7-4ca3-8c32-92fe0d9e3fff"
+            },
+            {
+              "Title": "Get outta there!",
+              "SymbolId": "468cafa2-d5ef-46f3-b0b7-626cdb0322cf"
+            },
+            {
+              "Title": "Take that value!",
+              "SymbolId": "123a1ff1-2935-4d9a-880f-897a7f8885ad"
+            },
+            {
+              "Title": "Speed it up!",
+              "SymbolId": "4f9eb54f-1b81-4a6b-a842-f80c423e5843"
+            }
+          ],
+          "MapCoordinate": {
+            "X": 0.0,
+            "Y": 0.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": "Skills.T001_Welcome",
+          "Type": null,
+          "Status": 0,
+          "Requirement": "None"
+        },
+        {
+          "Id": "c6ac02a0-1f33-401a-a9c4-d02ffa511300",
+          "Title": "New topic1",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 5.0,
+            "Y": -3.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "T3.Core.DataTypes.Texture2D, Core, Version=4.1.0.4, Culture=neutral, PublicKeyToken=null",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        },
+        {
+          "Id": "67b8faed-1e62-4518-8f71-bb9000a97c5d",
+          "Title": "New topic1",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 4.0,
+            "Y": 3.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "T3.Core.DataTypes.Texture2D, Core, Version=4.1.0.4, Culture=neutral, PublicKeyToken=null",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        },
+        {
+          "Id": "2195b88c-bbe2-4adf-9862-c54c9ae53d37",
+          "Title": "New topic3",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 8.0,
+            "Y": -1.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "T3.Core.DataTypes.Texture2D, Core, Version=4.1.0.4, Culture=neutral, PublicKeyToken=null",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        },
+        {
+          "Id": "66c465a3-33cf-4336-9209-4861c14d27f2",
+          "Title": "New topic3",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 7.0,
+            "Y": -1.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "T3.Core.DataTypes.Texture2D, Core, Version=4.1.0.4, Culture=neutral, PublicKeyToken=null",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        },
+        {
+          "Id": "c6784323-b93b-4702-9a96-9bbd3f279218",
+          "Title": "Working with strings",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 6.0,
+            "Y": 2.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "System.String, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        },
+        {
+          "Id": "59419077-5868-421b-bcb0-39361ba2ecc9",
+          "Title": "New topic6",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 7.0,
+            "Y": 2.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "System.String, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        },
+        {
+          "Id": "9f4b6aa3-6af6-40a1-b44a-0a1908155364",
+          "Title": "Flow Graph",
+          "Levels": [],
+          "MapCoordinate": {
+            "X": 7.0,
+            "Y": 4.0
+          },
+          "ZoneId": "717505b4-0c6e-4708-85d8-54e202f9bbdf",
+          "UnlocksTopics": [],
+          "Namespace": null,
+          "Type": "T3.Core.DataTypes.Command, Core, Version=4.1.0.4, Culture=neutral, PublicKeyToken=null",
+          "Status": 1,
+          "Requirement": "AllInputPaths"
+        }
+      ]
+    }
+  ]
+}

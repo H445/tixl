@@ -383,14 +383,14 @@ internal sealed partial class MagGraphView
         var gridSize = Vector2.One * minSize;
         var maxOpacity = 0.25f;
 
-        var fineGrid = MathUtils.RemapAndClamp(Scale.X, 0.5f, 2f, 0.0f, maxOpacity);
+        var fineGrid = Scale.X.RemapAndClamp(0.5f, 2f, 0.0f, maxOpacity);
         if (fineGrid > 0.01f)
         {
             var color = UiColors.CanvasGrid.Fade(fineGrid);
             DrawBackgroundGrid(drawList, gridSize, color);
         }
 
-        var roughGrid = MathUtils.RemapAndClamp(Scale.X, 0.1f, 2f, 0.0f, maxOpacity);
+        var roughGrid = Scale.X.RemapAndClamp(0.1f, 2f, 0.0f, maxOpacity);
         if (roughGrid > 0.01f)
         {
             var color = UiColors.CanvasGrid.Fade(roughGrid);

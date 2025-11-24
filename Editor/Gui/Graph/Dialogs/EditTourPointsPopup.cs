@@ -11,7 +11,7 @@ using T3.Editor.UiModel.Selection;
 
 namespace T3.Editor.Gui.Graph.Dialogs;
 
-internal static class EditTourPointsDialog
+internal static class EditTourPointsPopup
 {
     private static bool _isOpen;
 

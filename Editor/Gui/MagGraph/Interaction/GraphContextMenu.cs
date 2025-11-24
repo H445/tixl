@@ -90,7 +90,7 @@ internal static class GraphContextMenu
 
         if (ImGui.MenuItem("Edit Tour Points"))
         {
-            EditTourPointsDialog.ShowNextFrame();
+            EditTourPointsPopup.ShowNextFrame();
         }
 
         

@@ -9,7 +9,6 @@ namespace T3.Editor.SkillQuest;
 
 internal sealed class SkillQuestContext // can't be generic because it's used for generic state
 {
-    internal static List<QuestTopic> Topics=[];
     internal OpenedProject? OpenedProject;
     internal UiState.UiElementsVisibility? PreviousUiState;
     //internal MagGraphView? GraphView;

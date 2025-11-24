@@ -396,7 +396,7 @@ internal static class FormInputs
         if (!modified && wasNull)
             value = null!;  // Support legacy calls 
 
-        if (autoFocus && ImGui.IsWindowAppearing())
+        if (autoFocus)
         {
             // Todo - how the hell do you make this not select the entire text?
             ImGui.SetKeyboardFocusHere(-1);

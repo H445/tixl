@@ -21,8 +21,10 @@ internal static partial class SkillManager
 {
     internal static void Initialize()
     {
-        InitializeLevels();
         SkillProgression.LoadUserData();
+        
+        SkillMap.Load();
+        InitializeSkillMapFromLevelSymbols();
         UpdateActiveTopicAndLevel();
     }
 
@@ -163,8 +165,8 @@ internal static partial class SkillManager
 
     private static void InitializeLevels()
     {
-        //SkillQuestContext.Topics = CreateMockLevelStructure();
-        SkillQuestContext.Topics = CreateLevelStructureFromSymbols();
+        //SkillMap.Data.Topics = CreateMockLevelStructure();
+
     }
 
     /// <summary>
@@ -172,14 +174,18 @@ internal static partial class SkillManager
     /// </summary>
     internal static bool UpdateActiveTopicAndLevel()
     {
-        if (SkillQuestContext.Topics.Count == 0)
+        if (SkillMap.Data.Zones.Count == 0)
             return false;
 
         if (!SkillProgression.TryGetLastResult(out var lastResult)
-            || !TryGetTopicAndLevelForResult(lastResult, out var lastCompletedTopic, out var lastCompletedLevel))
+            || !TryGetTopicAndLevelForResult(lastResult,
+                                             out var lastCompletedZone,
+                                             out var lastCompletedTopic, 
+                                             out var lastCompletedLevel))
         {
-            _context.ActiveTopic = SkillQuestContext.Topics[0];
-            if (_context.ActiveTopic.Levels.Count == 0)
+            // Start with the first topic and first zone
+            _context.ActiveTopic = SkillMap.AllTopics.FirstOrDefault();
+            if (_context.ActiveTopic == null || _context.ActiveTopic.Levels.Count == 0)
             {
                 return false;
             }
@@ -200,45 +206,55 @@ internal static partial class SkillManager
             return true;
         }
 
-        // TODO: For properly advancing between topic we will need more logic and interactions later...
-        var topicIndex = SkillQuestContext.Topics.IndexOf(lastCompletedTopic);
-        var hasMoreTopics = topicIndex < SkillQuestContext.Topics.Count - 1;
-        if (hasMoreTopics)
-        {
-            _context.ActiveTopic = SkillQuestContext.Topics[topicIndex + 1];
-            _context.ActiveLevel = _context.ActiveTopic.Levels[0];
-            return true;
-        }
 
-        // Restart from the beginning...
-        _context.ActiveTopic = SkillQuestContext.Topics[0];
-        _context.ActiveLevel = _context.ActiveTopic.Levels[0];
+        Debug.Assert(false);
+        
+        return false;
+        // TODO: For properly advancing between topic we will need more logic and interactions later...
+        // var topicIndex = SkillMap.Data.Topics.IndexOf(lastCompletedTopic);
+        // var hasMoreTopics = topicIndex < SkillMap.Data.Topics.Count - 1;
+        // if (hasMoreTopics)
+        // {
+        //     _context.ActiveTopic = SkillMap.Data.Topics[topicIndex + 1];
+        //     _context.ActiveLevel = _context.ActiveTopic.Levels[0];
+        //     return true;
+        // }
+        //
+        // // Restart from the beginning...
+        // _context.ActiveTopic = SkillMap.Data.Topics[0];
+        // _context.ActiveLevel = _context.ActiveTopic.Levels[0];
         return true;
     }
 
     private static bool TryGetTopicAndLevelForResult(SkillProgression.LevelResult result,
+                                                     [NotNullWhen(true)] out QuestZone? zone,
                                                      [NotNullWhen(true)] out QuestTopic? topic,
                                                      [NotNullWhen(true)] out QuestLevel? level)
     {
+        zone = null;
         topic = null;
         level = null;
 
-        foreach (var t in SkillQuestContext.Topics)
+        foreach (var z in SkillMap.Data.Zones)
         {
-            if (t.Id != result.TopicId)
-                continue;
-
-            foreach (var l in t.Levels)
+            foreach (var t in z.Topics)
             {
-                if (l.SymbolId == result.LevelSymbolId)
-                {
-                    topic = t;
-                    level = l;
-                    return true;
-                }
-            }
+                if (t.Id != result.TopicId)
+                    continue;
 
-            return false;
+                foreach (var l in t.Levels)
+                {
+                    if (l.SymbolId == result.LevelSymbolId)
+                    {
+                        zone = z;
+                        topic = t;
+                        level = l;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
         }
 
         return false;

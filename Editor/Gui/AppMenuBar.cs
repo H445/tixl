@@ -14,6 +14,7 @@ using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.UiHelpers.Wiki;
 using T3.Editor.Gui.Windows;
 using T3.Editor.Gui.Windows.Layouts;
+using T3.Editor.SkillQuest.Data;
 using T3.Editor.UiModel;
 using T3.Editor.UiModel.Commands;
 using T3.Editor.UiModel.ProjectHandling;
@@ -307,6 +308,11 @@ internal static class AppMenuBar
 
                 if (ImGui.BeginMenu("Debug"))
                 {
+                    if (ImGui.MenuItem("Skill map"))
+                    {
+                        SkillMapPopup.ShowNextFrame();
+                    }
+                    
                     if (ImGui.MenuItem("ImGUI Demo", "", WindowManager.DemoWindowVisible))
                         WindowManager.DemoWindowVisible = !WindowManager.DemoWindowVisible;
 

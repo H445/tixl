@@ -19,9 +19,9 @@ namespace T3.Editor.Gui.Interaction;
 /// Other canvas should not inherit from this but use composition.
 /// IScalableCanvas should be removed
 /// </todo>
-public abstract partial class ScalableCanvas
+public partial class ScalableCanvas
 {
-    protected ScalableCanvas(Vector2? initialScale = null)
+    public ScalableCanvas(Vector2? initialScale = null)
     {
         if (initialScale == null)
             return;
@@ -447,7 +447,7 @@ public abstract partial class ScalableCanvas
 
     public bool EnableParentZoom { get; set; } = true;
 
-    protected abstract ScalableCanvas? Parent { get; }
+    protected virtual ScalableCanvas? Parent { get; }
 
     public readonly record struct InteractionState(bool UserPannedCanvas, bool UserZoomedCanvas, MouseState MouseState);
 

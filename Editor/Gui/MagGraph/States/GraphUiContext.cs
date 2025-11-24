@@ -246,7 +246,7 @@ internal sealed class GraphUiContext
                                                   ref SymbolNameForDialogEdits,
                                                   ref SymbolDescriptionForDialog);
             
-            results |= EditTourPointsDialog.Draw(compositionSymbol, projectView);
+            results |= EditTourPointsPopup.Draw(compositionSymbol, projectView);
             
             RenameSymbolDialog.Draw(projectView.NodeSelection.GetSelectedChildUis(), 
                                              ref SymbolNameForDialogEdits);

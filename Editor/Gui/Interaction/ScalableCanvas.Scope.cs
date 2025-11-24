@@ -11,7 +11,7 @@ namespace T3.Editor.Gui.Interaction;
 /// is not available when the transition is requested (e.g. because the Window has not been initialized
 /// yet or is not open). 
 /// </remarks>
-public abstract partial class ScalableCanvas
+public partial class ScalableCanvas
 {
     public CanvasScope GetTargetScope()
     {

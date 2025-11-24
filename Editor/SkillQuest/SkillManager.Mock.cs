@@ -6,12 +6,10 @@ namespace T3.Editor.SkillQuest;
 
 internal static partial class SkillManager
 {
-    private static List<QuestTopic> CreateLevelStructureFromSymbols()
+    private static void InitializeSkillMapFromLevelSymbols()
     {
         if (!TryGetSkillsProject(out var skills))
-            return [];
-
-        var topics = new List<QuestTopic>();
+            return;
 
         var lastNamespace = string.Empty;
         
@@ -30,19 +28,24 @@ internal static partial class SkillManager
                     lastTopic = topic;
                 }
 
-                var topicNamespace = RemovePrefix(symbol.Namespace.Split(".").Last());
+                if (!SkillMap.TryGetTopicWithNamespace(symbol.Namespace, out topic))
+                {
+                    topic = new QuestTopic
+                                {
+                                    Id = Guid.NewGuid(),
+                                    Title = RemovePrefix(symbol.Namespace.Split(".").Last()),
+                                    Levels = [],
+                                    UnlocksTopics = lastTopic != null ? [lastTopic.Id] : [],
+                                    Requirement = QuestTopic.Requirements.None,
+                                    ResultsForTopic = [],
+                                    Namespace = symbol.Namespace,
+                                    ZoneId = SkillMap.FallbackZone.Id,
+                                };
+                    SkillMap.FallbackZone.Topics.Add(topic);
+                }
                 
-                topic = new QuestTopic
-                            {
-                                Id = Guid.NewGuid(),
-                                Title = topicNamespace,
-                                Levels = [],
-                                PathsFromTopicIds = lastTopic != null ? [lastTopic.Id] : [],
-                                Requirement = QuestTopic.Requirements.None,
-                                ResultsForTopic = [],
-                            };
-                topics.Add(topic);
-                
+                // If we found a prefined topic with the given names, we can assume that it
+                // is already defined in the skill map.
                 
                 lastNamespace = symbol.Namespace;
             }
@@ -62,8 +65,6 @@ internal static partial class SkillManager
                                  });
 
         }
-        
-        return topics;
     }
 
     private static string RemovePrefix(string input)

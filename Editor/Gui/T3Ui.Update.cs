@@ -14,6 +14,7 @@ using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Windows.Layouts;
 using T3.Editor.Gui.Windows.RenderExport;
+using T3.Editor.SkillQuest.Data;
 using T3.Editor.UiModel;
 using T3.Editor.UiModel.ProjectHandling;
 using T3.Editor.UiModel.Selection;
@@ -47,6 +48,7 @@ public static partial class T3Ui
         ScreenshotWriter.Update();
         RenderProcess.Update();
         SkillQuest.SkillManager.Update();
+        SkillMapPopup.Draw();
 
         ResourceManager.RaiseFileWatchingEvents();
 
