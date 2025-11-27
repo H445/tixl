@@ -2,6 +2,7 @@
 
 using ImGuiNET;
 using T3.Editor.Gui.UiHelpers;
+using T3.Editor.Gui.Window;
 using T3.Editor.Skills.Data;
 using T3.Editor.Skills.Ui;
 using SkillTraining = T3.Editor.Skills.Training.SkillTraining;
@@ -10,7 +11,7 @@ namespace T3.Editor.Gui.Hub;
 
 internal static class SkillQuestPanel
 {
-    internal static void Draw(bool projectViewJustClosed)
+    internal static void Draw(GraphWindow window, bool projectViewJustClosed)
     {
         if (!UserSettings.Config.ShowSkillQuestInHub)
             return;
@@ -49,7 +50,9 @@ internal static class SkillQuestPanel
                            "An interactive journey from playful TiXL basics to advanced real-time graphics design.", 
                            () => ImGui.Dummy(new Vector2()), Height);
         
-        SkillProgressionUi.DrawContent(activeTopic, activeLevel, SkillProgressionUi.ContentModes.HubPanel);
+        SkillProgressionUi.DrawContent(activeTopic, activeLevel, SkillProgressionUi.ContentModes.HubPanel, ()=>{
+                                           SkillTraining.StartPlayModeFromHub(window);
+        });
         ContentPanel.End();
     }
 

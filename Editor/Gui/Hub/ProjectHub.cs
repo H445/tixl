@@ -9,6 +9,6 @@ internal static class ProjectHub
     {
         ProjectsPanel.Draw(window);
         ImGui.Separator();
-        SkillQuestPanel.Draw(reinitView);
+        SkillQuestPanel.Draw(window,reinitView);
     }
 }

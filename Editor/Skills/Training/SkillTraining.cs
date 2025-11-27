@@ -45,7 +45,7 @@ internal static partial class SkillTraining
         StartActiveLevel();
     }
 
-    private static void StartActiveLevel()
+    internal static void StartActiveLevel()
     {
         Debug.Assert(_context.GraphWindow != null);
         Debug.Assert(_context.ActiveTopic != null);
@@ -376,6 +376,8 @@ internal static partial class SkillTraining
     internal static void ExitPlayMode()
     {
         Debug.Assert(_context.OpenedProject != null);
+        if (_context.OpenedProject == null)
+            return;
 
         if (!_context.OpenedProject.Package.SymbolUis.TryGetValue(_context.OpenedProject.Package.HomeSymbolId, out var homeSymbolId))
         {
