@@ -37,6 +37,14 @@ internal static partial class SkillTraining
         StartActiveLevel();
     }
 
+    public static void StartTopic(QuestTopic topic)
+    {
+        SkillProgress.Data.ActiveTopicId = topic.Id;
+        SkillProgress.SaveUserData();
+        UpdateTopicStatesAndProgression();
+        StartActiveLevel();
+    }
+
     private static void StartActiveLevel()
     {
         Debug.Assert(_context.GraphWindow != null);
@@ -260,7 +268,7 @@ internal static partial class SkillTraining
                 continue;
             }
 
-            if (!someLevelsSkipped)
+            if (someLevelsSkipped)
             {
                 topic.ProgressionState = QuestTopic.ProgressStates.Passed;
                 continue;
@@ -456,6 +464,7 @@ internal static partial class SkillTraining
     public static void ResetProgress()
     {
         SkillProgress.Data.Results.Clear();
+        SkillProgress.Data.ActiveTopicId = SkillMapData.Data.Topics.Count >0 ? SkillMapData.Data.Topics[0].Id : Guid.Empty;
         SkillProgress.SaveUserData();
         UpdateTopicStatesAndProgression();
     }

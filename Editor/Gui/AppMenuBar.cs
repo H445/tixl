@@ -283,11 +283,13 @@ internal static class AppMenuBar
 
             if (ImGui.BeginMenu("Development Tools"))
             {
+                if (ImGui.MenuItem("Skill Map Editor"))
+                    SkillMapEditor.ShowNextFrame();
+                
                 if (ImGui.MenuItem("Tour Point Editor"))
                     EditTourPointsPopup.ShowNextFrame();
                 
-                if (ImGui.MenuItem("Skill Map Editor"))
-                    SkillMapEditor.ShowNextFrame();
+                ImGui.Separator();
                 
                 if (ImGui.BeginMenu("Clear shader cache"))
                 {

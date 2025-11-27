@@ -28,7 +28,7 @@ internal static class SkillMapPopup
             _showNextFrame = false;
         }
 
-        var popUpSize = new Vector2(800, 400) * T3Ui.UiScaleFactor;
+        var popUpSize = new Vector2(800, 600) * T3Ui.UiScaleFactor;
 
         // Center the popup in the main viewport
         var vp = ImGui.GetMainViewport();
@@ -50,7 +50,7 @@ internal static class SkillMapPopup
 
                 _topicSelection.Clear();
                 _topicSelection.Add(topic);
-                _mapCanvas.FocusToActiveTopics(_topicSelection, 400);
+                _mapCanvas.FocusTopics(_topicSelection, 400);
             }
             
             ImGui.BeginChild("Map", new Vector2(0, -10), false, ImGuiWindowFlags.NoBackground);

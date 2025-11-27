@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using ImGuiNET;
 using T3.Core.DataTypes;
+using T3.Core.DataTypes.Vector;
 using T3.Core.Utils;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
@@ -11,8 +12,10 @@ namespace T3.Editor.Skills.Ui;
 
 internal sealed class SkillMapCanvas : HexCanvas
 {
-    public bool DrawContent(HandleTopicInteraction? topicAction, out HexCanvas.Cell mouseCell, HashSet<QuestTopic> selection)
+    public bool DrawContent(HandleTopicInteraction? topicAction, out HexCanvas.Cell mouseCell, HashSet<QuestTopic>? selection=null)
     {
+        selection ??= _noSelection;
+        
         UpdateCanvas(out _);
 
         var dl = ImGui.GetWindowDrawList();
@@ -29,7 +32,9 @@ internal sealed class SkillMapCanvas : HexCanvas
         return isAnyItemHovered;
     }
 
-    public void FocusToActiveTopics(HashSet<QuestTopic> selection, float padding = 160)
+    private static readonly HashSet<QuestTopic> _noSelection = []; 
+
+    public void FocusTopics(HashSet<QuestTopic> selection, float padding = 160)
     {
         if (selection.Count == 0)
             return;
@@ -67,27 +72,7 @@ internal sealed class SkillMapCanvas : HexCanvas
         var posOnScreen = MapCoordsToScreenPos(topic.MapCoordinate);
         var radius = HexRadiusOnScreen;
 
-        var type = topic.TopicType switch
-                       {
-                           QuestTopic.TopicTypes.Image       => typeof(Texture2D),
-                           QuestTopic.TopicTypes.Numbers     => typeof(float),
-                           QuestTopic.TopicTypes.Command     => typeof(Command),
-                           QuestTopic.TopicTypes.String      => typeof(string),
-                           QuestTopic.TopicTypes.Gpu         => typeof(BufferWithViews),
-                           QuestTopic.TopicTypes.ShaderGraph => typeof(ShaderGraphNode),
-                           _                                 => throw new ArgumentOutOfRangeException()
-                       };
-
-        var unlockProgressFade = topic.ProgressionState switch
-                                     {
-                                         QuestTopic.ProgressStates.Upcoming  => 0.2f,
-                                         QuestTopic.ProgressStates.Locked  => 0.5f,
-                                         QuestTopic.ProgressStates.Completed => 0.8f,
-                                         QuestTopic.ProgressStates.Active    => 0.8f,
-                                         _                                   => 1f
-                                     };
-
-        var typeColor = TypeUiRegistry.GetTypeOrDefaultColor(type);
+        GetTopicColorAndStateFade(topic, out var typeColor, out var unlockProgressFade);
         var isHoveredFade = isHovered ? 1f : 0.9f;
         dl.AddNgonRotated(posOnScreen, radius * 0.95f, typeColor.Fade(isHoveredFade * unlockProgressFade));
 
@@ -144,6 +129,12 @@ internal sealed class SkillMapCanvas : HexCanvas
                 }
                 else if (topic.ProgressionState == QuestTopic.ProgressStates.Locked)
                 {
+                    Icons.DrawIconAtScreenPosition(Icon.Locked, (posOnScreen + new Vector2(-Icons.FontSize / 2, 25f * Scale.Y)).Floor(),
+                                                   dl,
+                                                   UiColors.ForegroundFull.Fade(0.4f * labelAlpha));
+                }
+                else if (topic.ProgressionState == QuestTopic.ProgressStates.Completed)
+                {
                     Icons.DrawIconAtScreenPosition(Icon.Checkmark, (posOnScreen + new Vector2(-Icons.FontSize / 2, 25f * Scale.Y)).Floor(),
                                                    dl,
                                                    UiColors.ForegroundFull.Fade(0.4f * labelAlpha));
@@ -153,7 +144,7 @@ internal sealed class SkillMapCanvas : HexCanvas
                     ImGui.PushFont(Scale.X < 0.6f ? Fonts.FontSmall : Fonts.FontNormal);
                     CustomImguiDraw.AddWrappedCenteredText(dl,
                                                            $"{topic.CompletedLevelCount} / {topic.Levels.Count}",
-                                                           posOnScreen + new Vector2(0, 35f * Scale.Y),
+                                                           posOnScreen + new Vector2(0, 25f * Scale.Y),
                                                            13, UiColors.ForegroundFull.Fade(labelAlpha));
                     ImGui.PopFont();
                 }
@@ -184,6 +175,30 @@ internal sealed class SkillMapCanvas : HexCanvas
 
         topicAction?.Invoke(topic, isSelected);
         return isHovered;
+    }
+
+    internal static void GetTopicColorAndStateFade(QuestTopic topic, out Color typeColor, out float unlockProgressFade)
+    {
+        var type = topic.TopicType switch
+                       {
+                           QuestTopic.TopicTypes.Image       => typeof(Texture2D),
+                           QuestTopic.TopicTypes.Numbers     => typeof(float),
+                           QuestTopic.TopicTypes.Command     => typeof(Command),
+                           QuestTopic.TopicTypes.String      => typeof(string),
+                           QuestTopic.TopicTypes.Gpu         => typeof(BufferWithViews),
+                           QuestTopic.TopicTypes.ShaderGraph => typeof(ShaderGraphNode),
+                           _                                 => throw new ArgumentOutOfRangeException()
+                       };
+        typeColor = TypeUiRegistry.GetTypeOrDefaultColor(type);
+
+        unlockProgressFade = topic.ProgressionState switch
+                                     {
+                                         QuestTopic.ProgressStates.Upcoming  => 0.2f,
+                                         QuestTopic.ProgressStates.Locked    => 0.5f,
+                                         QuestTopic.ProgressStates.Completed => 0.8f,
+                                         QuestTopic.ProgressStates.Active    => 0.8f,
+                                         _                                   => 1f
+                                     };
     }
 
     internal delegate void HandleTopicInteraction(QuestTopic topic, bool isSelected);

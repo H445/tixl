@@ -66,7 +66,7 @@ internal static class SkillMapEditor
                     if (_selectedTopics.Count == 0)
                     {
                         var tmp = new HashSet<QuestTopic>(SkillMapData.Data.Topics);
-                        _canvas.FocusToActiveTopics(tmp);
+                        _canvas.FocusTopics(tmp);
                     }
                 }
 

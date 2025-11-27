@@ -5,16 +5,7 @@
     {
       "Id": "0f40b82e-f22d-4119-9f9a-58f74e7ed42a"/*ImageQuiz*/,
       "SymbolId": "b1cb8864-0d51-4b7f-96eb-4c6267d4b216",
-      "InputValues": [
-        {
-          "Id": "cf267a38-5504-4d0c-b149-17bbe62c70cf"/*DifferenceRange*/,
-          "Type": "System.Numerics.Vector2",
-          "Value": {
-            "X": -0.302,
-            "Y": 0.05
-          }
-        }
-      ],
+      "InputValues": [],
       "Outputs": []
     },
     {
@@ -104,10 +95,16 @@
       "TargetSlotId": "372288fa-3794-47ba-9f91-59240513217a"
     },
     {
-      "SourceParentOrChildId": "599eefe1-05cf-4465-8cf0-10a4ad61e698",
-      "SourceSlotId": "fd3049aa-4c22-405b-b9b4-0a2474d0e377",
+      "SourceParentOrChildId": "6a7f6825-76e6-400d-ae86-a6ed877df10b",
+      "SourceSlotId": "e011dd8c-1b9c-458f-8960-e6c38e83ca74",
       "TargetParentOrChildId": "5b694ad8-2b4d-499c-8d74-5f2a21d0a82f",
       "TargetSlotId": "202340b4-0629-40a1-9399-0cda047df116"
+    },
+    {
+      "SourceParentOrChildId": "599eefe1-05cf-4465-8cf0-10a4ad61e698",
+      "SourceSlotId": "fd3049aa-4c22-405b-b9b4-0a2474d0e377",
+      "TargetParentOrChildId": "6a7f6825-76e6-400d-ae86-a6ed877df10b",
+      "TargetSlotId": "372288fa-3794-47ba-9f91-59240513217a"
     },
     {
       "SourceParentOrChildId": "33ff6766-9bef-44e5-ab97-64ed27fdc8cb",

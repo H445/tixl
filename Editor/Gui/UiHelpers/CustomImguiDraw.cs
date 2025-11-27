@@ -10,68 +10,86 @@ internal static class CustomImguiDraw
     private static readonly int[] _wrapLineIndices = new int[10];
 
     // The method now accepts a Span of ReadOnlySpans for the wrapped lines to avoid allocations
-    public static void AddWrappedCenteredText(ImDrawListPtr dl, string text, Vector2 position, int wrapCharCount, Color color, float verticalAlign = 0.5f)
+    public static void AddWrappedCenteredText(ImDrawListPtr dl,
+                                              string text,
+                                              Vector2 position,
+                                              int wrapCharCount,
+                                              Color color,
+                                              float verticalAlign = 0.5f)
     {
-        var textLength = text.Length;
-        var currentLineStart = 0;
-        var lineCount = 0;
+        var len = text.Length;
+        var current = 0;
+        var count = 0;
 
-        // Step 1: Calculate wrap indices
-        while (currentLineStart < textLength && lineCount < _wrapLineIndices.Length)
+        while (current < len && count < _wrapLineIndices.Length)
         {
-            var lineEnd = currentLineStart + wrapCharCount;
-
-            if (lineEnd > textLength)
+            var lineEnd = current + wrapCharCount;
+            if (lineEnd >= len)
             {
-                _wrapLineIndices[lineCount] = currentLineStart;
-                lineCount++;
+                _wrapLineIndices[count++] = current;
                 break;
             }
 
-            // Search backwards to find the last space or punctuation within the wrap length
-            var wrapPoint = (lineEnd - 1).ClampMin(0);
-            while (wrapPoint > 0 && wrapPoint > currentLineStart && !IsValidLineBreakCharacter(text[wrapPoint]))
+            var wrapPoint = lineEnd;
+
+            // search for a valid line break
+            var foundBreak = false;
+            for (var i = lineEnd; i > current; i--)
             {
-                wrapPoint--;
+                var c = text[i - 1]; // ← look at the preceding character
+
+                if (IsBreakChar(c))
+                {
+                    wrapPoint = i; // break AFTER this character
+                    foundBreak = true;
+                    break;
+                }
             }
 
-            if (wrapPoint == currentLineStart)
-            {
-                wrapPoint = lineEnd; // Force wrap at max length if no valid break found
-            }
+            // if no reasonable break found → hard wrap
+            if (!foundBreak)
+                wrapPoint = lineEnd;
 
-            _wrapLineIndices[lineCount] = currentLineStart;
-            currentLineStart = wrapPoint;
-            lineCount++;
+            _wrapLineIndices[count++] = current;
+            current = wrapPoint;
         }
 
-        // Step 2: Draw wrapped text centered horizontally and vertically
         var lineHeight = ImGui.GetTextLineHeight();
-        var totalHeight = lineHeight * lineCount;
-        var yStart = position.Y - totalHeight * verticalAlign; // Center vertically
+        var totalHeight = lineHeight * count;
+        var yStart = position.Y - totalHeight * verticalAlign;
 
-        for (var i = 0; i < lineCount; i++)
+        for (var i = 0; i < count; i++)
         {
-            // Calculate the slice for the line using the stored indices
-            var startIdx = _wrapLineIndices[i];
-            var endIdx = (i + 1 < lineCount) ? _wrapLineIndices[i + 1] : text.Length;
-            var lineSpan = text.AsSpan(startIdx, endIdx - startIdx); // Slice the original text
+            var start = _wrapLineIndices[i];
+            var end = (i + 1 < count) ? _wrapLineIndices[i + 1] : len;
 
-            var textWidth = ImGui.CalcTextSize(lineSpan).X;
-            var xStart = position.X - textWidth / 2.0f; // Center horizontally
+            var line = text.AsSpan(start, end - start);
 
-            // Draw the line at the correct position
-            dl.AddText(new Vector2(xStart, yStart + i * lineHeight), color, lineSpan);
+            var w = ImGui.CalcTextSize(line).X;
+            var xStart = position.X - w * 0.5f;
+
+            dl.AddText(new Vector2(xStart, yStart + i * lineHeight), color, line);
         }
 
         return;
 
-        bool IsValidLineBreakCharacter(char c)
+        // ---------------------------------------------------------
+        // local helper
+        // ---------------------------------------------------------
+        static bool IsBreakChar(char c)
         {
-            return char.IsWhiteSpace(c) || c == '-' || c == '.' || c == ',' || c == ';' || c == '!' || c == '?';
+            // break AFTER whitespace or punctuation
+            return char.IsWhiteSpace(c)
+                   || c == '-'
+                   || c == ','
+                   || c == '.'
+                   || c == ';'
+                   || c == ':'
+                   || c == '!'
+                   || c == '?';
         }
     }
-    
+
     private static readonly Vector2[] _pointsForNgon = new Vector2[MaxNgonCorners];
     private const int MaxNgonCorners = 8;
 

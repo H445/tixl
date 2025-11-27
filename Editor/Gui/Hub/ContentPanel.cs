@@ -14,6 +14,7 @@ internal static class ContentPanel
     {
         ImGui.BeginChild(title, new Vector2(0, height), false, ImGuiWindowFlags.NoBackground);
         ImGui.Indent(10 * T3Ui.UiScaleFactor);
+        FormInputs.AddVerticalSpace();
         FormInputs.AddSectionHeader(title);
         
         if (drawTools != null)
