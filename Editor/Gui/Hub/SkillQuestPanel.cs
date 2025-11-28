@@ -24,7 +24,7 @@ internal static class SkillQuestPanel
             return;
         }
         
-        if (projectViewJustClosed)
+        if (projectViewJustClosed || NeedsUpdate)
         {
             SkillProgressionUi.TopicSelection.Clear();
             if (activeTopic.ProgressionState == QuestTopic.ProgressStates.Completed)
@@ -47,6 +47,7 @@ internal static class SkillQuestPanel
             // Only selected active
             SkillProgressionUi.TopicSelection.Clear();
             SkillProgressionUi.TopicSelection.Add(activeTopic);
+            NeedsUpdate = false;
         }
         
         ContentPanel.Begin("Skill Quest", 
@@ -67,4 +68,5 @@ internal static class SkillQuestPanel
 
     //private static readonly HashSet<QuestTopic> _selectedTopic = [];
     private static readonly SkillMapCanvas _mapCanvas = new();
+    public static bool NeedsUpdate;
 }

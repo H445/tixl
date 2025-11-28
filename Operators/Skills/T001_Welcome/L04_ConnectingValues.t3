@@ -9,7 +9,7 @@
         {
           "Id": "e0f765f3-ac71-45c9-87a4-e9be3fa9a9a0"/*SpeedFactor*/,
           "Type": "System.Single",
-          "Value": 15.0
+          "Value": 10.0
         }
       ],
       "Outputs": []
@@ -17,13 +17,7 @@
     {
       "Id": "66fd6534-b49a-4f18-99ad-1e293e46b6a9"/*Time*/,
       "SymbolId": "b0d75f21-df33-460b-beab-d8c5e1f23e5e",
-      "InputValues": [
-        {
-          "Id": "e0f765f3-ac71-45c9-87a4-e9be3fa9a9a0"/*SpeedFactor*/,
-          "Type": "System.Single",
-          "Value": 15.0
-        }
-      ],
+      "InputValues": [],
       "Outputs": []
     },
     {

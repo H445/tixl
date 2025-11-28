@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using ImGuiNET;
 using T3.Core.Animation;
 using T3.Editor.Gui;
+using T3.Editor.Gui.Hub;
 using T3.Editor.Gui.Input;
 using T3.Editor.Gui.MagGraph.Interaction;
 using T3.Editor.Gui.MagGraph.Ui;
@@ -496,6 +497,7 @@ internal static partial class SkillTraining
         SkillProgress.Data.ActiveTopicId = SkillMapData.Data.Topics.Count >0 ? SkillMapData.Data.Topics[0].Id : Guid.Empty;
         SkillProgress.SaveUserData();
         UpdateTopicStatesAndProgression();
+        SkillQuestPanel.NeedsUpdate = true;
     }
 
     private static readonly Cache _cache = new();

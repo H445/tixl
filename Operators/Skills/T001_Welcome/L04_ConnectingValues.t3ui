@@ -6,7 +6,6 @@
   "SymbolChildUis": [
     {
       "ChildId": "32966f34-ef59-45ba-b1db-7443e68f1144"/*Time*/,
-      "AnnotationId": "83594797-3ae4-4ab8-8e04-56af86e881c4",
       "Position": {
         "X": 1153.381,
         "Y": 2196.268
@@ -21,7 +20,6 @@
     },
     {
       "ChildId": "75f735c0-5354-49b6-860b-518557023656"/*RoundedRect*/,
-      "AnnotationId": "83594797-3ae4-4ab8-8e04-56af86e881c4",
       "Position": {
         "X": 1293.381,
         "Y": 2161.268
@@ -55,7 +53,7 @@
     {
       "Id": "83594797-3ae4-4ab8-8e04-56af86e881c4",
       "Label": "Solution",
-      "Collapsed": "True",
+      "Collapsed": "False",
       "Color": {
         "X": 0.6,
         "Y": 0.6,
