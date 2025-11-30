@@ -48,13 +48,9 @@ float4 psMain(vsOutput psInput) : SV_TARGET
 
     float2 uv = psInput.texCoord;
 
-    float sourceAspectRatio = (float)TargetResolution.x / (float)TargetResolution.y;
+    float sourceAspectRatio = (float)OrgResolution.x / (float)OrgResolution.y;
 
-    float2 stretch = float2((float)OrgResolution.y / (float)TargetResolution.y, //
-                            (float)OrgResolution.x / (float)TargetResolution.x) *
-                     Stretch;
-
-    float2 divisions = float2(sourceAspectRatio / stretch.x, 1 / stretch.y) / Scale;
+    float2 divisions = float2(sourceAspectRatio / Stretch.x, 1 / Stretch.y) / Scale;
     float2 p = psInput.texCoord;
     float2 offset = Offset * float2(-1, 1); // translation on X will match the user's movement
     p += offset;
@@ -77,7 +73,11 @@ float4 psMain(vsOutput psInput) : SV_TARGET
 
     // float2 samplePos = (RepeatMode > 3.5) ? p
     //                                       : p + 0.5;
-    float2 samplePos = p + 0.5;
+
+    // float2 rescale = float2((float)OrgResolution.x / (float)TargetResolution.x, //
+    //                         (float)OrgResolution.y / (float)TargetResolution.y);
+
+    float2 samplePos = (p + 0.5);
 
     float4 imgColorForCel = ImageA.Sample(texSampler, samplePos);
     return imgColorForCel;
