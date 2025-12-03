@@ -88,7 +88,8 @@ internal sealed class MidiSysexOutput : Instance<MidiSysexOutput>
             // If the starting byte of the sysex string does not equal midi exclusive start
             if (_bytes.ElementAt(0) != 240)
             {
-                Log.Error($"Sysex String needs to start with midi exclusive start byte: F0", this);
+                _lastErrorMessage = "Sysex String needs to start with midi exclusive start byte: F0";
+                Log.Warning(_lastErrorMessage, this);
                 
                 // Set initialized so we do not loop
                 _initialized = true;
@@ -98,7 +99,8 @@ internal sealed class MidiSysexOutput : Instance<MidiSysexOutput>
             // If the end byte of the sysex string does not equal midi exclusive end
             if (_bytes.ElementAt(_bytes.Count-1) != 247)
             {
-                Log.Error($"Sysex String needs to end with midi exclusive end byte: F7", this);
+                _lastErrorMessage = "Sysex String needs to end with midi exclusive end byte: F7";
+                Log.Warning(_lastErrorMessage, this);
                 
                 // Set initialized so we do not loop
                 _initialized = true;
@@ -133,7 +135,8 @@ internal sealed class MidiSysexOutput : Instance<MidiSysexOutput>
             }
 
             _lastErrorMessage = !foundDevice ? $"Can't find MidiDevice {deviceName}" : null;
-
+            Log.Warning(_lastErrorMessage, this);
+            
             _initialized = true;
         }
     }
