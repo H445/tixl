@@ -3,12 +3,12 @@ using T3.Core.Utils;
 namespace Lib.flow.context;
 
 [Guid("7953f704-ebee-498b-8bdd-a2c201dfe278")]
-internal sealed class SetIntVariable : Instance<SetIntVariable>
+internal sealed class SetIntVar : Instance<SetIntVar>
 {
     [Output(Guid = "7d806685-4678-4dfc-9dbc-36fdfa0c7a59")]
     public readonly Slot<Command> Output = new();
 
-    public SetIntVariable()
+    public SetIntVar()
     {
         Output.UpdateAction += Update;
     }

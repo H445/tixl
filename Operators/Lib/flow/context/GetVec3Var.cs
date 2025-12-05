@@ -1,13 +1,13 @@
 namespace Lib.flow.context;
 
 [Guid("f21de2e1-6af8-4651-90a0-6c662bbb23af")]
-public sealed class GetVec3 : Instance<GetVec3>
+public sealed class GetVec3Var : Instance<GetVec3Var>
 ,ICustomDropdownHolder
 {
     [Output(Guid = "F26C6DFE-AFC5-4824-9580-92FF5CD8F086", DirtyFlagTrigger = DirtyFlagTrigger.Animated)]
     public readonly Slot<Vector3> Result = new();
 
-    public GetVec3()
+    public GetVec3Var()
     {
         Result.UpdateAction += Update;
     }

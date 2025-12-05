@@ -11,7 +11,7 @@
     },
     {
       "Id": "d8a9d923-232f-4cd4-9e24-fadbf40fe1d1"/*VariableName*/,
-      "DefaultValue": "someVec3"
+      "DefaultValue": "pos"
     }
   ],
   "Children": [],

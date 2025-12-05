@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using ImGuiNET;
 using T3.Core.Operator;
 using T3.Core.Operator.Slots;
@@ -8,7 +8,7 @@ using T3.Editor.Gui.UiHelpers;
 
 namespace T3.Editor.Gui.OpUis.UIs;
 
-internal static class GetIntVarUi
+internal static class SetVec3VarUi
 {
     private sealed class Binding : OpUiBinding
     {
@@ -16,12 +16,13 @@ internal static class GetIntVarUi
         {
             IsValid = AutoBind(instance);
         }
+        
+        [BindInput("E1034127-63C9-42ED-9BDD-D1BC054BD103")]
+        internal readonly InputSlot<Vector3> Value = null!;
 
-        [BindInput("d7662b65-f249-4887-a319-dc2cf7d192f2")]
+        [BindInput("0edf7837-4555-4e62-902f-930abf72e8b8")]
         internal readonly InputSlot<string> VariableName = null!;
 
-        [BindOutput("B306B216-630C-4611-90FD-52FF322EBD00")]
-        internal readonly Slot<int> Result = null!;
     }
 
     public static OpUi.CustomUiResult DrawChildUi(Instance instance,
@@ -36,21 +37,30 @@ internal static class GetIntVarUi
         if (!data.IsValid)
             return OpUi.CustomUiResult.PreventOpenSubGraph;
 
+        // Draw reference lines on hover
+        if (area.Contains(ImGui.GetMousePos()))
+        {
+            OpUi.DrawVariableReferences(drawList, canvas, area.GetCenter(), instance, data.VariableName.Value, 
+                                        Guid.Parse("f21de2e1-6af8-4651-90a0-6c662bbb23af"), 
+                                        Guid.Parse("d8a9d923-232f-4cd4-9e24-fadbf40fe1d1"));
+        }
+        
+        
+        var symbolChild = instance.SymbolChild;
         drawList.PushClipRect(area.Min, area.Max, true);
 
-        var value = data.Result.Value;
+        var value = data.Value.TypedInputValue.Value;
 
-        var name = instance.SymbolChild.Name;
-        if (!string.IsNullOrWhiteSpace(name))
+        if (!string.IsNullOrWhiteSpace(symbolChild.Name))
         {
-            WidgetElements.DrawPrimaryTitle(drawList, area, name, canvas.Scale);
+            WidgetElements.DrawPrimaryTitle(drawList, area, symbolChild.Name, canvas.Scale);
         }
         else
         {
-            WidgetElements.DrawPrimaryTitle(drawList, area, "Get int: " + data.VariableName.TypedInputValue.Value, canvas.Scale);
+            WidgetElements.DrawPrimaryTitle(drawList, area, "Set vec3: " + data.VariableName.TypedInputValue.Value, canvas.Scale);
         }
 
-        WidgetElements.DrawSmallValue(drawList, area, $"{value:0}", canvas.Scale);
+        WidgetElements.DrawSmallValue(drawList, area, $"{value}", canvas.Scale);
 
         drawList.PopClipRect();
         return OpUi.CustomUiResult.Rendered | OpUi.CustomUiResult.PreventInputLabels | OpUi.CustomUiResult.PreventOpenSubGraph;

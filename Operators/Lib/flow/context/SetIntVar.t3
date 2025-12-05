@@ -15,7 +15,7 @@
     },
     {
       "Id": "bfd87742-aaf5-4fa8-b714-fd275de1c60d"/*VariableName*/,
-      "DefaultValue": "x"
+      "DefaultValue": "i"
     },
     {
       "Id": "da431996-4c4c-4cdc-9723-9116bbb5440c"/*ClearAfterExecution*/,

@@ -1,12 +1,12 @@
 namespace Lib.flow.context;
 
 [Guid("fdad077d-e919-4f40-a154-36e86245a585")]
-public sealed class SetVec3 : Instance<SetVec3>
+public sealed class SetVec3Var : Instance<SetVec3Var>
 {
     [Output(Guid = "55864a65-4227-4418-b86d-803fc4793676")]
     public readonly Slot<Command> Result = new();
 
-    public SetVec3()
+    public SetVec3Var()
     {
         Result.UpdateAction += Update;
     }
