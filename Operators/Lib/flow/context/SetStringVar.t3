@@ -7,11 +7,11 @@
     },
     {
       "Id": "5be2939b-27f5-4af8-b78e-3ae220d6b1a4"/*VariableName*/,
-      "DefaultValue": "x"
+      "DefaultValue": "s"
     },
     {
       "Id": "64453e52-84eb-487a-b69c-6c5c793dc057"/*StringValue*/,
-      "DefaultValue": "0"
+      "DefaultValue": ""
     },
     {
       "Id": "77d3ebbd-9a07-445d-8990-6b9d91d0e79d"/*SubGraph*/,
