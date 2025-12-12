@@ -1,0 +1,80 @@
+{
+  "Id": "6dbe4ed2-5f14-4ad3-aa19-84679a466815"/*Apc40MidiButton*/,
+  "Description": "",
+  "InputUis": [
+    {
+      "InputId": "051d2472-f3e4-40a0-ad3c-4fad77d1bf74"/*Device*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 508.0
+      },
+      "Usage": "CustomDropdown"
+    },
+    {
+      "InputId": "0575aa4b-16a6-4bb5-a6ff-01ce8feb68db"/*OnColor*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 688.0
+      }
+    },
+    {
+      "InputId": "13e66d6a-2383-4691-a4de-06cedae90b5f"/*OffColor*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 763.0
+      }
+    },
+    {
+      "InputId": "53f4dbbc-249d-4043-af11-367cf738e9ee"/*ChannelNumber*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 373.0
+      }
+    },
+    {
+      "InputId": "6a94579f-5142-407a-9341-d6c4ab6a94fa"/*NoteNumber*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 418.0
+      }
+    },
+    {
+      "InputId": "903019ed-1991-4670-a00a-c5d004b9bcbe"/*DurationInSecs*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 823.0
+      }
+    },
+    {
+      "InputId": "9756ac4b-2687-4c61-9b05-d9646e3a0be5"/*SendMode*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 553.0
+      }
+    },
+    {
+      "InputId": "dd076a47-99df-4357-95fe-2d9bcc83afeb"/*TriggerSend*/,
+      "Position": {
+        "X": 197.0,
+        "Y": 598.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "9b43cb79-a171-4fc4-bcd2-e13a4e31bbf6"/*Result*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 200.0
+      }
+    },
+    {
+      "OutputId": "8227cd32-c872-41f1-9edd-9afb7c350377"/*IsActive*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 300.0
+      }
+    }
+  ]
+}

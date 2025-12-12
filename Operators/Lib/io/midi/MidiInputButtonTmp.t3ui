@@ -1,0 +1,52 @@
+{
+  "Id": "b7e7d697-1322-4484-a78a-94f76d643193"/*MidiInputButtonTmp*/,
+  "Description": "",
+  "InputUis": [
+    {
+      "InputId": "cf192485-5d88-46c4-8155-c258e46c441f"/*Channel*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 135.0
+      }
+    },
+    {
+      "InputId": "da372541-40d1-499e-ad69-eebe03662d95"/*Device*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 90.0
+      },
+      "Usage": "Default"
+    },
+    {
+      "InputId": "eba87e98-f0a1-47a9-a254-84a706590272"/*Control*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 180.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "5aab8de1-830d-41b0-8f3d-a457b15bb147"/*Result*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "OutputId": "187ab3c4-bda4-454e-b11b-967e8372c92f"/*Range*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "OutputId": "68f66510-ae52-49ab-be3f-21af3efef260"/*WasHit*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 100.0
+      }
+    }
+  ]
+}

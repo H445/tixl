@@ -1,0 +1,19 @@
+{
+  "Id": "b7e7d697-1322-4484-a78a-94f76d643193"/*MidiInputButtonTmp*/,
+  "Inputs": [
+    {
+      "Id": "cf192485-5d88-46c4-8155-c258e46c441f"/*Channel*/,
+      "DefaultValue": 1
+    },
+    {
+      "Id": "da372541-40d1-499e-ad69-eebe03662d95"/*Device*/,
+      "DefaultValue": "Midi Device"
+    },
+    {
+      "Id": "eba87e98-f0a1-47a9-a254-84a706590272"/*Control*/,
+      "DefaultValue": 48
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}
