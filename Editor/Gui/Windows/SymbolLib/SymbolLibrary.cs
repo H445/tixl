@@ -696,7 +696,7 @@ internal sealed class SymbolLibrary : Window
                                                                        _deleteSymbolDialog.ShowNextFrame();
                                                                    }
 
-                                                                   // New: if this symbol is the namespace's main symbol and belongs to an editable project,
+                                                                   // If this symbol is the namespace's main symbol and belongs to an editable project,
                                                                    // allow deleting the whole project from the symbol's context menu.
                                                                    try
                                                                    {
@@ -955,10 +955,3 @@ internal sealed class SymbolLibrary : Window
         return false;
     }
 }
-
-
-
-
-
-
-

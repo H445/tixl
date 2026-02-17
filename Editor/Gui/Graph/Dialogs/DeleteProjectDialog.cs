@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Immutable;
+using System.Linq;
 using ImGuiNET;
 using T3.Core.SystemUi;
 using T3.Editor.Gui.Input;
@@ -34,6 +35,10 @@ internal sealed partial class DeleteProjectDialog : ModalDialog
             _cachedOperatorFiles = null;
             _allowDeletion = false;
             _lastAnalysis = null;
+
+            // reset selection state when dialog opens or project changes
+            _operatorSelection.Clear();
+            _assetSelection.Clear();
         }
 
         LocalProjectInfo? info = null;
@@ -120,6 +125,10 @@ internal sealed partial class DeleteProjectDialog : ModalDialog
         _cachedAssets = null;
         _cachedOperatorFiles = null;
         _lastAnalysis = null;
+
+        // reset selection state
+        _operatorSelection.Clear();
+        _assetSelection.Clear();
     }
 
     private EditableSymbolProject? _project;
@@ -128,4 +137,27 @@ internal sealed partial class DeleteProjectDialog : ModalDialog
     private List<string>? _cachedAssets;
     private List<string>? _cachedOperatorFiles;
     private ProjectAnalysisResult? _lastAnalysis;
+
+    // Selection helpers for operators and assets lists
+    private readonly UiMultiSelectionHelper<string> _operatorSelection = new();
+    private readonly UiMultiSelectionHelper<string> _assetSelection = new();
+
+    // Placeholder move operations: show messagebox for now to avoid risky file operations
+    private void MoveOperatorsToProject(EditableSymbolProject targetProject, IEnumerable<string> operatorNames)
+    {
+        var list = operatorNames as IList<string> ?? operatorNames.ToList();
+        var preview = list.Take(5).ToList();
+        var names = string.Join(", ", preview);
+        var msg = list.Count > 5 ? $"Moving {list.Count} operators...\n({names}...)" : $"Moving {names}";
+        BlockingWindow.Instance.ShowMessageBox($"Move operators to {targetProject.DisplayName} not implemented yet.\n{msg}", "Move Operators");
+    }
+
+    private void MoveAssetsToProject(EditableSymbolProject targetProject, IEnumerable<string> assetPaths)
+    {
+        var list = assetPaths as IList<string> ?? assetPaths.ToList();
+        var preview = list.Take(5).Select(p => System.IO.Path.GetFileName(p)).ToList();
+        var names = string.Join(", ", preview);
+        var msg = list.Count > 5 ? $"Moving {list.Count} assets...\n({names}...)" : $"Moving {names}";
+        BlockingWindow.Instance.ShowMessageBox($"Move assets to {targetProject.DisplayName} not implemented yet.\n{msg}", "Move Assets");
+    }
 }

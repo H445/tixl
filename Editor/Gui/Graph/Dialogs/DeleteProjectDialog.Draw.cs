@@ -1,5 +1,7 @@
 #nullable enable
 using ImGuiNET;
+using System;
+using System.Collections.Generic;
 using T3.Editor.Gui.Styling;
 using T3.Editor.UiModel;
 
@@ -61,7 +63,8 @@ internal sealed partial class DeleteProjectDialog
     }
 
     /// <summary>
-    /// Renders a two-column scrollable list showing operators on the left and assets on the right.
+    /// Renders a two-column layout showing operators on the left and assets on the right.
+    /// Each column is individually scrollable.
     /// </summary>
     private void DrawOperatorsAndAssetsList(EditableSymbolProject project)
     {
@@ -70,29 +73,36 @@ internal sealed partial class DeleteProjectDialog
         var itemHeight = fontSize + 4.0f;
         var scrollHeight = itemHeight * maxVisibleItems;
 
-        if (ImGui.BeginChild("OperatorsAndAssets", new Vector2(0, scrollHeight), true))
+        var contentWidth = ImGui.GetContentRegionAvail().X;
+        var columnWidth = (contentWidth - 8) / 2; // 8 for spacing between columns
+        var headerHeight = Fonts.FontSmall.FontSize + 6;
+        var listHeight = Math.Max(0, scrollHeight - headerHeight);
+
+        // Left column: Operators
+        ImGui.BeginGroup();
+        DrawColumnHeader("Operators");
+        ImGui.PushID("OperatorsListChild");
+        if (ImGui.BeginChild("OperatorsList", new Vector2(columnWidth, listHeight), true, ImGuiWindowFlags.None))
         {
-            var contentWidth = ImGui.GetContentRegionAvail().X;
-            var columnWidth = (contentWidth - 16) / 2;
-
-            // Two columns side by side
-            ImGui.Columns(2, "##OperatorsAssetsColumns", true);
-            ImGui.SetColumnWidth(0, columnWidth);
-
-            // Left column: Operators
-            DrawColumnHeader("Operators");
             DrawOperatorsList();
-
-            ImGui.NextColumn();
-
-            // Right column: Assets
-            DrawColumnHeader("Assets");
-            DrawAssetsList(project);
-
-            ImGui.Columns(1);
         }
-
         ImGui.EndChild();
+        ImGui.PopID();
+        ImGui.EndGroup();
+
+        ImGui.SameLine(0, 8);
+
+        // Right column: Assets
+        ImGui.BeginGroup();
+        DrawColumnHeader("Assets");
+        ImGui.PushID("AssetsListChild");
+        if (ImGui.BeginChild("AssetsList", new Vector2(columnWidth, listHeight), true, ImGuiWindowFlags.None))
+        {
+            DrawAssetsList(project);
+        }
+        ImGui.EndChild();
+        ImGui.PopID();
+        ImGui.EndGroup();
     }
 
     private static void DrawColumnHeader(string title)
@@ -121,9 +131,47 @@ internal sealed partial class DeleteProjectDialog
                             .OrderBy(n => n)
                             .ToList();
 
-        foreach (var opName in operatorNames)
+        // Update the selection helper with visible items
+        _operatorSelection.SetVisibleItems(operatorNames);
+
+        for (var i = 0; i < operatorNames.Count; i++)
         {
-            CustomComponents.StylizedText("  " + opName, Fonts.FontSmall, UiColors.Text);
+            var opName = operatorNames[i];
+            var label = "  " + opName;
+            var isSelected = _operatorSelection.IsSelected(opName);
+
+            ImGui.PushID($"op_{i}");
+
+            var pressed = ImGui.Selectable(label, isSelected, ImGuiSelectableFlags.None, new Vector2(0, 0));
+
+            // Right-click context menu for move
+            CustomComponents.ContextMenuForItem(() =>
+            {
+                if (ImGui.BeginMenu("Move To..."))
+                {
+                    foreach (var target in EditableSymbolProject.AllProjects)
+                    {
+                        if (target.CsProjectFile.RootNamespace == _project?.CsProjectFile.RootNamespace)
+                            continue;
+
+                        if (ImGui.MenuItem(target.DisplayName))
+                        {
+                            var toMove = _operatorSelection.GetSelectedOrFallback(opName);
+                            MoveOperatorsToProject(target, toMove);
+                        }
+                    }
+
+                    ImGui.EndMenu();
+                }
+            }, title: opName);
+
+            // Use SelectionHelper for click handling
+            if (pressed)
+            {
+                _operatorSelection.HandleClick(opName, i);
+            }
+
+            ImGui.PopID();
         }
     }
 
@@ -138,10 +186,48 @@ internal sealed partial class DeleteProjectDialog
         const int maxToShow = 50;
         var displayed = _cachedAssets.Take(maxToShow).ToList();
 
-        foreach (var asset in displayed)
+        // Update the selection helper with visible items
+        _assetSelection.SetVisibleItems(displayed);
+
+        for (var i = 0; i < displayed.Count; i++)
         {
+            var asset = displayed[i];
             var relativePath = asset.Replace(project.Folder + "\\", "").Replace(project.Folder + "/", "");
-            CustomComponents.StylizedText("  " + relativePath, Fonts.FontSmall, UiColors.Text);
+            var label = "  " + relativePath;
+            var isSelected = _assetSelection.IsSelected(asset);
+
+            ImGui.PushID($"asset_{i}");
+
+            var pressed = ImGui.Selectable(label, isSelected, ImGuiSelectableFlags.None, new Vector2(0, 0));
+
+            // Right-click context menu for move
+            CustomComponents.ContextMenuForItem(() =>
+            {
+                if (ImGui.BeginMenu("Move To..."))
+                {
+                    foreach (var target in EditableSymbolProject.AllProjects)
+                    {
+                        if (target.CsProjectFile.RootNamespace == _project?.CsProjectFile.RootNamespace)
+                            continue;
+
+                        if (ImGui.MenuItem(target.DisplayName))
+                        {
+                            var toMove = _assetSelection.GetSelectedOrFallback(asset);
+                            MoveAssetsToProject(target, toMove);
+                        }
+                    }
+
+                    ImGui.EndMenu();
+                }
+            }, title: relativePath);
+
+            // Use SelectionHelper for click handling
+            if (pressed)
+            {
+                _assetSelection.HandleClick(asset, i);
+            }
+
+            ImGui.PopID();
         }
 
         if (_cachedAssets.Count > maxToShow)
