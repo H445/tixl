@@ -59,6 +59,10 @@ internal sealed class SymbolLibrary : Window
         if (_symbolToDelete != null)
             _deleteSymbolDialog.Draw(_symbolToDelete);
 
+        // Show delete project dialog if requested
+        if (_projectToDelete != null)
+            _deleteProjectDialog.Draw(_projectToDelete);
+
         ImGui.PushStyleVar(ImGuiStyleVar.IndentSpacing, 10);
 
         // Show usages view if a symbol's usage is being inspected
@@ -336,6 +340,20 @@ internal sealed class SymbolLibrary : Window
                                                         _subtreeNodeToRename = subtree;
                                                         _renameNamespaceDialog.ShowNextFrame();
                                                     }
+
+                                                    // New: Allow deleting the project if this namespace maps to an editable project
+                                                    var nsFull = subtree.GetAsString();
+                                                    var proj = EditableSymbolProject.AllProjects.FirstOrDefault(p => p.CsProjectFile.RootNamespace == nsFull);
+                                                    if (proj != null)
+                                                    {
+                                                        ImGui.Separator();
+                                                        if (ImGui.MenuItem("Delete Project"))
+                                                        {
+                                                            // Open the delete dialog inside SymbolLibrary so it shows immediately here
+                                                            _projectToDelete = proj;
+                                                            _deleteProjectDialog.ShowNextFrame();
+                                                        }
+                                                    }
                                                 });
 
             
@@ -515,6 +533,10 @@ internal sealed class SymbolLibrary : Window
     // The symbol currently selected for deletion
     private static Symbol? _symbolToDelete;
 
+    // Dialog for deleting projects (opened from namespace or main symbol context)
+    private static readonly DeleteProjectDialog _deleteProjectDialog = new();
+    private static EditableSymbolProject? _projectToDelete;
+
     // --- Highlight and Aim Icon for selected operator in node graph ---
     // Store the last selected symbol id and time for highlight/aim icon animation
     private static Guid? _lastSelectedSymbolId;
@@ -609,7 +631,7 @@ internal sealed class SymbolLibrary : Window
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, ColorVariations.OperatorBackgroundHover.Apply(color).Rgba);
             ImGui.PushStyleColor(ImGuiCol.Text, ColorVariations.OperatorLabel.Apply(color).Rgba);
 
-            bool buttonPressed = ImGui.Button(symbol.Name.AddSpacesForImGuiOutput());
+            ImGui.Button(symbol.Name.AddSpacesForImGuiOutput());
 
             // Get button rect for icon and highlight
             var buttonMin = ImGui.GetItemRectMin();
@@ -672,6 +694,36 @@ internal sealed class SymbolLibrary : Window
                                                                    {
                                                                        _symbolToDelete = symbol;
                                                                        _deleteSymbolDialog.ShowNextFrame();
+                                                                   }
+
+                                                                   // New: if this symbol is the namespace's main symbol and belongs to an editable project,
+                                                                   // allow deleting the whole project from the symbol's context menu.
+                                                                   try
+                                                                   {
+                                                                       var symbolPackage = symbol.SymbolPackage as EditableSymbolProject;
+                                                                       if (symbolPackage != null)
+                                                                       {
+                                                                           // Check if symbol is the main symbol of its namespace
+                                                                           var ns = symbol.Namespace ?? string.Empty;
+                                                                           if (!string.IsNullOrEmpty(ns))
+                                                                           {
+                                                                               var lastDot = ns.LastIndexOf('.');
+                                                                               var lastSeg = lastDot >= 0 ? ns[(lastDot + 1)..] : ns;
+                                                                               if (string.Equals(lastSeg, symbol.Name, StringComparison.Ordinal))
+                                                                               {
+                                                                                   ImGui.Separator();
+                                                                                   if (ImGui.MenuItem("Delete Project"))
+                                                                                   {
+                                                                                       _projectToDelete = symbolPackage;
+                                                                                       _deleteProjectDialog.ShowNextFrame();
+                                                                                   }
+                                                                               }
+                                                                           }
+                                                                       }
+                                                                   }
+                                                                   catch
+                                                                   {
+                                                                       // swallow any failures in context menu render path
                                                                    }
                                                                },
                                                 title: symbol.Name,
@@ -903,3 +955,10 @@ internal sealed class SymbolLibrary : Window
         return false;
     }
 }
+
+
+
+
+
+
+
