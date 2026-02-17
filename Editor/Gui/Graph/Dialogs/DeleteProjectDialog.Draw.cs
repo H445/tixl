@@ -3,6 +3,7 @@ using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using T3.Editor.Gui.Styling;
+using T3.Editor.Gui.UiHelpers;
 using T3.Editor.UiModel;
 
 namespace T3.Editor.Gui.Dialogs;
@@ -147,7 +148,7 @@ internal sealed partial class DeleteProjectDialog
             // Right-click context menu for move
             CustomComponents.ContextMenuForItem(() =>
             {
-                if (ImGui.BeginMenu("Move To..."))
+                if (ImGui.BeginMenu("Move Operator(s) To..."))
                 {
                     foreach (var target in EditableSymbolProject.AllProjects)
                     {
@@ -163,7 +164,7 @@ internal sealed partial class DeleteProjectDialog
 
                     ImGui.EndMenu();
                 }
-            }, title: opName);
+            }, title: GetContextMenuTitle(opName, _operatorSelection));
 
             // Use SelectionHelper for click handling
             if (pressed)
@@ -203,7 +204,7 @@ internal sealed partial class DeleteProjectDialog
             // Right-click context menu for move
             CustomComponents.ContextMenuForItem(() =>
             {
-                if (ImGui.BeginMenu("Move To..."))
+                if (ImGui.BeginMenu("Move Asset(s) To..."))
                 {
                     foreach (var target in EditableSymbolProject.AllProjects)
                     {
@@ -219,7 +220,7 @@ internal sealed partial class DeleteProjectDialog
 
                     ImGui.EndMenu();
                 }
-            }, title: relativePath);
+            }, title: GetContextMenuTitle(relativePath, _assetSelection));
 
             // Use SelectionHelper for click handling
             if (pressed)
@@ -272,5 +273,17 @@ internal sealed partial class DeleteProjectDialog
         }
 
         ImGui.EndChild();
+    }
+
+    /// <summary>
+    /// Generates context menu title showing the item name with a "+X" counter if multiple items are selected.
+    /// </summary>
+    private static string GetContextMenuTitle<TKey>(string displayName, UiMultiSelectionHelper<TKey> selection) where TKey : notnull
+    {
+        var count = selection.Count;
+        if (count <= 1)
+            return displayName;
+
+        return $"{displayName} ...and {count - 1} more";
     }
 }

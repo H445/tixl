@@ -15,11 +15,17 @@ internal sealed class UiMultiSelectionHelper<TKey> where TKey : notnull
     private readonly HashSet<TKey> _selected = new();
     private int _anchorIndex = -1;
     private IReadOnlyList<TKey>? _lastVisibleItems;
+    private TKey? _lastSelectedKey;
 
     /// <summary>
     /// Gets the set of currently selected keys.
     /// </summary>
     public IReadOnlySet<TKey> Selected => _selected;
+
+    /// <summary>
+    /// Gets the most recently selected/clicked item key.
+    /// </summary>
+    public TKey? LastSelectedKey => _lastSelectedKey;
 
     /// <summary>
     /// Gets the number of selected items.
@@ -60,6 +66,9 @@ internal sealed class UiMultiSelectionHelper<TKey> where TKey : notnull
         var io = ImGui.GetIO();
         bool ctrl = io.KeyCtrl;
         bool shift = io.KeyShift;
+
+        // Track the last clicked item
+        _lastSelectedKey = key;
 
         if (shift && _anchorIndex >= 0 && _lastVisibleItems != null)
         {
