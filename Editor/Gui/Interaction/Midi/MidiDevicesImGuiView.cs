@@ -15,6 +15,8 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
     private readonly Dictionary<string, DeviceUiState> _uiStates = new();
     private double _lastDrawUtc;
+    private bool _blinkOn;
+    private double _lastBlinkFlipMs;
 
     protected override void DrawContent()
     {
@@ -27,6 +29,17 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         }
         _lastDrawUtc = nowMs;
 
+        // Initialize blink timer on first run, otherwise flip _blinkOn every 500ms
+        if (_lastBlinkFlipMs == 0)
+        {
+            _lastBlinkFlipMs = nowMs;
+        }
+        else if (nowMs - _lastBlinkFlipMs >= 500)
+        {
+            _lastBlinkFlipMs = nowMs;
+            _blinkOn = !_blinkOn;
+        }
+
         var statuses = CompatibleMidiDeviceHandling.GetConnectedDeviceStatuses();
 
         if (statuses.Count == 0)
@@ -38,7 +51,8 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         ImGui.BeginChild("device_list", new System.Numerics.Vector2(-1, -1), false);
         foreach (var s in statuses)
         {
-            var blinkOn = ((int)(nowMs / 500)) % 2 == 0; // 500ms blink period
+            // Use the frame-toggle blink state (updated above every 500ms)
+            var blinkOn = _blinkOn;
             DrawDeviceReadOnly(s, blinkOn);
             ImGui.Separator();
         }
