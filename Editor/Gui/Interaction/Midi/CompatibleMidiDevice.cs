@@ -2,6 +2,9 @@
 using NAudio.Midi;
 using Operators.Utils;
 using T3.Editor.Gui.Interaction.Midi.CommandProcessing;
+using System;
+using System.Reflection;
+using System.Linq;
 
 namespace T3.Editor.Gui.Interaction.Midi;
 
@@ -25,6 +28,60 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
         _deviceProductName = deviceInfo.ProductName;
         
         MidiConnectionManager.RegisterConsumer(this);
+    }
+
+    /// <summary>
+    /// Returns a threadsafe snapshot of the device state for UI rendering.
+    /// </summary>
+    protected internal MidiDeviceStatus GetStatusSnapshot()
+    {
+        // Copy global cache (it's shared, but provides the last known LED states)
+        int[] cacheCopy;
+        lock (CacheControllerColors)
+        {
+            cacheCopy = new int[CacheControllerColors.Length];
+            Array.Copy(CacheControllerColors, cacheCopy, CacheControllerColors.Length);
+        }
+
+        // Try to obtain a device-specific ClipGridSize constant if present (e.g. APC40 defines it)
+        int? clipGridSize = null;
+        try
+        {
+            var t = GetType();
+            var f = t.GetField("ClipGridSize", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+            if (f != null && f.FieldType == typeof(int))
+                clipGridSize = (int)f.GetValue(null);
+        }
+        catch
+        {
+            // ignore - optional
+        }
+
+        // Try to obtain a device-specific _useGenericMode field (private in some devices)
+        bool? useGenericMode = null;
+        try
+        {
+            var t = GetType();
+            var f = t.GetField("_useGenericMode", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+            if (f != null && f.FieldType == typeof(bool))
+                useGenericMode = (bool?)f.GetValue(this);
+        }
+        catch
+        {
+            // ignore - optional
+        }
+
+        return new MidiDeviceStatus(
+            productName: _deviceProductName ?? string.Empty,
+            deviceTypeName: GetType().Name,
+            isConnected: MidiOutConnection != null || _midiInputConnection != null,
+            isInControlMode: IsInControlMode,
+            useGenericMode: useGenericMode,
+            controllerColors: cacheCopy,
+            controlCount: CacheControllerColors.Length,
+            clipGridSize: clipGridSize,
+            snapshotTimeUtc: DateTime.UtcNow
+        );
     }
 
     /// <summary>
@@ -384,6 +441,72 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
     private readonly List<ControlChangeSignal> _controlSignalsSinceLastUpdate = new();
     private MidiIn _midiInputConnection;
     protected MidiOut MidiOutConnection;
+
+    // Expose product name for lookup by UI
+    protected internal string DeviceProductName => _deviceProductName ?? string.Empty;
+
+    /// <summary>
+    /// Try to send an LED color for a specific controller index (calls overridden SendColor implementation).
+    /// Returns true if a MIDI out connection existed and the message was attempted.
+    /// </summary>
+    protected internal bool TrySendLed(int apcControlIndex, int colorCode)
+    {
+        if (MidiOutConnection == null)
+            return false;
+        try
+        {
+            SendColor(MidiOutConnection, apcControlIndex, colorCode);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"TrySendLed failed: {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Try to send a Note On message (useful for testing). Returns true if sent.
+    /// </summary>
+    protected internal bool TrySendNoteOn(int channel, int noteNumber, int velocity)
+    {
+        if (MidiOutConnection == null)
+            return false;
+
+        try
+        {
+            var noteOnEvent = new NoteOnEvent(0, channel, noteNumber, velocity, 50);
+            MidiOutConnection.Send(noteOnEvent.GetAsShortMessage());
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"TrySendNoteOn failed: {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Try to send a Control Change message (for testing CCs).
+    /// </summary>
+    protected internal bool TrySendControlChange(int channel, int controllerId, int value)
+    {
+        if (MidiOutConnection == null)
+            return false;
+
+        try
+        {
+            // ControlChangeEvent exists in NAudio.Midi
+            var cc = new ControlChangeEvent(0, channel, (MidiController)controllerId, value);
+            MidiOutConnection.Send(cc.GetAsShortMessage());
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"TrySendControlChange failed: {e.Message}");
+            return false;
+        }
+    }
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
@@ -396,3 +519,4 @@ internal sealed class MidiDeviceProductAttribute : Attribute
 
     internal string[] ProductNames { get; }
 }
+

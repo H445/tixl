@@ -10,6 +10,7 @@ using T3.Editor.Gui.Windows.Output;
 using T3.Editor.Gui.Windows.RenderExport;
 using T3.Editor.Gui.Windows.SymbolLib;
 using T3.Editor.Gui.Windows.Variations;
+using T3.Editor.Gui.Interaction.Midi;
 
 namespace T3.Editor.Gui.Windows.Layouts;
 
@@ -48,6 +49,7 @@ internal static partial class WindowManager
     internal static readonly SettingsWindow SettingsWindow = new();
     internal static readonly UtilitiesWindow UtilitiesWindow = new();
     internal static readonly ScreenManagerWindow ScreenManagerWindow = new();
+    internal static readonly MidiDevicesImGuiView MidiDevicesWindow = new();
     internal static readonly SnixlWindow SnixlWindow = new();
 
 
@@ -73,6 +75,7 @@ internal static partial class WindowManager
                 UtilitiesWindow,    // item shown in TiXL > Development menu
                 SettingsWindow, // item shown in TiXL menu
                 ScreenManagerWindow,
+                MidiDevicesWindow, // our new MIDI status panel
             ];
 
 

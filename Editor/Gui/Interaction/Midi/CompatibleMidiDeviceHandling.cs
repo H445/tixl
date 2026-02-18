@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿#nullable enable
+using System.Reflection;
 using Operators.Utils;
 using T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
 using T3.Editor.Gui.UiHelpers;
@@ -52,6 +53,27 @@ internal static class CompatibleMidiDeviceHandling
         {
             compatibleMidiDevice.Update();
         }
+    }
+
+    /// <summary>
+    /// Returns a stable snapshot list of connected device statuses for UI rendering.
+    /// </summary>
+    internal static IReadOnlyList<MidiDeviceStatus> GetConnectedDeviceStatuses()
+    {
+        var list = new List<MidiDeviceStatus>(_connectedMidiDevices.Count);
+        foreach (var d in _connectedMidiDevices)
+        {
+            try
+            {
+                list.Add(d.GetStatusSnapshot());
+            }
+            catch (Exception e)
+            {
+                Log.Warning($"Failed taking snapshot of device {d}: {e.Message}");
+            }
+        }
+
+        return list;
     }
 
     /// <summary>
@@ -116,4 +138,12 @@ internal static class CompatibleMidiDeviceHandling
 
     private static readonly List<Type> _compatibleControllerTypes;
     private static readonly List<CompatibleMidiDevice> _connectedMidiDevices = new();
+
+    /// <summary>
+    /// Returns the connected CompatibleMidiDevice instance that matches the product name, or null.
+    /// </summary>
+    internal static CompatibleMidiDevice? GetConnectedDeviceByProductName(string productName)
+    {
+        return _connectedMidiDevices.FirstOrDefault(d => d.DeviceProductName == productName);
+    }
 }
