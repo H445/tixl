@@ -7,6 +7,7 @@ using T3.Editor.Gui.Input;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.UiModel;
+using T3.Editor.UiModel.Helpers;
 
 namespace T3.Editor.Gui.Dialogs;
 
@@ -39,6 +40,12 @@ internal sealed partial class DeleteProjectDialog : ModalDialog
             // reset selection state when dialog opens or project changes
             _operatorSelection.Clear();
             _assetSelection.Clear();
+
+            // Ensure symbol analysis is initialized for "used by" badges
+            if (!SymbolAnalysis.DetailsInitialized)
+            {
+                SymbolAnalysis.UpdateDetails();
+            }
         }
 
         LocalProjectInfo? info = null;

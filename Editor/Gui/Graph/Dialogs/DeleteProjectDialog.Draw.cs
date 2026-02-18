@@ -2,9 +2,12 @@
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
+using T3.Core.Operator;
+using T3.Editor.Gui.Input;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.UiModel;
+using T3.Editor.UiModel.Helpers;
 
 namespace T3.Editor.Gui.Dialogs;
 
@@ -33,27 +36,6 @@ internal sealed partial class DeleteProjectDialog
             return;
         }
 
-        // Show dependencies warning first (like DeleteSymbolDialog)
-        if (!info.DependingSymbols.IsEmpty)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.StatusAttention.Rgba);
-            ImGui.TextWrapped($"[{projectName}] is used by [{info.DependingSymbols.Count}] symbols in [{info.DependingProjectCount}] other projects:");
-            ImGui.PopStyleColor();
-
-            ListDependingSymbols();
-
-            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.StatusAttention.Rgba);
-            ImGui.TextWrapped("Clicking Force delete will automatically disconnect/clean all usages. " +
-                              "This may completely break these projects/symbols, and can *NOT* be undone.");
-            ImGui.PopStyleColor();
-        }
-        else
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.Text.Rgba);
-            ImGui.TextWrapped($"Project [{projectName}] is not used by other projects and can be safely deleted.");
-            ImGui.PopStyleColor();
-        }
-
         // Show what will be deleted - operators and assets in two columns
         ImGui.Separator();
         ImGui.PushStyleColor(ImGuiCol.Text, UiColors.Text.Rgba);
@@ -61,6 +43,27 @@ internal sealed partial class DeleteProjectDialog
         ImGui.PopStyleColor();
 
         DrawOperatorsAndAssetsList(project);
+
+        // Show dependencies warning first (like DeleteSymbolDialog)
+        if (info.DependingSymbols.IsEmpty)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.Text.Rgba);
+            ImGui.TextWrapped($"Project [{projectName}] is not used by other projects and can be safely deleted.");
+            ImGui.PopStyleColor();
+        }
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.StatusAttention.Rgba);
+            ImGui.TextWrapped($"[{projectName}] is used by [{info.DependingSymbols.Count}] symbols in [{info.DependingProjectCount}] other projects:");
+            ImGui.PopStyleColor();
+
+            ListDependingSymbols();
+            
+            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.StatusAttention.Rgba);
+            ImGui.TextWrapped("Clicking Force delete will automatically disconnect/clean all usages. " +
+                              "This may completely break these projects/symbols, and can *NOT* be undone.");
+            ImGui.PopStyleColor();
+        }
     }
 
     /// <summary>
@@ -81,7 +84,7 @@ internal sealed partial class DeleteProjectDialog
 
         // Left column: Operators
         ImGui.BeginGroup();
-        DrawColumnHeader("Operators");
+        DrawColumnHeader("Operators", columnWidth);
         ImGui.PushID("OperatorsListChild");
         if (ImGui.BeginChild("OperatorsList", new Vector2(columnWidth, listHeight), true, ImGuiWindowFlags.None))
         {
@@ -95,7 +98,7 @@ internal sealed partial class DeleteProjectDialog
 
         // Right column: Assets
         ImGui.BeginGroup();
-        DrawColumnHeader("Assets");
+        DrawColumnHeader("Assets", columnWidth);
         ImGui.PushID("AssetsListChild");
         if (ImGui.BeginChild("AssetsList", new Vector2(columnWidth, listHeight), true, ImGuiWindowFlags.None))
         {
@@ -106,15 +109,24 @@ internal sealed partial class DeleteProjectDialog
         ImGui.EndGroup();
     }
 
-    private static void DrawColumnHeader(string title)
+    private static void DrawColumnHeader(string title, float width)
     {
-        var avail = ImGui.GetContentRegionAvail();
         var cursorPos = ImGui.GetCursorScreenPos();
         var drawList = ImGui.GetWindowDrawList();
-        var rectMax = new Vector2(cursorPos.X + avail.X, cursorPos.Y + Fonts.FontSmall.FontSize + 4);
-        drawList.AddRectFilled(cursorPos, rectMax, UiColors.BackgroundFull.Fade(0.3f), 0.0f);
+        var headerHeight = Fonts.FontSmall.FontSize + 4;
+        var rectMax = new Vector2(cursorPos.X + width, cursorPos.Y + headerHeight);
+        drawList.AddRectFilled(cursorPos, rectMax, UiColors.BackgroundFull.Fade(0.7f), 0.0f);
 
+        // Center the text horizontally and vertically within the header rect
+        var textSize = ImGui.CalcTextSize(title);
+        var textX = cursorPos.X + Math.Max(0, (width - textSize.X) * 0.5f);
+        var textY = cursorPos.Y + Math.Max(0, (headerHeight - textSize.Y) * 0.5f);
+
+        ImGui.SetCursorScreenPos(new Vector2(textX, textY));
         CustomComponents.StylizedText(title, Fonts.FontSmall, UiColors.Text);
+
+        // Ensure subsequent items start below the header
+        ImGui.SetCursorScreenPos(new Vector2(cursorPos.X, cursorPos.Y + headerHeight));
     }
 
     private void DrawOperatorsList()
@@ -132,8 +144,17 @@ internal sealed partial class DeleteProjectDialog
                             .OrderBy(n => n)
                             .ToList();
 
+        // Build a lookup of symbols in this project by name for quick access
+        var projectNamespace = _project?.CsProjectFile.RootNamespace ?? string.Empty;
+        var projectSymbolsByName = EditorSymbolPackage.AllSymbols
+                                                      .Where(s => s.SymbolPackage.RootNamespace == projectNamespace)
+                                                      .ToDictionary(s => s.Name, s => s);
+
         // Update the selection helper with visible items
         _operatorSelection.SetVisibleItems(operatorNames);
+
+        // Calculate available width for layout
+        var availWidth = ImGui.GetContentRegionAvail().X;
 
         for (var i = 0; i < operatorNames.Count; i++)
         {
@@ -144,6 +165,12 @@ internal sealed partial class DeleteProjectDialog
             ImGui.PushID($"op_{i}");
 
             var pressed = ImGui.Selectable(label, isSelected, ImGuiSelectableFlags.None, new Vector2(0, 0));
+
+            // Draw "used by" badge if symbol analysis is available
+            if (projectSymbolsByName.TryGetValue(opName, out var symbol))
+            {
+                DrawUsedByBadge(symbol, availWidth);
+            }
 
             // Right-click context menu for move
             CustomComponents.ContextMenuForItem(() =>
@@ -285,5 +312,90 @@ internal sealed partial class DeleteProjectDialog
             return displayName;
 
         return $"{displayName} ...and {count - 1} more";
+    }
+
+    /// <summary>
+    /// Draws "used by" badge with icon and tooltip showing which symbols depend on this operator.
+    /// </summary>
+    private static void DrawUsedByBadge(Symbol symbol, float availWidth)
+    {
+        if (!SymbolAnalysis.DetailsInitialized)
+            return;
+
+        if (!SymbolAnalysis.InformationForSymbolIds.TryGetValue(symbol.Id, out var info))
+            return;
+
+        var dependingCount = info.DependingSymbols.Count;
+        if (dependingCount == 0)
+        {
+            // Show "NOT USED" indicator for unused operators
+            ImGui.SameLine(availWidth - 60);
+            ImGui.PushStyleColor(ImGuiCol.Text, UiColors.TextMuted.Rgba);
+            ImGui.TextUnformatted("");
+            ImGui.PopStyleColor();
+            return;
+        }
+
+        // Build tooltip matches here so the local DrawTooltip can reference them
+        var allSymbolUis = EditorSymbolPackage.AllSymbolUis;
+        var matches = allSymbolUis
+                     .Where(s => info.DependingSymbols.Contains(s.Symbol.Id))
+                     .OrderBy(s => s.Symbol.Namespace)
+                     .ThenBy(s => s.Symbol.Name);
+
+        // Position badge on the right side - use absolute X position like SymbolLibrary
+        ImGui.SameLine(availWidth - 25);
+
+        ImGui.PushStyleColor(ImGuiCol.Text, UiColors.TextMuted.Rgba);
+
+        // Draw icon
+        Icon.Referenced.DrawAtCursor();
+
+        // Tooltip for icon: use same pattern as SymbolLibrary (local DrawTooltip uses BeginTooltip/ListSymbols style)
+        void DrawTooltip()
+        {
+            ImGui.BeginTooltip();
+            ImGui.TextUnformatted("used by...");
+            FormInputs.AddVerticalSpace();
+
+            // Reuse the same grouping and layout logic as SymbolLibrary.ListSymbols
+            var lastGroupName = string.Empty;
+            ColumnLayout.StartLayout(25);
+            foreach (var required in matches)
+            {
+                var projectName = required.Symbol.SymbolPackage.RootNamespace;
+                if (projectName != lastGroupName)
+                {
+                    lastGroupName = projectName;
+                    FormInputs.AddVerticalSpace(5);
+                    ImGui.PushFont(Fonts.FontSmall);
+                    ImGui.TextUnformatted(projectName);
+                    ImGui.PopFont();
+                }
+
+                var hasIssues = required.Tags.HasFlag(SymbolUi.SymbolTags.Obsolete)
+                                | required.Tags.HasFlag(SymbolUi.SymbolTags.NeedsFix);
+                var color = hasIssues ? UiColors.StatusAttention : UiColors.Text;
+                ImGui.PushStyleColor(ImGuiCol.Text, color.Rgba);
+                ColumnLayout.StartGroupAndWrapIfRequired(1);
+                ImGui.TextUnformatted(required.Symbol.Name);
+                ColumnLayout.ExtendWidth(ImGui.GetItemRectSize().X);
+                ImGui.PopStyleColor();
+            }
+
+            ImGui.EndTooltip();
+        }
+
+        CustomComponents.TooltipForLastItem(DrawTooltip);
+
+        ImGui.SameLine(0, 2);
+
+        // Draw count
+        ImGui.TextUnformatted($"{dependingCount}");
+
+        // Tooltip for count
+        CustomComponents.TooltipForLastItem(DrawTooltip);
+
+        ImGui.PopStyleColor();
     }
 }
