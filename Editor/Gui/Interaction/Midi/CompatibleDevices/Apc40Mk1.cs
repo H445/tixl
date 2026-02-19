@@ -574,15 +574,41 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     private static readonly ButtonRange DevLock = new(63);
     private static readonly ButtonRange ClipDevView = new(64);
     private static readonly ButtonRange DetailView = new(65);
-    
+
+    // Public mapping for device control buttons in physical left-to-right/top-to-bottom order
+    // This maps the two rows (4 buttons each) that appear under the "Device Control" area on the APC40 MK1.
+    // According to the APC40 Communications Protocol (notes 0x3A..0x41) the labels are:
+    //  0x3A (58) = CLIP/TRACK (1)
+    //  0x3B (59) = DEVICE ON/OFF (2)
+    //  0x3C (60) = Device Left (3)
+    //  0x3D (61) = Device Right (4)
+    //  0x3E (62) = DETAIL VIEW (5)
+    //  0x3F (63) = REC QUANTIZATION (6)
+    //  0x40 (64) = MIDI OVERDUB (7)
+    //  0x41 (65) = METRONOME (8)
+    public static readonly int[] DeviceControlNoteOrder = new[] { 58, 59, 60, 61, 62, 63, 64, 65 };
+    public static readonly string[] DeviceControlLabels = new[]
+    {
+        "CLIP/TRACK",    // 58 (0x3A)
+        "DEVICE ON/OFF", // 59 (0x3B)
+        "Device Left",   // 60 (0x3C)
+        "Device Right",  // 61 (0x3D)
+        "DETAIL VIEW",   // 62 (0x3E)
+        "REC QUANT",     // 63 (0x3F)
+        "MIDI OVERDUB",  // 64 (0x40)
+        "METRONOME"      // 65 (0x41)
+    };
+
     // Mode buttons
     private static readonly ButtonRange Pan = new(87);
     private static readonly ButtonRange Sends = new(88);
     private static readonly ButtonRange User = new(89);
     private static readonly ButtonRange Metronome = new(90);
-    private static readonly ButtonRange Play = new(91);
-    private static readonly ButtonRange Stop = new(92);
-    private static readonly ButtonRange Record = new(93);
+
+    // Public mapping of mode buttons in the physical left-to-right/top-to-bottom order
+    // Exposed so the GUI can render the buttons in the exact physical arrangement of the APC40 Mk1.
+    public static readonly int[] ModeButtonNoteOrder = new[] { 87, 88, 89, 90 };
+    public static readonly string[] ModeButtonLabels = new[] { "PAN", "SEND A", "SEND B", "SEND C" };
 
     // Faders and knobs (Control Change messages)
     private static readonly ButtonRange Fader1To8 = new(7, 7);      // CC 7 on channels 1-8
