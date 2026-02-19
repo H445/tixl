@@ -2,6 +2,8 @@ using ImGuiNET;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
 using T3.Editor.Gui.Styling;
+using T3.Core.Utils;
+using System.Numerics;
 
 namespace T3.Editor.Gui.Interaction.Midi;
 
@@ -364,7 +366,38 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
                 if (i > 0 && i % 4 != 0) ImGui.SameLine();
                 var noteId = notes[i];
                 var label = labels[i];
-                DrawSimpleButton(s, label, noteId, btnSize, blinkOn, label);
+
+                // Render device left/right as icons per request, keep other buttons as before
+                if (noteId == 58)
+                {
+                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
+                    DrawIconButtonWithBg(Icon.ChevronLeft, btnSize, bgCol, state);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.TextUnformatted($"Device Left (Note {noteId})");
+                        ImGui.EndTooltip();
+                    }
+                }
+                else if (noteId == 59)
+                {
+                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
+                    DrawIconButtonWithBg(Icon.ChevronRight, btnSize, bgCol, state);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.TextUnformatted($"Device Right (Note {noteId})");
+                        ImGui.EndTooltip();
+                    }
+                }
+                else
+                {
+                    DrawSimpleButton(s, label, noteId, btnSize, blinkOn, label);
+                }
             }
         }
         else
@@ -379,7 +412,38 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
             {
                 if (i > 0 && i % 4 != 0) ImGui.SameLine();
                 var (lbl, noteId) = devButtons[i];
-                DrawSimpleButton(s, lbl, noteId, btnSize, blinkOn, lbl);
+
+                if (noteId == 58)
+                {
+                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
+                    DrawIconButtonWithBg(Icon.ChevronLeft, btnSize, bgCol, state);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.TextUnformatted($"Device Left (Note {noteId})");
+                        ImGui.EndTooltip();
+                    }
+                }
+                else if (noteId == 59)
+                {
+                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
+                    DrawIconButtonWithBg(Icon.ChevronRight, btnSize, bgCol, state);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.TextUnformatted($"Device Right (Note {noteId})");
+                        ImGui.EndTooltip();
+                    }
+                }
+                else
+                {
+                    if (i > 0 && i % 4 != 0) ImGui.SameLine();
+                    DrawSimpleButton(s, lbl, noteId, btnSize, blinkOn, lbl);
+                }
             }
         }
 
@@ -466,18 +530,111 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
             if (i > 0) ImGui.SameLine();
             var (lbl, noteId, onColor) = transportButtons[i];
             var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-            var col = colorCode > 0 ? onColor : _offColor;
+            var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
 
-            ImGui.PushStyleColor(ImGuiCol.Button, col);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
-            ImGui.Button($"{lbl}##{noteId}", transportBtnSize);
-            if (ImGui.IsItemHovered())
+            // Use icon for Play per request
+            if (noteId == 91)
             {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted($"{lbl} (Note {noteId})");
-                ImGui.EndTooltip();
+                var bgCol = colorCode > 0 ? onColor : _offColor;
+                DrawIconButtonWithBg(Icon.PlayForwards, transportBtnSize, bgCol, state);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.TextUnformatted($"Play (Note {noteId})");
+                    ImGui.EndTooltip();
+                }
             }
-            ImGui.PopStyleColor(2);
+            else if (noteId == 92) // STOP -> draw a filled square centered in the button
+            {
+                var stateLocal = state;
+
+                // Mimic CustomComponents.IconButton styling so the background responds the same.
+                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
+                if (stateLocal == CustomComponents.ButtonStates.Activated)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, UiColors.BackgroundButtonActivated.Rgba);
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundButtonActivated.Fade(0.8f).Rgba);
+                }
+
+                ImGui.PushID(noteId);
+                ImGui.Button(string.Empty, transportBtnSize);
+                ImGui.PopID();
+
+                // Draw square foreground using the standard state/text color so it matches text buttons
+                var sysColor = GetStateColorVec(stateLocal);
+                var min = ImGui.GetItemRectMin();
+                var max = ImGui.GetItemRectMax();
+                var center = (min + max) / 2f;
+                var iconSize = Icons.FontSize;
+                var iconMin = new Vector2(center.X - iconSize / 2f, center.Y - iconSize / 2f).Floor();
+                var iconMax = iconMin + new Vector2(iconSize, iconSize);
+                var dl = ImGui.GetWindowDrawList();
+                dl.AddRectFilled(iconMin, iconMax, ImGui.GetColorU32(sysColor), 2f);
+
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.TextUnformatted($"Stop (Note {noteId})");
+                    ImGui.EndTooltip();
+                }
+
+                ImGui.PopStyleColor();
+                if (stateLocal == CustomComponents.ButtonStates.Activated)
+                    ImGui.PopStyleColor(2);
+                ImGui.PopStyleVar(1);
+            }
+            else if (noteId == 93) // REC -> draw a filled circle centered in the button
+            {
+                var stateLocal = state;
+
+                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
+                if (stateLocal == CustomComponents.ButtonStates.Activated)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, UiColors.BackgroundButtonActivated.Rgba);
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundButtonActivated.Fade(0.8f).Rgba);
+                }
+
+                ImGui.PushID(noteId);
+                ImGui.Button(string.Empty, transportBtnSize);
+                ImGui.PopID();
+
+                var sysColorRec = GetStateColorVec(stateLocal);
+                var min = ImGui.GetItemRectMin();
+                var max = ImGui.GetItemRectMax();
+                var center = (min + max) / 2f;
+                var radius = Icons.FontSize / 2f;
+                var dl = ImGui.GetWindowDrawList();
+                dl.AddCircleFilled(center.Floor(), radius, ImGui.GetColorU32(sysColorRec), 16);
+
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.TextUnformatted($"Record (Note {noteId})");
+                    ImGui.EndTooltip();
+                }
+
+                ImGui.PopStyleColor();
+                if (stateLocal == CustomComponents.ButtonStates.Activated)
+                    ImGui.PopStyleColor(2);
+                ImGui.PopStyleVar(1);
+            }
+            else
+            {
+                var col = colorCode > 0 ? onColor : _offColor;
+
+                ImGui.PushStyleColor(ImGuiCol.Button, col);
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
+                ImGui.Button($"{lbl}##{noteId}", transportBtnSize);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.TextUnformatted($"{lbl} (Note {noteId})");
+                    ImGui.EndTooltip();
+                }
+                ImGui.PopStyleColor(2);
+            }
         }
 
         ImGui.Spacing();
@@ -488,18 +645,54 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
         // Row 1: Up button (centered)
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + navBtnSize.X + 3 * scale);
-        DrawSimpleButton(s, "\u25b2", 94, navBtnSize, blinkOn, "Bank Up");
+        {
+            var noteId = 94;
+            var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+            var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+            var bgCol = ColorForSimpleLed(colorCode, blinkOn);
+            DrawIconButtonWithBg(Icon.ArrowUp, navBtnSize, bgCol, state);
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.TextUnformatted("Bank Up (Note 94)");
+                ImGui.EndTooltip();
+            }
+        }
 
         // Row 2: Left, Shift, Right
-        DrawSimpleButton(s, "\u25c4", 97, navBtnSize, blinkOn, "Bank Left");
+        {
+            var noteIdLeft = 97;
+            var colorCodeLeft = noteIdLeft < s.ControllerColors.Length ? s.ControllerColors[noteIdLeft] : -1;
+            var stateLeft = colorCodeLeft > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+            var bgColLeft = ColorForSimpleLed(colorCodeLeft, blinkOn);
+            DrawIconButtonWithBg(Icon.ArrowLeft, navBtnSize, bgColLeft, stateLeft);
+        }
         ImGui.SameLine();
         DrawSimpleButton(s, "SHIFT", 98, navBtnSize, blinkOn, "Shift");
         ImGui.SameLine();
-        DrawSimpleButton(s, "\u25ba", 96, navBtnSize, blinkOn, "Bank Right");
+        {
+            var noteIdRight = 96;
+            var colorCodeRight = noteIdRight < s.ControllerColors.Length ? s.ControllerColors[noteIdRight] : -1;
+            var stateRight = colorCodeRight > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+            var bgColRight = ColorForSimpleLed(colorCodeRight, blinkOn);
+            DrawIconButtonWithBg(Icon.ArrowRight, navBtnSize, bgColRight, stateRight);
+        }
 
         // Row 3: Down button (centered)
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + navBtnSize.X + 3 * scale);
-        DrawSimpleButton(s, "\u25bc", 95, navBtnSize, blinkOn, "Bank Down");
+        {
+            var noteId = 95;
+            var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+            var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+            var bgColDown = ColorForSimpleLed(colorCode, blinkOn);
+            DrawIconButtonWithBg(Icon.ArrowDown, navBtnSize, bgColDown, state);
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.TextUnformatted("Bank Down (Note 95)");
+                ImGui.EndTooltip();
+            }
+        }
 
         ImGui.Spacing();
 
@@ -606,6 +799,24 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
             ImGui.EndTooltip();
         }
         ImGui.PopStyleColor(2);
+    }
+
+    private static void DrawIconButtonWithBg(Icon icon, Vector2 size, Vector4 bgCol, CustomComponents.ButtonStates state)
+    {
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
+        ImGui.PushStyleColor(ImGuiCol.Button, bgCol);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(bgCol, 1.2f));
+
+        ImGui.PushID((int)icon);
+        ImGui.Button(string.Empty, size);
+        ImGui.PopID();
+
+        // Draw icon with same color used for text in buttons
+        Icons.DrawIconOnLastItem(icon, GetStateColorVec(state));
+
+        ImGui.PopStyleColor(3);
+        ImGui.PopStyleVar(1);
     }
 
     #endregion
@@ -748,6 +959,18 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     }
 
     #endregion
+
+    private static Vector4 GetStateColorVec(CustomComponents.ButtonStates state)
+    {
+        return state switch
+        {
+            CustomComponents.ButtonStates.Dimmed => UiColors.Text.Fade(0.8f).Rgba,
+            CustomComponents.ButtonStates.Disabled => UiColors.TextDisabled.Fade(0.6f).Rgba,
+            CustomComponents.ButtonStates.Activated => UiColors.StatusActivated.Rgba,
+            CustomComponents.ButtonStates.NeedsAttention => UiColors.StatusAttention.Rgba,
+            _ => UiColors.Text.Rgba
+        };
+    }
 
     internal override IReadOnlyList<T3.Editor.Gui.Windows.Window> GetInstances()
     {
