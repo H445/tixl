@@ -3,7 +3,6 @@ using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
 using T3.Editor.Gui.Styling;
 using T3.Core.Utils;
-using System.Numerics;
 
 namespace T3.Editor.Gui.Interaction.Midi;
 
@@ -71,6 +70,107 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
         ImGui.PopID();
     }
+
+    #region Shared Helpers
+
+    /// <summary>Safe color code lookup from ControllerColors array.</summary>
+    private static int GetColorCode(MidiDeviceStatus s, int noteId)
+        => noteId >= 0 && noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+
+    /// <summary>Draws a tooltip on the last item if hovered.</summary>
+    private static void DrawTooltipIfHovered(string text)
+    {
+        if (!ImGui.IsItemHovered()) return;
+        ImGui.BeginTooltip();
+        ImGui.TextUnformatted(text);
+        ImGui.EndTooltip();
+    }
+
+    /// <summary>Draws a tooltip with two lines on the last item if hovered.</summary>
+    private static void DrawTooltipIfHovered(string line1, string line2)
+    {
+        if (!ImGui.IsItemHovered()) return;
+        ImGui.BeginTooltip();
+        ImGui.TextUnformatted(line1);
+        ImGui.TextUnformatted(line2);
+        ImGui.EndTooltip();
+    }
+
+    /// <summary>
+    /// Draws a colored LED button with tooltip.
+    /// </summary>
+    private static void DrawLedButton(string label, int noteId, Vector4 col, Vector2 size, string tooltip)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Button, col);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
+        ImGui.Button($"{label}##{noteId}", size);
+        DrawTooltipIfHovered(tooltip);
+        ImGui.PopStyleColor(2);
+    }
+
+    /// <summary>
+    /// Draws an icon button with background color based on LED state.
+    /// </summary>
+    private static void DrawIconButton(MidiDeviceStatus s, Icon icon, int noteId, Vector2 size, bool blinkOn, string tooltip)
+    {
+        var colorCode = GetColorCode(s, noteId);
+        var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+        var bgCol = ColorForSimpleLed(colorCode, blinkOn);
+        DrawIconButtonWithBg(icon, size, bgCol, state);
+        DrawTooltipIfHovered(tooltip);
+    }
+
+    /// <summary>
+    /// Draws a transport button with a custom shape (square for Stop, circle for Record)
+    /// rendered via the draw list.
+    /// </summary>
+    private static void DrawStopButton(int noteId, MidiDeviceStatus s, Vector2 size, bool blinkOn)
+    {
+        var colorCode = GetColorCode(s, noteId);
+        var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+        var bgCol = ColorForSimpleLed(colorCode, blinkOn);
+
+        DrawStyledButton(noteId, bgCol, state, size, () =>
+        {
+            var sysColor = GetStateColorVec(state);
+            var min = ImGui.GetItemRectMin();
+            var max = ImGui.GetItemRectMax();
+            var center = (min + max) / 2f;
+            var dl = ImGui.GetWindowDrawList();
+            DrawStopShape(dl, center, Icons.FontSize, ImGui.GetColorU32(sysColor));
+        });
+    }
+
+    private static void DrawRecordButton(int noteId, MidiDeviceStatus s, Vector2 size, bool blinkOn)
+    {
+        var colorCode = GetColorCode(s, noteId);
+        var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
+        var bgCol = ColorForSimpleLed(colorCode, blinkOn);
+
+        DrawStyledButton(noteId, bgCol, state, size, () =>
+        {
+            var sysColor = GetStateColorVec(state);
+            var min = ImGui.GetItemRectMin();
+            var max = ImGui.GetItemRectMax();
+            var center = (min + max) / 2f;
+            var dl = ImGui.GetWindowDrawList();
+            DrawRecordShape(dl, center, Icons.FontSize, ImGui.GetColorU32(sysColor));
+        });
+    }
+
+    private static void DrawStopShape(ImDrawListPtr dl, Vector2 center, float iconSize, uint color)
+    {
+        var iconMin = new Vector2(center.X - iconSize / 2f, center.Y - iconSize / 2f).Floor();
+        var iconMax = iconMin + new Vector2(iconSize, iconSize);
+        dl.AddRectFilled(iconMin, iconMax, color, 2f);
+    }
+
+    private static void DrawRecordShape(ImDrawListPtr dl, Vector2 center, float iconSize, uint color)
+    {
+        dl.AddCircleFilled(center.Floor(), iconSize / 2f, color, 16);
+    }
+
+    #endregion
 
     #region APC40 MK1 Full Hardware Layout
 
@@ -154,25 +254,21 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     /// </summary>
     private static void DrawKnobRow(string idPrefix, int ccStart, int count, Vector2 size, Vector4 color)
     {
+        var hoverColor = BrightenColor(color, 1.15f);
         for (var i = 0; i < count; i++)
         {
             if (i > 0) ImGui.SameLine();
             var cc = ccStart + i;
             ImGui.PushStyleColor(ImGuiCol.Button, color);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(color, 1.15f));
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, hoverColor);
             ImGui.Button($"K{i + 1}##{idPrefix}{cc}", size);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted($"{idPrefix} {i + 1} (CC {cc})");
-                ImGui.EndTooltip();
-            }
+            DrawTooltipIfHovered($"{idPrefix} {i + 1} (CC {cc})");
             ImGui.PopStyleColor(2);
         }
     }
 
     /// <summary>
-    /// Draws the 8x5 clip launch grid with scene launch buttons on the right side
+    /// Draws the 8x5 clip launch grid, with scene launch buttons on the right side
     /// and Stop All Clips button below the scene launch column.
     /// </summary>
     private void DrawClipGridWithSceneLaunch(MidiDeviceStatus s, bool blinkOn, Vector2 clipBtnSize, Vector2 sceneBtnSize, float scale)
@@ -200,76 +296,46 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         }
 
         ImGui.TableSetColumnIndex(cols + 1);
-        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.6f, 0.6f, 0.6f, 1f));
-        ImGui.TextUnformatted("SCENE");
-        ImGui.PopStyleColor();
+        DrawSectionLabel("SCENE");
 
         // Clip grid rows (R1 at top)
         for (var r = 0; r < rows; r++)
         {
             ImGui.TableNextRow();
 
-            // Row label
             ImGui.TableSetColumnIndex(0);
             ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.2f, 0.3f, 1f));
             ImGui.Button($"R{r + 1}", new Vector2(24 * scale, clipBtnSize.Y));
             ImGui.PopStyleColor();
 
-            // 8 clip launch buttons
             for (var c = 0; c < cols; c++)
             {
                 ImGui.TableSetColumnIndex(c + 1);
                 var idx = r * cols + c; // index 0-39
-                var colorCode = idx < s.ControllerColors.Length ? s.ControllerColors[idx] : -1;
+                var colorCode = GetColorCode(s, idx);
                 var col = ColorForClipLaunch(colorCode, blinkOn);
 
                 ImGui.PushStyleColor(ImGuiCol.Button, col);
                 ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
                 ImGui.Button($"##{idx}", clipBtnSize);
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"Clip Launch R{r + 1}C{c + 1} (idx {idx})");
-                    ImGui.TextUnformatted($"Color: {ColorCodeName(colorCode)}");
-                    ImGui.EndTooltip();
-                }
+                DrawTooltipIfHovered($"Clip Launch R{r + 1}C{c + 1} (idx {idx})", $"Color: {ColorCodeName(colorCode)}");
                 ImGui.PopStyleColor(2);
             }
 
             // Scene Launch button (right column)
             ImGui.TableSetColumnIndex(cols + 1);
             var sceneIdx = 82 + r; // Scene Launch 1-5 = notes 82-86
-            var sceneColor = sceneIdx < s.ControllerColors.Length ? s.ControllerColors[sceneIdx] : -1;
-            var sceneCol = ColorForSimpleLed(sceneColor, blinkOn);
-            ImGui.PushStyleColor(ImGuiCol.Button, sceneCol);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(sceneCol, 1.2f));
-            ImGui.Button($"S{r + 1}##{sceneIdx}", sceneBtnSize);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted($"Scene Launch {r + 1} (Note {sceneIdx})");
-                ImGui.EndTooltip();
-            }
-            ImGui.PopStyleColor(2);
+            var sceneCol = ColorForSimpleLed(GetColorCode(s, sceneIdx), blinkOn);
+            DrawLedButton($"S{r + 1}", sceneIdx, sceneCol, sceneBtnSize, $"Scene Launch {r + 1} (Note {sceneIdx})");
         }
 
         // Stop All Clips row
         ImGui.TableNextRow();
-        ImGui.TableSetColumnIndex(0);
-        for (var c = 1; c <= cols; c++)
-            ImGui.TableSetColumnIndex(c);
-
         ImGui.TableSetColumnIndex(cols + 1);
-        var stopAllColor = 81 < s.ControllerColors.Length ? s.ControllerColors[81] : -1;
-        var stopAllCol = ColorForSimpleLed(stopAllColor, blinkOn);
+        var stopAllCol = ColorForSimpleLed(GetColorCode(s, 81), blinkOn);
         ImGui.PushStyleColor(ImGuiCol.Button, stopAllCol);
-        ImGui.Button($"STOP##81", sceneBtnSize);
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted("Stop All Clips (Note 81)");
-            ImGui.EndTooltip();
-        }
+        ImGui.Button("STOP##81", sceneBtnSize);
+        DrawTooltipIfHovered("Stop All Clips (Note 81)");
         ImGui.PopStyleColor();
 
         ImGui.EndTable();
@@ -281,32 +347,18 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     /// </summary>
     private void DrawTrackControlButtons(MidiDeviceStatus s, bool blinkOn, Vector2 btnSize, float scale)
     {
-        const int tracks = 8;
         var labelWidth = new Vector2(60 * scale, btnSize.Y);
 
-        // --- Clip Stop (indices 52-59, Note 0x34 on Ch0-7 in Ableton mode) ---
-        DrawTrackButtonRow(s, blinkOn, "CLIP STOP", 52, tracks, btnSize, labelWidth, true,
-            "Clip Stop (Note 52-59)");
-
-        // --- Solo (Note 49/0x31 on Ch0-7 in Ableton mode, Note 49 in generic) ---
-        DrawTrackButtonRow(s, blinkOn, "SOLO", 49, 1, btnSize, labelWidth, false,
-            "Solo (Note 49, Ch 0-7 in Ableton)");
-
-        // --- Activator / A-B buttons (indices 66-73, Note 66-73 on Ch1) ---
-        DrawTrackButtonRow(s, blinkOn, "ACTIVATOR", 66, tracks, btnSize, labelWidth, true,
-            "Activator (Note 66-73)");
-
-        // --- Record Arm (Note 48/0x30 on Ch0-7 in Ableton, Notes 48-55 in Generic) ---
-        DrawTrackButtonRow(s, blinkOn, "REC ARM", 48, 1, btnSize, labelWidth, false,
-            "Record Arm (Note 48, Ch 0-7 in Ableton)");
-
-        // --- Track Select (Note 51/0x33 on Ch0-7 in Ableton, Notes 58-65 in Generic) ---
-        DrawTrackButtonRow(s, blinkOn, "TRK SEL", 51, 1, btnSize, labelWidth, false,
-            "Track Select (Note 51, Ch 0-7 in Ableton)");
+        DrawTrackButtonRow(s, blinkOn, "CLIP STOP", 52, btnSize, labelWidth, true, "Clip Stop (Note 52-59)");
+        DrawTrackButtonRow(s, blinkOn, "TRK SEL", 51, btnSize, labelWidth, false, "Track Select (Note 51, Ch 0-7 in Ableton)");
+        DrawTrackButtonRow(s, blinkOn, "ACTIVATOR", 66, btnSize, labelWidth, true, "Activator (Note 66-73)");
+        DrawTrackButtonRow(s, blinkOn, "SOLO", 49, btnSize, labelWidth, false, "Solo (Note 49, Ch 0-7 in Ableton)");
+        DrawTrackButtonRow(s, blinkOn, "REC ARM", 48, btnSize, labelWidth, false, "Record Arm (Note 48, Ch 0-7 in Ableton)");
+        
     }
 
     private void DrawTrackButtonRow(MidiDeviceStatus s, bool blinkOn, string label,
-        int startIdx, int _, Vector2 btnSize, Vector2 labelSize,
+        int startIdx, Vector2 btnSize, Vector2 labelSize,
         bool hasPerTrackIndices, string tooltip)
     {
         const int tracks = 8;
@@ -318,30 +370,16 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         for (var i = 0; i < tracks; i++)
         {
             ImGui.SameLine();
-            int colorCode;
-            int noteIdx;
-            if (hasPerTrackIndices)
-            {
-                noteIdx = startIdx + i;
-                colorCode = noteIdx < s.ControllerColors.Length ? s.ControllerColors[noteIdx] : -1;
-            }
-            else
-            {
-                noteIdx = startIdx;
-                colorCode = (i == 0 && noteIdx < s.ControllerColors.Length) ? s.ControllerColors[noteIdx] : -1;
-            }
+            var noteIdx = hasPerTrackIndices ? startIdx + i : startIdx;
+            var colorCode = hasPerTrackIndices || i == 0 ? GetColorCode(s, noteIdx) : -1;
             var col = ColorForSimpleLed(colorCode, blinkOn);
 
             ImGui.PushStyleColor(ImGuiCol.Button, col);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
             ImGui.Button($"{i + 1}##{label}{i}", btnSize);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted($"{label} Track {i + 1}");
-                ImGui.TextUnformatted(hasPerTrackIndices ? $"Note {noteIdx}, Color: {colorCode}" : tooltip);
-                ImGui.EndTooltip();
-            }
+            DrawTooltipIfHovered(
+                $"{label} Track {i + 1}",
+                hasPerTrackIndices ? $"Note {noteIdx}, Color: {colorCode}" : tooltip);
             ImGui.PopStyleColor(2);
         }
     }
@@ -356,347 +394,122 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     {
         DrawSectionLabel("DEVICE CONTROL");
 
-        // Use device-specific ordered mapping when available
-        if (s.DeviceTypeName?.IndexOf("Apc40", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            var notes = Apc40Mk1.DeviceControlNoteOrder;
-            var labels = Apc40Mk1.DeviceControlLabels;
-            for (var i = 0; i < notes.Length && i < labels.Length; i++)
-            {
-                if (i > 0 && i % 4 != 0) ImGui.SameLine();
-                var noteId = notes[i];
-                var label = labels[i];
+        // Determine button layout — APC40 uses ordered mapping, fallback uses hardcoded
+        var isApc40 = s.DeviceTypeName?.IndexOf("Apc40", StringComparison.OrdinalIgnoreCase) >= 0;
+        var notes = isApc40 ? Apc40Mk1.DeviceControlNoteOrder : _fallbackDeviceControlNotes;
+        var labels = isApc40 ? Apc40Mk1.DeviceControlLabels : _fallbackDeviceControlLabels;
 
-                // Render device left/right as icons per request, keep other buttons as before
-                if (noteId == 58)
-                {
-                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
-                    DrawIconButtonWithBg(Icon.ChevronLeft, btnSize, bgCol, state);
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.BeginTooltip();
-                        ImGui.TextUnformatted($"Device Left (Note {noteId})");
-                        ImGui.EndTooltip();
-                    }
-                }
-                else if (noteId == 59)
-                {
-                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
-                    DrawIconButtonWithBg(Icon.ChevronRight, btnSize, bgCol, state);
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.BeginTooltip();
-                        ImGui.TextUnformatted($"Device Right (Note {noteId})");
-                        ImGui.EndTooltip();
-                    }
-                }
-                else
-                {
+        for (var i = 0; i < notes.Length && i < labels.Length; i++)
+        {
+            if (i > 0 && i % 4 != 0) ImGui.SameLine();
+            var noteId = notes[i];
+            var label = labels[i];
+
+            switch (noteId)
+            {
+                case 58:
+                    DrawIconButton(s, Icon.ChevronLeft, noteId, btnSize, blinkOn, $"Device Left (Note {noteId})");
+                    break;
+                case 59:
+                    DrawIconButton(s, Icon.ChevronRight, noteId, btnSize, blinkOn, $"Device Right (Note {noteId})");
+                    break;
+                default:
                     DrawSimpleButton(s, label, noteId, btnSize, blinkOn, label);
-                }
-            }
-        }
-        else
-        {
-            var devButtons = new (string Label, int NoteId)[]
-            {
-                ("Dev◄", 58), ("Dev►", 59), ("Bnk◄", 60), ("Bnk►", 61),
-                ("On/Off", 62), ("Lock", 63), ("Clip/D", 64), ("Detail", 65),
-            };
-
-            for (var i = 0; i < devButtons.Length; i++)
-            {
-                if (i > 0 && i % 4 != 0) ImGui.SameLine();
-                var (lbl, noteId) = devButtons[i];
-
-                if (noteId == 58)
-                {
-                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
-                    DrawIconButtonWithBg(Icon.ChevronLeft, btnSize, bgCol, state);
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.BeginTooltip();
-                        ImGui.TextUnformatted($"Device Left (Note {noteId})");
-                        ImGui.EndTooltip();
-                    }
-                }
-                else if (noteId == 59)
-                {
-                    var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-                    var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-                    var bgCol = ColorForSimpleLed(colorCode, _blinkOn);
-                    DrawIconButtonWithBg(Icon.ChevronRight, btnSize, bgCol, state);
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.BeginTooltip();
-                        ImGui.TextUnformatted($"Device Right (Note {noteId})");
-                        ImGui.EndTooltip();
-                    }
-                }
-                else
-                {
-                    if (i > 0 && i % 4 != 0) ImGui.SameLine();
-                    DrawSimpleButton(s, lbl, noteId, btnSize, blinkOn, lbl);
-                }
+                    break;
             }
         }
 
         ImGui.Spacing();
-
         DrawSectionLabel("MODE");
 
-        // If this is an APC40 device and the compatible device class exposes the ordered
-        // mapping, use it to render mode buttons in the exact physical order.
-        if (s.DeviceTypeName?.IndexOf("Apc40", StringComparison.OrdinalIgnoreCase) >= 0)
+        if (isApc40)
         {
-            var notes = Apc40Mk1.ModeButtonNoteOrder;
-            var labels = Apc40Mk1.ModeButtonLabels;
-            for (var i = 0; i < notes.Length && i < labels.Length; i++)
+            var modeNotes = Apc40Mk1.ModeButtonNoteOrder;
+            var modeLabels = Apc40Mk1.ModeButtonLabels;
+            for (var i = 0; i < modeNotes.Length && i < modeLabels.Length; i++)
             {
                 if (i > 0) ImGui.SameLine();
-                var noteId = notes[i];
-                var label = labels[i];
-                var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-                var col = colorCode > 0 ? _greenColor : _offColor; // use green to indicate active for simplicity
-
-                ImGui.PushStyleColor(ImGuiCol.Button, col);
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
-                ImGui.Button($"{label}##{noteId}", btnSize);
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"{label} (Note {noteId})");
-                    ImGui.EndTooltip();
-                }
-                ImGui.PopStyleColor(2);
+                var noteId = modeNotes[i];
+                var colorCode = GetColorCode(s, noteId);
+                var col = colorCode > 0 ? _greenColor : _offColor;
+                DrawLedButton(modeLabels[i], noteId, col, btnSize, $"{modeLabels[i]} (Note {noteId})");
             }
         }
         else
         {
-            // Fallback to previous hardcoded layout
-            var modeButtons = new (string Label, int NoteId, Vector4 ActiveColor)[]
-            {
-                ("PAN", 87, new Vector4(0.2f, 0.6f, 0.8f, 1f)),
-                ("SEND", 88, new Vector4(0.2f, 0.6f, 0.8f, 1f)),
-                ("USER", 89, new Vector4(0.2f, 0.6f, 0.8f, 1f)),
-                ("METRO", 90, new Vector4(0.7f, 0.4f, 0.2f, 1f)),
-            };
-
-            for (var i = 0; i < modeButtons.Length; i++)
+            for (var i = 0; i < _fallbackModeButtons.Length; i++)
             {
                 if (i > 0) ImGui.SameLine();
-                var (label, noteId, activeColor) = modeButtons[i];
-                var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+                var (label, noteId, activeColor) = _fallbackModeButtons[i];
+                var colorCode = GetColorCode(s, noteId);
                 var col = colorCode > 0 ? activeColor : _offColor;
-
-                ImGui.PushStyleColor(ImGuiCol.Button, col);
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
-                ImGui.Button($"{label}##{noteId}", btnSize);
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"{label} (Note {noteId})");
-                    ImGui.EndTooltip();
-                }
-                ImGui.PopStyleColor(2);
+                DrawLedButton(label, noteId, col, btnSize, $"{label} (Note {noteId})");
             }
         }
     }
 
+    // Fallback data for non-APC40 devices (avoids per-frame allocations)
+    private static readonly int[] _fallbackDeviceControlNotes = { 58, 59, 60, 61, 62, 63, 64, 65 };
+    private static readonly string[] _fallbackDeviceControlLabels = { "Dev◄", "Dev►", "Bnk◄", "Bnk►", "On/Off", "Lock", "Clip/D", "Detail" };
+    private static readonly (string Label, int NoteId, Vector4 ActiveColor)[] _fallbackModeButtons =
+    {
+        ("PAN", 87, new Vector4(0.2f, 0.6f, 0.8f, 1f)),
+        ("SEND", 88, new Vector4(0.2f, 0.6f, 0.8f, 1f)),
+        ("USER", 89, new Vector4(0.2f, 0.6f, 0.8f, 1f)),
+        ("METRO", 90, new Vector4(0.7f, 0.4f, 0.2f, 1f)),
+    };
+
     /// <summary>
-    /// Draws Transport controls (Play, Stop, Record) and Navigation (Bank arrows, Shift,
-    /// Tap Tempo, Nudge+/-, Session).
+    /// Draws Transport controls and Navigation.
     /// </summary>
     private void DrawTransportAndNavigation(MidiDeviceStatus s, bool blinkOn, Vector2 btnSize, float scale)
     {
         DrawSectionLabel("TRANSPORT");
 
         var transportBtnSize = new Vector2(50 * scale, 22 * scale);
-        var transportButtons = new (string Label, int NoteId, Vector4 OnColor)[]
-        {
-            ("\u25b6 PLAY", 91, new Vector4(0.1f, 0.85f, 0.2f, 1f)),
-            ("\u25a0 STOP", 92, new Vector4(0.6f, 0.6f, 0.6f, 1f)),
-            ("\u25cf REC", 93, new Vector4(0.9f, 0.15f, 0.1f, 1f)),
-        };
 
-        for (var i = 0; i < transportButtons.Length; i++)
+        // Play
         {
-            if (i > 0) ImGui.SameLine();
-            var (lbl, noteId, onColor) = transportButtons[i];
-            var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
+            var colorCode = GetColorCode(s, 91);
             var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-
-            // Use icon for Play per request
-            if (noteId == 91)
-            {
-                var bgCol = colorCode > 0 ? onColor : _offColor;
-                DrawIconButtonWithBg(Icon.PlayForwards, transportBtnSize, bgCol, state);
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"Play (Note {noteId})");
-                    ImGui.EndTooltip();
-                }
-            }
-            else if (noteId == 92) // STOP -> draw a filled square centered in the button
-            {
-                var stateLocal = state;
-
-                // Mimic CustomComponents.IconButton styling so the background responds the same.
-                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
-                ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
-                if (stateLocal == CustomComponents.ButtonStates.Activated)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Button, UiColors.BackgroundButtonActivated.Rgba);
-                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundButtonActivated.Fade(0.8f).Rgba);
-                }
-
-                ImGui.PushID(noteId);
-                ImGui.Button(string.Empty, transportBtnSize);
-                ImGui.PopID();
-
-                // Draw square foreground using the standard state/text color so it matches text buttons
-                var sysColor = GetStateColorVec(stateLocal);
-                var min = ImGui.GetItemRectMin();
-                var max = ImGui.GetItemRectMax();
-                var center = (min + max) / 2f;
-                var iconSize = Icons.FontSize;
-                var iconMin = new Vector2(center.X - iconSize / 2f, center.Y - iconSize / 2f).Floor();
-                var iconMax = iconMin + new Vector2(iconSize, iconSize);
-                var dl = ImGui.GetWindowDrawList();
-                dl.AddRectFilled(iconMin, iconMax, ImGui.GetColorU32(sysColor), 2f);
-
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"Stop (Note {noteId})");
-                    ImGui.EndTooltip();
-                }
-
-                ImGui.PopStyleColor();
-                if (stateLocal == CustomComponents.ButtonStates.Activated)
-                    ImGui.PopStyleColor(2);
-                ImGui.PopStyleVar(1);
-            }
-            else if (noteId == 93) // REC -> draw a filled circle centered in the button
-            {
-                var stateLocal = state;
-
-                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
-                ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
-                if (stateLocal == CustomComponents.ButtonStates.Activated)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Button, UiColors.BackgroundButtonActivated.Rgba);
-                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundButtonActivated.Fade(0.8f).Rgba);
-                }
-
-                ImGui.PushID(noteId);
-                ImGui.Button(string.Empty, transportBtnSize);
-                ImGui.PopID();
-
-                var sysColorRec = GetStateColorVec(stateLocal);
-                var min = ImGui.GetItemRectMin();
-                var max = ImGui.GetItemRectMax();
-                var center = (min + max) / 2f;
-                var radius = Icons.FontSize / 2f;
-                var dl = ImGui.GetWindowDrawList();
-                dl.AddCircleFilled(center.Floor(), radius, ImGui.GetColorU32(sysColorRec), 16);
-
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"Record (Note {noteId})");
-                    ImGui.EndTooltip();
-                }
-
-                ImGui.PopStyleColor();
-                if (stateLocal == CustomComponents.ButtonStates.Activated)
-                    ImGui.PopStyleColor(2);
-                ImGui.PopStyleVar(1);
-            }
-            else
-            {
-                var col = colorCode > 0 ? onColor : _offColor;
-
-                ImGui.PushStyleColor(ImGuiCol.Button, col);
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
-                ImGui.Button($"{lbl}##{noteId}", transportBtnSize);
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"{lbl} (Note {noteId})");
-                    ImGui.EndTooltip();
-                }
-                ImGui.PopStyleColor(2);
-            }
+            var bgCol = colorCode > 0 ? new Vector4(0.1f, 0.85f, 0.2f, 1f) : _offColor;
+            DrawIconButtonWithBg(Icon.PlayForwards, transportBtnSize, bgCol, state);
+            DrawTooltipIfHovered("Play (Note 91)");
         }
 
-        ImGui.Spacing();
+        // Stop
+        ImGui.SameLine();
+        DrawStopButton(92, s, transportBtnSize, blinkOn);
+        DrawTooltipIfHovered("Stop (Note 92)");
 
+        // Record
+        ImGui.SameLine();
+        DrawRecordButton(93, s, transportBtnSize, blinkOn);
+        DrawTooltipIfHovered("Record (Note 93)");
+
+        ImGui.Spacing();
         DrawSectionLabel("NAVIGATION");
 
         var navBtnSize = new Vector2(30 * scale, 20 * scale);
 
         // Row 1: Up button (centered)
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + navBtnSize.X + 3 * scale);
-        {
-            var noteId = 94;
-            var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-            var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-            var bgCol = ColorForSimpleLed(colorCode, blinkOn);
-            DrawIconButtonWithBg(Icon.ArrowUp, navBtnSize, bgCol, state);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted("Bank Up (Note 94)");
-                ImGui.EndTooltip();
-            }
-        }
+        DrawIconButton(s, Icon.ArrowUp, 94, navBtnSize, blinkOn, "Bank Up (Note 94)");
 
         // Row 2: Left, Shift, Right
-        {
-            var noteIdLeft = 97;
-            var colorCodeLeft = noteIdLeft < s.ControllerColors.Length ? s.ControllerColors[noteIdLeft] : -1;
-            var stateLeft = colorCodeLeft > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-            var bgColLeft = ColorForSimpleLed(colorCodeLeft, blinkOn);
-            DrawIconButtonWithBg(Icon.ArrowLeft, navBtnSize, bgColLeft, stateLeft);
-        }
+        DrawIconButton(s, Icon.ArrowLeft, 97, navBtnSize, blinkOn, "Bank Left (Note 97)");
         ImGui.SameLine();
         DrawSimpleButton(s, "SHIFT", 98, navBtnSize, blinkOn, "Shift");
         ImGui.SameLine();
-        {
-            var noteIdRight = 96;
-            var colorCodeRight = noteIdRight < s.ControllerColors.Length ? s.ControllerColors[noteIdRight] : -1;
-            var stateRight = colorCodeRight > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-            var bgColRight = ColorForSimpleLed(colorCodeRight, blinkOn);
-            DrawIconButtonWithBg(Icon.ArrowRight, navBtnSize, bgColRight, stateRight);
-        }
+        DrawIconButton(s, Icon.ArrowRight, 96, navBtnSize, blinkOn, "Bank Right (Note 96)");
 
         // Row 3: Down button (centered)
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + navBtnSize.X + 3 * scale);
-        {
-            var noteId = 95;
-            var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-            var state = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-            var bgColDown = ColorForSimpleLed(colorCode, blinkOn);
-            DrawIconButtonWithBg(Icon.ArrowDown, navBtnSize, bgColDown, state);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted("Bank Down (Note 95)");
-                ImGui.EndTooltip();
-            }
-        }
+        DrawIconButton(s, Icon.ArrowDown, 95, navBtnSize, blinkOn, "Bank Down (Note 95)");
 
         ImGui.Spacing();
 
-        // Utility buttons: Tap Tempo, Nudge-, Nudge+, Session
+        // Utility buttons
         DrawSimpleButton(s, "TAP", 99, btnSize, blinkOn, "Tap Tempo");
         ImGui.SameLine();
         DrawSimpleButton(s, "NUD-", 100, btnSize, blinkOn, "Nudge -");
@@ -707,10 +520,7 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     }
 
     /// <summary>
-    /// Draws fader indicators for 8 channel faders, master fader, A-B crossfader,
-    /// Cue Level knob, and Tempo knob.
-    /// Since fader/knob positions are CC values not stored in ControllerColors,
-    /// these are shown as labeled static UI elements.
+    /// Draws fader indicators.
     /// </summary>
     private static void DrawFaders(float scale)
     {
@@ -719,30 +529,21 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         var faderBtnSize = new Vector2(26 * scale, 50 * scale);
         var knobBtnSize = new Vector2(24 * scale, 24 * scale);
 
-        // 8 channel faders (CC 7 on ch 1-8)
+        // 8 channel faders
         for (var i = 0; i < 8; i++)
         {
             if (i > 0) ImGui.SameLine();
             ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.3f, 0.3f, 0.35f, 1f));
             ImGui.Button($"F{i + 1}##fader{i}", faderBtnSize);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted($"Track Fader {i + 1} (CC 7, Ch {i + 1})");
-                ImGui.EndTooltip();
-            }
+            DrawTooltipIfHovered($"Track Fader {i + 1} (CC 7, Ch {i + 1})");
             ImGui.PopStyleColor();
         }
 
+        // Master fader
         ImGui.SameLine();
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.4f, 0.3f, 0.3f, 1f));
         ImGui.Button("MST##faderM", faderBtnSize);
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted("Master Fader (CC 14)");
-            ImGui.EndTooltip();
-        }
+        DrawTooltipIfHovered("Master Fader (CC 14)");
         ImGui.PopStyleColor();
 
         // Crossfader and utility knobs
@@ -750,34 +551,19 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         var crossfaderSize = new Vector2(160 * scale, 18 * scale);
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.35f, 0.35f, 0.4f, 1f));
         ImGui.Button("A \u25c4\u2500\u2500 CROSSFADER \u2500\u2500\u25ba B##xfader", crossfaderSize);
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted("A-B Crossfader (CC 15)");
-            ImGui.EndTooltip();
-        }
+        DrawTooltipIfHovered("A-B Crossfader (CC 15)");
         ImGui.PopStyleColor();
 
         ImGui.SameLine();
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.3f, 0.5f, 0.5f, 1f));
         ImGui.Button("CUE##cue47", knobBtnSize);
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted("Cue Level (CC 47)");
-            ImGui.EndTooltip();
-        }
+        DrawTooltipIfHovered("Cue Level (CC 47)");
         ImGui.PopStyleColor();
 
         ImGui.SameLine();
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.5f, 0.3f, 0.5f, 1f));
         ImGui.Button("TEMPO##tempo13", knobBtnSize);
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted("Tempo (CC 13)");
-            ImGui.EndTooltip();
-        }
+        DrawTooltipIfHovered("Tempo (CC 13)");
         ImGui.PopStyleColor();
     }
 
@@ -786,36 +572,36 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     /// </summary>
     private void DrawSimpleButton(MidiDeviceStatus s, string label, int noteId, Vector2 size, bool blinkOn, string tooltipLabel)
     {
-        var colorCode = noteId < s.ControllerColors.Length ? s.ControllerColors[noteId] : -1;
-        var col = ColorForSimpleLed(colorCode, blinkOn);
-
-        ImGui.PushStyleColor(ImGuiCol.Button, col);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
-        ImGui.Button($"{label}##{noteId}", size);
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted($"{tooltipLabel} (Note {noteId})");
-            ImGui.EndTooltip();
-        }
-        ImGui.PopStyleColor(2);
+        var col = ColorForSimpleLed(GetColorCode(s, noteId), blinkOn);
+        DrawLedButton(label, noteId, col, size, $"{tooltipLabel} (Note {noteId})");
     }
 
     private static void DrawIconButtonWithBg(Icon icon, Vector2 size, Vector4 bgCol, CustomComponents.ButtonStates state)
+    {
+        DrawStyledButton((int)icon, bgCol, state, size, () => Icons.DrawIconOnLastItem(icon, GetStateColorVec(state)));
+    }
+
+    /// <summary>
+    /// Pushes the common button styling, emits an invisible button and invokes the drawContent action
+    /// to render either an icon or a custom shape on top of the button rectangle.
+    /// This keeps styling identical between icon and shape buttons.
+    /// </summary>
+    private static void DrawStyledButton(object idKey, Vector4 bgCol, CustomComponents.ButtonStates state, Vector2 size, Action drawContent)
     {
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
         ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
         ImGui.PushStyleColor(ImGuiCol.Button, bgCol);
         ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(bgCol, 1.2f));
 
-        ImGui.PushID((int)icon);
+        // Push a string id to match ImGui.PushID overloads (int/IntPtr/string/ReadOnlySpan<char>)
+        ImGui.PushID(idKey?.ToString() ?? string.Empty);
         ImGui.Button(string.Empty, size);
         ImGui.PopID();
 
-        // Draw icon with same color used for text in buttons
-        Icons.DrawIconOnLastItem(icon, GetStateColorVec(state));
+         // Let the caller draw the icon/shape using the current item rect
+         drawContent();
 
-        ImGui.PopStyleColor(3);
+         ImGui.PopStyleColor(3);
         ImGui.PopStyleVar(1);
     }
 
@@ -861,19 +647,13 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
                 {
                     ImGui.TableSetColumnIndex(c + 1);
                     var idx = r * cols + c;
-                    var colorCode = idx < s.ControllerColors.Length ? s.ControllerColors[idx] : -1;
+                    var colorCode = GetColorCode(s, idx);
                     var col = ColorForClipLaunch(colorCode, blinkOn);
 
                     ImGui.PushStyleColor(ImGuiCol.Button, col);
                     ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
                     ImGui.Button("", btnSize);
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.BeginTooltip();
-                        ImGui.TextUnformatted($"Button {idx} (R{r + 1}C{c + 1})");
-                        ImGui.TextUnformatted($"Color: {colorCode}");
-                        ImGui.EndTooltip();
-                    }
+                    DrawTooltipIfHovered($"Button {idx} (R{r + 1}C{c + 1})", $"Color: {colorCode}");
                     ImGui.PopStyleColor(2);
                 }
             }
@@ -886,19 +666,12 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
     #region Color Mapping
 
-    // APC40 Mk1 clip launch LED color states (from protocol):
-    // 0=off, 1=green, 2=green blink, 3=red, 4=red blink, 5=yellow, 6=yellow blink, 7-127=green
     private static readonly Vector4 _greenColor = new(0.1f, 0.85f, 0.2f, 1f);
     private static readonly Vector4 _redColor = new(0.9f, 0.15f, 0.1f, 1f);
     private static readonly Vector4 _yellowColor = new(0.95f, 0.75f, 0.05f, 1f);
     private static readonly Vector4 _offColor = new(0.25f, 0.25f, 0.25f, 1f);
     private static readonly Vector4 _dimColor = new(0.15f, 0.15f, 0.15f, 0.8f);
 
-    /// <summary>
-    /// Maps APC40 Mk1 7-state clip launch color codes to RGBA colors.
-    /// Protocol: 0=off, 1=green, 2=green blink, 3=red, 4=red blink,
-    ///          5=yellow, 6=yellow blink, 7-127=green
-    /// </summary>
     private static Vector4 ColorForClipLaunch(int colorCode, bool blinkOn)
     {
         return colorCode switch
@@ -915,10 +688,6 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         };
     }
 
-    /// <summary>
-    /// Maps simple LED state for non-clip-grid buttons.
-    /// Most buttons: 0=off, 1-127=on. Clip Stop also supports 2=blink.
-    /// </summary>
     private static Vector4 ColorForSimpleLed(int colorCode, bool blinkOn)
     {
         return colorCode switch
@@ -930,9 +699,6 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         };
     }
 
-    /// <summary>
-    /// Returns a human-readable name for a color code value.
-    /// </summary>
     private static string ColorCodeName(int code)
     {
         return code switch
