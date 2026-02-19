@@ -16,6 +16,8 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
     private double _lastDrawUtc;
     private bool _blinkOn;
     private double _lastBlinkFlipMs;
+    // per-channel UI fader values (8 channels + master)
+    private readonly float[] _channelFaderValues = new float[9];
 
     protected override void DrawContent()
     {
@@ -737,7 +739,8 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         var clipH = clipBtnSize.Y;
         var smallH = smallBtnSize.Y;
         var knobH = knobSize.Y;
-        var faderH = 50 * scale;
+        // make faders roughly the height of 3 small buttons plus a little padding so they read as taller controls
+        var faderH = smallH * 3f + 6f * scale;
 
         // Header row (empty)
         ImGui.TableNextRow();
@@ -859,18 +862,54 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
         // === Faders row: 8 channel faders and Master fader in last column ===
         ImGui.TableNextRow();
+        // Draw interactive vertical sliders for each channel. Use same width as a button and a height ~3 buttons.
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.3f, 0.3f, 0.35f, 1f));
-            ImGui.Button($"F{c + 1}##fader{c}", new Vector2(btnW, faderH));
-            ImGui.PopStyleColor();
+            ImGui.PushID($"fader{c}");
+            // If the snapshot provides controller values, initialize the UI slider from CC 7 on channels 1..8
+            var ch = Math.Clamp(c, 0, 7);
+            var idx = ch * 128 + 7; // channel c -> MIDI channel (0..15), CC 7
+            if (s.ControllerValues != null && idx >= 0 && idx < s.ControllerValues.Length)
+            {
+                _channelFaderValues[c] = s.ControllerValues[idx];
+            }
+
+            // VSliderFloat draws a vertical slider sized to match a button width and the taller fader height
+            ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, ImGui.GetStyle().ItemSpacing.Y));
+            ImGui.VSliderFloat($"##fader{c}", new Vector2(btnW, faderH), ref _channelFaderValues[c], 0f, 1f, "");
+            ImGui.PopStyleVar(2);
+
+            // Show live value in tooltip (percent)
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.TextUnformatted($"Track Fader {c + 1}: {Math.Round(_channelFaderValues[c] * 100)}%");
+                ImGui.EndTooltip();
+            }
+            ImGui.PopID();
         }
-        // Master fader in last column - use same width as clip columns
+
+        // Master fader in last column - use same width and height
         ImGui.TableSetColumnIndex(clipCols);
-        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.4f, 0.3f, 0.3f, 1f));
-        ImGui.Button("MST##faderM", new Vector2(btnW, faderH));
-        ImGui.PopStyleColor();
+        ImGui.PushID("faderM");
+        // Initialize master fader from CC 14 on channel 0 if available in the provided snapshot
+        var idxM = 0 * 128 + 14; // channel 0, CC 14
+        if (s.ControllerValues != null && idxM >= 0 && idxM < s.ControllerValues.Length)
+        {
+            _channelFaderValues[8] = s.ControllerValues[idxM];
+        }
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
+        ImGui.VSliderFloat("##faderM", new Vector2(btnW, faderH), ref _channelFaderValues[8], 0f, 1f, "");
+        ImGui.PopStyleVar(1);
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.BeginTooltip();
+            ImGui.TextUnformatted($"Master Fader: {Math.Round(_channelFaderValues[8] * 100)}%");
+            ImGui.EndTooltip();
+        }
+        ImGui.PopID();
 
         ImGui.EndTable();
     }

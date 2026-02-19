@@ -43,6 +43,14 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
             Array.Copy(CacheControllerColors, cacheCopy, CacheControllerColors.Length);
         }
 
+        // Copy global controller value cache (for UI display of live values)
+        float[] cacheValuesCopy;
+        lock (CacheControllerValues)
+        {
+            cacheValuesCopy = new float[CacheControllerValues.Length];
+            Array.Copy(CacheControllerValues, cacheValuesCopy, CacheControllerValues.Length);
+        }
+
         // Try to obtain a device-specific ClipGridSize constant if present (e.g. APC40 defines it)
         int? clipGridSize = null;
         try
@@ -78,6 +86,7 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
             isInControlMode: IsInControlMode,
             useGenericMode: useGenericMode,
             controllerColors: cacheCopy,
+            controllerValues: cacheValuesCopy,
             controlCount: CacheControllerColors.Length,
             clipGridSize: clipGridSize,
             snapshotTimeUtc: DateTime.UtcNow
@@ -365,6 +374,25 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
                                                                ControllerValue = controlChangeEvent.ControllerValue,
                                                            });
                 }
+                // Also update the global controller value cache so the UI can display live values.
+                // Normalize value to 0..1
+                try
+                {
+                    // Use zero-based channel indexing for the cache: channel 1 -> index 0.
+                    lock (CacheControllerValues)
+                    {
+                        var ch0 = Math.Max(0, controlChangeEvent.Channel - 1);
+                        var idx = ch0 * 128 + (int)controlChangeEvent.Controller;
+                        if (idx >= 0 && idx < CacheControllerValues.Length)
+                        {
+                            CacheControllerValues[idx] = controlChangeEvent.ControllerValue / 127f;
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore cache update failures
+                }
                 _hasNewMessages = true;
                 return;
         }
@@ -421,7 +449,10 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
     }
 
     protected static readonly int[] CacheControllerColors = Enumerable.Repeat(-1, 256).ToArray();
-    #endregion
+    // Cache of last seen controller values per MIDI channel and controller id.
+    // Indexing: channel (0..15) * 128 + controllerId (0..127) => total length 16*128 = 2048
+    protected static readonly float[] CacheControllerValues = new float[16 * 128];
+     #endregion
 
     /// <summary>
     /// Clears all pending button signals. Call this when a mode switch changes button mappings
