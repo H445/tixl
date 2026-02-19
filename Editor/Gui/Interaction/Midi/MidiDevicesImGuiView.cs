@@ -787,9 +787,10 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         DrawTooltipIfHovered("Stop All Clips (Note 81)");
         ImGui.PopStyleColor();
 
-        // spacer row
+        // small spacer row above the Track Selection row so it has some breathing room
         ImGui.TableNextRow();
-        for (var c = 0; c < columns; c++) { ImGui.TableSetColumnIndex(c); ImGui.TextUnformatted(""); }
+        var smallSpacer = smallH * 0.35f;
+        for (var c = 0; c < columns; c++) { ImGui.TableSetColumnIndex(c); ImGui.Dummy(new Vector2(0, smallSpacer)); }
 
         // === Track Selection row: 8 small selectors + Master select in last column ===
         ImGui.TableNextRow();
@@ -805,6 +806,10 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         ImGui.Button("MST##trkselM", new Vector2(btnW, smallH));
         DrawTooltipIfHovered("Master Track Select");
         ImGui.PopStyleColor();
+
+        // small spacer row below the Track Selection row so there's a little space before the Activator/Solo/Record rows
+        ImGui.TableNextRow();
+        for (var c = 0; c < columns; c++) { ImGui.TableSetColumnIndex(c); ImGui.Dummy(new Vector2(0, smallSpacer)); }
 
         // === Activator / Solo / Rec Arm rows with cue knob centered in middle row (solo) ===
         // Activator
@@ -830,9 +835,9 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
             DrawLedButton((c + 1).ToString(), 49, col, new Vector2(btnW, smallH), $"Solo/Cue Track {c + 1}");
         }
         ImGui.TableSetColumnIndex(clipCols);
-        // cue knob centered here - make sure it fits the scene column width
+        // cue knob centered here - use the same height as the other rows so the three rows have equal spacing
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.3f, 0.5f, 0.5f, 1f));
-        ImGui.Button("CUE", new Vector2(btnW, knobH));
+        ImGui.Button("CUE", new Vector2(btnW, smallH));
         DrawTooltipIfHovered("Cue Level (CC 47)");
         ImGui.PopStyleColor();
 
@@ -848,7 +853,7 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         ImGui.TableSetColumnIndex(clipCols);
         ImGui.TextUnformatted("");
 
-        // spacer row before faders
+        // spacer row
         ImGui.TableNextRow();
         for (var c = 0; c < columns; c++) { ImGui.TableSetColumnIndex(c); ImGui.TextUnformatted(""); }
 
