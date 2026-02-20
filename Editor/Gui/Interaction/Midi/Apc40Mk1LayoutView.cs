@@ -176,26 +176,32 @@ internal static class Apc40Mk1LayoutView
 
         // --- Activator row ---
         ImGui.TableNextRow();
+        var combinedCueHeight = smallH * 3f + ImGui.GetStyle().ItemSpacing.Y * 2f;
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
             var note = 66 + c;
             var col  = ColorForSimpleLed(GetColorCode(s, note), blinkOn);
-            DrawLedButton("A", note, col, new Vector2(btnW, smallH), $"Activator Track {c + 1}");
+            // activator should be smallH
+            DrawLedButton($"A{c + 1}", note, col, new Vector2(btnW, smallH), $"Activator Track {c + 1}");
         }
         ImGui.TableSetColumnIndex(clipCols);
-        ImGui.TextUnformatted("");
+        // remember the top-left of the scene cell so we can draw the larger cue knob later
+        var cueCellPos = ImGui.GetCursorScreenPos();
+        // place a small dummy to keep this scene cell height equal to the small rows
+        ImGui.Dummy(new Vector2(btnW, smallH));
 
-        // --- Solo/Cue row (cue knob in last column) ---
+        // --- Solo/Cue row (cue knob occupies the scene column) ---
         ImGui.TableNextRow();
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
             var col = ColorForSimpleLed(GetColorCode(s, 49), blinkOn);
-            DrawLedButton((c + 1).ToString(), 49, col, new Vector2(btnW, smallH), $"Solo/Cue Track {c + 1}");
+            // solo/cue track buttons should be smallH
+            DrawLedButton($"S{c + 1}", 49, col, new Vector2(btnW, smallH), $"Solo/Cue Track {c + 1}");
         }
         ImGui.TableSetColumnIndex(clipCols);
-        DrawCueKnob(s, new Vector2(btnW, smallH));
+        ImGui.Dummy(new Vector2(btnW, smallH));
 
         // --- Record Arm row ---
         ImGui.TableNextRow();
@@ -204,10 +210,20 @@ internal static class Apc40Mk1LayoutView
             ImGui.TableSetColumnIndex(c);
             var note = 48 + c;
             var col  = ColorForSimpleLed(GetColorCode(s, note), blinkOn);
-            DrawLedButton("R", note, col, new Vector2(btnW, smallH), $"Record Arm Track {c + 1}");
+            // match height for alignment
+            DrawLedButton($"R{c + 1}", note, col, new Vector2(btnW, smallH), $"Record Arm Track {c + 1}");
         }
         ImGui.TableSetColumnIndex(clipCols);
-        ImGui.TextUnformatted("");
+        ImGui.Dummy(new Vector2(btnW, smallH));
+
+        // Now draw the cue knob at the recorded absolute position so it visually spans the three small rows
+        if (cueCellPos != default)
+        {
+            var prevCursor = ImGui.GetCursorScreenPos();
+            ImGui.SetCursorScreenPos(cueCellPos);
+            DrawCueKnob(s, new Vector2(btnW, combinedCueHeight));
+            ImGui.SetCursorScreenPos(prevCursor);
+        }
 
         // --- Faders row ---
         ImGui.TableNextRow();
@@ -475,4 +491,3 @@ internal static class Apc40Mk1LayoutView
         ImGui.PopID();
     }
 }
-
