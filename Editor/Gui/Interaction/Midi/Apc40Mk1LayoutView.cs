@@ -333,14 +333,28 @@ internal static class Apc40Mk1LayoutView
                                        Vector2 clipBtnSize, Vector2 smallBtnSize,
                                        float scale)
     {
-        var btnW        = clipBtnSize.X;
-        var knobDim     = Math.Max(28f * scale, btnW);
-        var knobRender  = new Vector2(knobDim, knobDim);
+        var btnW = clipBtnSize.X;
+
+        // Remember the left edge (screen X) of the right-panel content so we can align
+        // elements (like the crossfader) to the same column grid later.
+        var rightPanelStartScreen = ImGui.GetCursorScreenPos();
+
+        // Expand the four columns on the right panel to fill available horizontal space.
+        var style = ImGui.GetStyle();
+        var avail = ImGui.GetContentRegionAvail().X;
+        const int cols = 4;
+        // account for spacing between columns
+        var totalSpacing = style.ItemSpacing.X * (cols - 1);
+
+        var minKnob = Math.Max(28f * scale, btnW);
+        var computedColumnW = MathF.Floor(Math.Max(minKnob, (avail - totalSpacing) / cols));
+        var knobRender = new Vector2(computedColumnW, computedColumnW);
 
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(1.5f * scale, 4f * scale));
 
-        DrawKnobGrid("track",  Apc40Mk1.TopKnobs1To8.StartIndex, 4, 2, knobRender, s, blinkOn);
-        DrawModeKnobLabels(smallBtnSize, s, knobRender.X);
+        // Use computedColumnW for the knob grid and for aligning other right-panel controls.
+        DrawKnobGrid("track",  Apc40Mk1.TopKnobs1To8.StartIndex, cols, 2, knobRender, s, blinkOn);
+        DrawModeKnobLabels(new Vector2(computedColumnW, smallBtnSize.Y), s, computedColumnW);
 
         ImGui.Spacing();
 
@@ -348,18 +362,25 @@ internal static class Apc40Mk1LayoutView
 
         ImGui.Spacing();
 
-        DrawKnobGrid("device", Apc40Mk1.RightPerBankKnobs.StartIndex, 4, 2, knobRender, s, blinkOn);
+        DrawKnobGrid("device", Apc40Mk1.RightPerBankKnobs.StartIndex, cols, 2, knobRender, s, blinkOn);
 
         ImGui.Spacing();
 
-        DrawDeviceControlButtons(s, blinkOn, smallBtnSize, knobRender.X);
+        // Device control buttons should use the computed column width so columns stay aligned
+        DrawDeviceControlButtons(s, blinkOn, new Vector2(computedColumnW, smallBtnSize.Y), computedColumnW);
 
         ImGui.Spacing();
 
         DrawTransportButtons(s, blinkOn, scale);
         ImGui.Spacing();
         // Use the centralized crossfader helper (from MidiLayoutDrawHelpers)
-        DrawCrossfader("apc40_xfader", scale,
+        // Compute a target width that covers the four columns plus inter-column spacing so the
+        // crossfader visually spans the knob/device columns.
+        var crossfaderTargetWidth = computedColumnW * cols + totalSpacing;
+        // Align crossfader to the earlier right-panel start X so it spans the exact columns
+        var curScreenPos = ImGui.GetCursorScreenPos();
+        ImGui.SetCursorScreenPos(new Vector2(rightPanelStartScreen.X, curScreenPos.Y));
+        DrawCrossfader("apc40_xfader", scale, crossfaderTargetWidth,
                        ref _crossfaderValue,
                        ref _crossfaderDragging,
                        ref _crossfaderDragStartX,
@@ -367,6 +388,9 @@ internal static class Apc40Mk1LayoutView
                        s,
                        Apc40Mk1.AbFader.StartIndex,
                        blinkOn);
+        // Restore cursor X to the left edge of the right panel content so subsequent items
+        // continue at the expected column alignment.
+        ImGui.SetCursorScreenPos(new Vector2(rightPanelStartScreen.X, ImGui.GetCursorScreenPos().Y));
 
         ImGui.PopStyleVar();
     }
@@ -443,7 +467,7 @@ internal static class Apc40Mk1LayoutView
         ImGui.TableSetColumnIndex(1); DrawIconButton(s, Icon.ArrowLeft,  Apc40Mk1.BankSelectLeft.StartIndex, btn, blinkOn, "Bank Left");
         ImGui.TableSetColumnIndex(2); ImGui.Dummy(btn);
         ImGui.TableSetColumnIndex(3); DrawIconButton(s, Icon.ArrowRight, Apc40Mk1.BankSelectRight.StartIndex, btn, blinkOn, "Bank Right");
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "NUD-", Apc40Mk1.NudgeMinus.StartIndex, btn, blinkOn, "Nudge -");
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "NU-", Apc40Mk1.NudgeMinus.StartIndex, btn, blinkOn, "Nudge -");
 
         // Row 2: empty | empty | ↓ | empty | NUD+
         ImGui.TableNextRow();
@@ -451,7 +475,7 @@ internal static class Apc40Mk1LayoutView
         ImGui.TableSetColumnIndex(1); ImGui.Dummy(btn);
         ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowDown,  Apc40Mk1.BankSelectDown.StartIndex, btn, blinkOn, "Bank Down");
         ImGui.TableSetColumnIndex(3); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "NUD+", Apc40Mk1.NudgePlus.StartIndex, btn, blinkOn, "Nudge +");
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "NU+", Apc40Mk1.NudgePlus.StartIndex, btn, blinkOn, "Nudge +");
 
         ImGui.EndTable();
     }
@@ -502,6 +526,19 @@ internal static class Apc40Mk1LayoutView
     private static void DrawTransportButtons(MidiDeviceStatus s, bool blinkOn, float scale)
     {
         var size = new Vector2(40 * scale, 22 * scale);
+
+        // Center the three transport buttons horizontally within the current content region.
+        // Compute total width (3 buttons + spacing between them) and offset the cursor accordingly.
+        var style = ImGui.GetStyle();
+        var itemSpacing = style.ItemSpacing.X;
+        var totalButtons = 3;
+        var totalWidth = size.X * totalButtons + itemSpacing * (totalButtons - 1);
+        var avail = ImGui.GetContentRegionAvail().X;
+        if (avail > totalWidth)
+        {
+            var curX = ImGui.GetCursorPosX();
+            ImGui.SetCursorPosX(curX + (avail - totalWidth) * 0.5f);
+        }
 
         var colorCode = GetColorCode(s, Apc40Mk1.Play.StartIndex);
         var state     = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;

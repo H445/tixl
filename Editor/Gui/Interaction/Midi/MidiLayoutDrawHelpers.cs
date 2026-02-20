@@ -400,7 +400,17 @@ internal static class MidiLayoutDrawHelpers
     /// the helper can update them during interaction. The helper will also sync from
     /// the device when the user is not dragging.
     /// </summary>
-    internal static void DrawCrossfader(string id, float scale,
+    /// <param name="id">Unique ImGui id string.</param>
+    /// <param name="scale">Scale factor for overall size.</param>
+    /// <param name="targetWidthPx">Target width in pixels (replaces fixed 140px).</param>
+    /// <param name="value">Current fader value in [0,1]; updated by interaction.</param>
+    /// <param name="isDragging">Drag state persisted by the caller across frames.</param>
+    /// <param name="dragStartX">Screen-X captured at drag start (persisted by caller).</param>
+    /// <param name="dragStartVal">Value captured at drag start (persisted by caller).</param>
+    /// <param name="s">MIDI device status, for reading CC values.</param>
+    /// <param name="cc">CC number this fader is controlling.</param>
+    /// <param name="blinkOn">Whether to use blinking colors for LED feedback.</param>
+    internal static void DrawCrossfader(string id, float scale, float targetWidthPx,
                                         ref float value,
                                         ref bool  isDragging,
                                         ref float dragStartX,
@@ -408,13 +418,16 @@ internal static class MidiLayoutDrawHelpers
                                         MidiDeviceStatus s,
                                         int cc,
                                         bool blinkOn)
-    {
-        // Read from device when the user isn't dragging
-        var valIdx = 0 * 128 + cc;
-        if (!isDragging && s.ControllerValues != null && valIdx >= 0 && valIdx < s.ControllerValues.Length)
-            value = s.ControllerValues[valIdx];
+     {
+         // Read from device when the user isn't dragging
+         var valIdx = 0 * 128 + cc;
+         if (!isDragging && s.ControllerValues != null && valIdx >= 0 && valIdx < s.ControllerValues.Length)
+             value = s.ControllerValues[valIdx];
 
-        var width  = 140f * scale;
+        // Default size previously was 140 x 22 multiplied by scale. Use the provided target width
+        // but keep a sensible minimum so visuals don't collapse on very narrow panels.
+        var minWidth = 80f * scale;
+        var width = MathF.Max(targetWidthPx, minWidth);
         var height = 22f * scale;
         var size   = new Vector2(width, height);
 

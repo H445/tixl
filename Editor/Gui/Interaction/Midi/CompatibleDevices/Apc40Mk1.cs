@@ -615,7 +615,7 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     // Public mapping of mode buttons in the physical left-to-right/top-to-bottom order
     // Exposed so the GUI can render the buttons in the exact physical arrangement of the APC40 Mk1.
     public static readonly int[] ModeButtonNoteOrder = new[] { 87, 88, 89, 90 };
-    public static readonly string[] ModeButtonLabels = new[] { "PAN", "SEND A", "SEND B", "SEND C" };
+    public static readonly string[] ModeButtonLabels = new[] { "PAN", "Snd A", "Snd B", "Snd C" };
 
     // Faders and knobs (Control Change messages)
     internal static readonly ButtonRange Fader1To8 = new(7, 7);      // CC 7 on channels 1-8
