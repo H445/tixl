@@ -37,54 +37,64 @@ internal static class Apc40Mk1LayoutView
     internal static void Draw(MidiDeviceStatus s, bool blinkOn)
     {
         const int leftColumns = 9; // 8 clip columns + 1 scene/control column
-        var itemSpacing = 0.5f * T3Ui.UiScaleFactor;
+        var itemSpacing = 2f * T3Ui.UiScaleFactor;
+        var innerBorder = 4f * T3Ui.UiScaleFactor; // inset from panel edges
 
+        var windowPos  = ImGui.GetWindowPos();
         var contentMin = ImGui.GetWindowContentRegionMin();
         var contentMax = ImGui.GetWindowContentRegionMax();
-        var availX     = Math.Max(0f, contentMax.X - contentMin.X);
+        var availX     = Math.Max(0f, contentMax.X - contentMin.X - 2f * innerBorder);
 
-        var interPanelPadding = 3f  * T3Ui.UiScaleFactor;
-        var minRightPanel     = 140f * T3Ui.UiScaleFactor;
+        var interPanelPadding = 8f * T3Ui.UiScaleFactor;
+        var minRightPanel     = 152f * T3Ui.UiScaleFactor;
 
-        var innerPadEst  = ImGui.GetStyle().ItemInnerSpacing.X;
+        // Button width: fill available space minus right panel reservation.
+        // Table cell = btnW (content) + 2*CellPadding.X; with CellPadding = ItemSpacing/2
+        var cellPad      = itemSpacing * 0.5f;
         var spaceForLeft = Math.Max(0f, availX - minRightPanel - interPanelPadding);
         var btnW = MathF.Floor(ClampF(
-            (spaceForLeft - (leftColumns - 1) * itemSpacing - leftColumns * 2f * innerPadEst) / leftColumns,
-            16f * T3Ui.UiScaleFactor,
-            34f * T3Ui.UiScaleFactor));
+            (spaceForLeft) / leftColumns - 2f * cellPad,
+            14f * T3Ui.UiScaleFactor,
+            36f * T3Ui.UiScaleFactor));
 
         var clipBtnSize  = new Vector2(btnW, btnW);
-        var smallBtnSize = new Vector2(btnW, MathF.Max(10f * T3Ui.UiScaleFactor, btnW * 0.45f));
+        var smallBtnSize = new Vector2(btnW, MathF.Max(11f * T3Ui.UiScaleFactor, btnW * 0.45f));
 
-        var innerPad       = ImGui.GetStyle().ItemInnerSpacing.X;
-        var leftPanelWidth = btnW * leftColumns + (leftColumns - 1) * itemSpacing + leftColumns * 2f * innerPad;
-        var rightPanelWidth = Math.Max(minRightPanel, availX - leftPanelWidth - interPanelPadding);
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,  new Vector2(itemSpacing, itemSpacing));
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(2f, 2f));
+        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,  new Vector2(cellPad, cellPad));
 
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(itemSpacing, itemSpacing));
-        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(itemSpacing, itemSpacing));
+        // --- Inner border offset ---
+        var startPos = ImGui.GetCursorPos();
+        startPos.X += innerBorder;
+        startPos.Y += innerBorder;
+        ImGui.SetCursorPos(startPos);
 
-        var tableFlags = ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoHostExtendX;
-        if (ImGui.BeginTable("apc40_main_table", 2, tableFlags))
-        {
-            ImGui.TableSetupColumn(null, ImGuiTableColumnFlags.WidthFixed, leftPanelWidth);
-            ImGui.TableSetupColumn(null, ImGuiTableColumnFlags.WidthFixed, rightPanelWidth);
+        // --- Left panel ---
+        ImGui.BeginGroup();
+        DrawLeftPanel(s, blinkOn, clipBtnSize, smallBtnSize, T3Ui.UiScaleFactor);
+        ImGui.EndGroup();
+        var leftPanelBottom = ImGui.GetCursorPosY();
+        // Measure the actual rendered width of the left panel group
+        var actualLeftWidth = ImGui.GetItemRectMax().X - (windowPos.X + contentMin.X + innerBorder);
 
-            ImGui.TableNextRow();
+        // --- Right panel (right-aligned to the content region right edge) ---
+        var rightPanelWidth = Math.Max(minRightPanel, availX - actualLeftWidth - interPanelPadding);
+        // Position from the right edge of the content region (accounting for inner border)
+        var rightStartX     = contentMin.X + innerBorder + availX - rightPanelWidth;
+        // Ensure we don't overlap the left panel
+        rightStartX = Math.Max(rightStartX, contentMin.X + innerBorder + actualLeftWidth + interPanelPadding);
 
-            ImGui.TableSetColumnIndex(0);
-            ImGui.BeginGroup();
-            DrawLeftPanel(s, blinkOn, clipBtnSize, smallBtnSize, T3Ui.UiScaleFactor);
-            ImGui.EndGroup();
+        ImGui.SetCursorPos(new Vector2(rightStartX, startPos.Y));
+        ImGui.BeginGroup();
+        DrawRightPanel(s, blinkOn, clipBtnSize, smallBtnSize, T3Ui.UiScaleFactor);
+        ImGui.EndGroup();
+        var rightPanelBottom = ImGui.GetCursorPosY();
 
-            ImGui.TableSetColumnIndex(1);
-            ImGui.BeginGroup();
-            DrawRightPanel(s, blinkOn, clipBtnSize, smallBtnSize, T3Ui.UiScaleFactor);
-            ImGui.EndGroup();
+        // Advance cursor past the taller of the two panels + bottom border
+        ImGui.SetCursorPosY(Math.Max(leftPanelBottom, rightPanelBottom) + innerBorder);
 
-            ImGui.EndTable();
-        }
-
-        ImGui.PopStyleVar(2);
+        ImGui.PopStyleVar(3);
     }
 
     // -------------------------------------------------------------------------
@@ -102,10 +112,10 @@ internal static class Apc40Mk1LayoutView
         if (!ImGui.BeginTable("left_panel_table_" + s.ProductName, columns, ImGuiTableFlags.SizingFixedFit))
             return;
 
-        var btnW   = clipBtnSize.X;
-        var clipH  = clipBtnSize.Y;
-        var smallH = smallBtnSize.Y;
-        var faderH = smallH * 3.2f + 4f * scale;
+        var btnW    = clipBtnSize.X;
+        var clipH   = clipBtnSize.Y;
+        var smallH  = smallBtnSize.Y;
+        var faderH  = smallH * 3.2f + 4f * scale;
 
         for (var cc = 0; cc < clipCols; cc++)
             ImGui.TableSetupColumn(null, ImGuiTableColumnFlags.WidthFixed, btnW);
@@ -270,10 +280,10 @@ internal static class Apc40Mk1LayoutView
                                        float scale)
     {
         var btnW        = clipBtnSize.X;
-        var knobDim     = Math.Max(24f * scale, btnW);
+        var knobDim     = Math.Max(28f * scale, btnW);
         var knobRender  = new Vector2(knobDim, knobDim);
 
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0.5f * scale, 3f * scale));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(1.5f * scale, 4f * scale));
 
         DrawKnobGrid("track",  48, 4, 2, knobRender, s, blinkOn);
         DrawModeKnobLabels(smallBtnSize, s, knobRender.X);
