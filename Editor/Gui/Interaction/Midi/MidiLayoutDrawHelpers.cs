@@ -114,9 +114,18 @@ internal static class MidiLayoutDrawHelpers
     {
         ImGui.PushStyleColor(ImGuiCol.Button, col);
         ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
+        // Reduce top padding for compact/small buttons so they don't appear vertically offset
+        // compared to other compact elements. Keep horizontal padding from current style.
+        var currentPadX = ImGui.GetStyle().FramePadding.X;
+        // Use a small fraction of the button height for vertical padding (rounded down)
+        var reducedPadY = MathF.Floor(Math.Max(0f, size.Y * 0.12f));
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(currentPadX, reducedPadY));
+
         ImGui.Button($"{label}##{noteId}", size);
         DrawTooltipIfHovered(tooltip);
+
         ImGui.PopStyleColor(2);
+        ImGui.PopStyleVar();
     }
 
     /// <summary>Draws a simple LED button whose color is derived from the device color cache.</summary>

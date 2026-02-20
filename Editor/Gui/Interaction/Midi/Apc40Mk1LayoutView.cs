@@ -96,6 +96,8 @@ internal static class Apc40Mk1LayoutView
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,  new Vector2(baseSpacing, baseSpacing));
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(framePadding, framePadding));
         ImGui.PushStyleVar(ImGuiStyleVar.CellPadding,  new Vector2(cellPad, cellPad));
+        // Render all text in this layout using the project's small font so labels stay compact
+        ImGui.PushFont(Fonts.FontSmall);
 
         // --- Inner border offset ---
         var startPos = ImGui.GetCursorPos();
@@ -134,6 +136,7 @@ internal static class Apc40Mk1LayoutView
         ImGui.Dummy(new Vector2(0f, innerBorder));
 
         ImGui.PopStyleVar(3);
+        ImGui.PopFont();
     }
 
     // -------------------------------------------------------------------------
