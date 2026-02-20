@@ -482,7 +482,9 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     
     // ===== Common to both modes =====
     private const int ShiftButtonNote = 98;
-    private const int ClipGridSize = 40;  // 5 rows x 8 columns
+    internal const int ClipGridSize = 40;  // 5 rows x 8 columns
+    internal const int ClipGridColumns = 8;
+    internal const int ClipGridRows = 5;
     
     // ===== Channel range for multi-channel mappings =====
     private static readonly ButtonRange MidiChannels1To8 = new(1, 8);
@@ -509,7 +511,7 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     private const int AbletonTrackSelectNote = 51;
     
     // ===== Scene Launch buttons (same in both modes) =====
-    private static readonly ButtonRange SceneLaunchNotes = new(82, 86);
+    internal static readonly ButtonRange SceneLaunchNotes = new(82, 86);
     
     #endregion
 
@@ -533,11 +535,11 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     private static readonly ButtonRange SceneLaunch5 = new(86);
     
     // Track control buttons (below the clip grid)
-    private static readonly ButtonRange ClipStopButtons1To8 = new(52, 59);
+    internal static readonly ButtonRange ClipStopButtons1To8 = new(52, 59);
     private static readonly ButtonRange ClipSelectButtons1To8 = new(51, 51); // Note 51 with different channels
-    private static readonly ButtonRange ClipSoloButtons1To8 = new(50, 50);   // Note 50 with different channels  
-    private static readonly ButtonRange ClipRecArmButtons1To8 = new(48, 48); // Note 48 with different channels
-    private static readonly ButtonRange ClipABButtons1To8 = new(66, 73);
+    internal static readonly ButtonRange ClipSoloButtons1To8 = new(50, 50);   // Note 50 with different channels  
+    internal static readonly ButtonRange ClipRecArmButtons1To8 = new(48, 48); // Note 48 with different channels
+    internal static readonly ButtonRange ClipABButtons1To8 = new(66, 73);
     
     // Record/Arm buttons (bottom row - used for mode switching with Shift)
     // In Ableton mode: Note 48 on Channels 1-8
@@ -550,26 +552,31 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     private static readonly ButtonRange TrackSelectButtons = new(TrackSelectBaseId, TrackSelectBaseId + 7);
     
     // Stop all clips button
-    private static readonly ButtonRange ClipStopAll = new(81);
+    internal static readonly ButtonRange ClipStopAll = new(81);
     
     // Navigation buttons
-    private static readonly ButtonRange BankSelectUp = new(94);
-    private static readonly ButtonRange BankSelectDown = new(95);
-    private static readonly ButtonRange BankSelectRight = new(96);
-    private static readonly ButtonRange BankSelectLeft = new(97);
-    private static readonly ButtonRange Shift = new(98);
+    internal static readonly ButtonRange BankSelectUp = new(94);
+    internal static readonly ButtonRange BankSelectDown = new(95);
+    internal static readonly ButtonRange BankSelectRight = new(96);
+    internal static readonly ButtonRange BankSelectLeft = new(97);
+    internal static readonly ButtonRange Shift = new(98);
     
     // Transport buttons
-    private static readonly ButtonRange TapTempo = new(99);
-    private static readonly ButtonRange NudgeMinus = new(100);
-    private static readonly ButtonRange NudgePlus = new(101);
+    internal static readonly ButtonRange TapTempo = new(99);
+    internal static readonly ButtonRange NudgeMinus = new(100);
+    internal static readonly ButtonRange NudgePlus = new(101);
     private static readonly ButtonRange Session = new(102); // Also called "Clip/Track" on some models
+    
+    // Transport play/stop/record
+    internal static readonly ButtonRange Play = new(91);
+    internal static readonly ButtonRange Stop = new(92);
+    internal static readonly ButtonRange Record = new(93);
     
     // Device control buttons
     private static readonly ButtonRange DeviceLeftArrow = new(58);
     private static readonly ButtonRange DeviceRightArrow = new(59);
-    private static readonly ButtonRange BankLeftArrow = new(60);
-    private static readonly ButtonRange BankRightArrow = new(61);
+    internal static readonly ButtonRange BankLeftArrow = new(60);
+    internal static readonly ButtonRange BankRightArrow = new(61);
     private static readonly ButtonRange DevOnOff = new(62);
     private static readonly ButtonRange DevLock = new(63);
     private static readonly ButtonRange ClipDevView = new(64);
@@ -611,13 +618,13 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     public static readonly string[] ModeButtonLabels = new[] { "PAN", "SEND A", "SEND B", "SEND C" };
 
     // Faders and knobs (Control Change messages)
-    private static readonly ButtonRange Fader1To8 = new(7, 7);      // CC 7 on channels 1-8
-    private static readonly ButtonRange MasterFader = new(14);       // CC 14 on channel 1
-    private static readonly ButtonRange AbFader = new(15);           // CC 15 on channel 1 (Crossfader)
-    private static readonly ButtonRange TopKnobs1To8 = new(48, 55); // CC 48-55 on channel 1
-    private static readonly ButtonRange CueLevelKnob = new(47);      // CC 47 on channel 1
+    internal static readonly ButtonRange Fader1To8 = new(7, 7);      // CC 7 on channels 1-8
+    internal static readonly ButtonRange MasterFader = new(14);       // CC 14 on channel 1
+    internal static readonly ButtonRange AbFader = new(15);           // CC 15 on channel 1 (Crossfader)
+    internal static readonly ButtonRange TopKnobs1To8 = new(48, 55); // CC 48-55 on channel 1
+    internal static readonly ButtonRange CueLevelKnob = new(47);      // CC 47 on channel 1
     private static readonly ButtonRange TempoKnob = new(13);         // CC 13 on channel 1
-    private static readonly ButtonRange RightPerBankKnobs = new(16, 23); // CC 16-23 on channel 1
+    internal static readonly ButtonRange RightPerBankKnobs = new(16, 23); // CC 16-23 on channel 1
 
     /// <summary>
     /// APC40 Mk1 LED color values (sent as velocity in Note On messages)
