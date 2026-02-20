@@ -277,6 +277,115 @@ internal static class MidiLayoutDrawHelpers
         ImGui.EndTable();
     }
 
+    /// <summary>
+    /// Draws a realistic vertical fader that visually matches the crossfader style.
+    /// Handles click-to-set and drag interaction; only syncs <paramref name="value"/>
+    /// from the caller when <paramref name="isDragging"/> is false.
+    /// Returns true while the user is actively dragging.
+    /// </summary>
+    /// <param name="id">Unique ImGui id string.</param>
+    /// <param name="size">Widget size in pixels.</param>
+    /// <param name="value">Current fader value in [0,1]; updated by interaction.</param>
+    /// <param name="isDragging">Drag state persisted by the caller across frames.</param>
+    /// <param name="dragStartY">Screen-Y captured at drag start (persisted by caller).</param>
+    /// <param name="dragStartVal">Value captured at drag start (persisted by caller).</param>
+    /// <param name="tooltip">Optional tooltip text shown on hover.</param>
+    internal static void DrawVerticalFader(string id, Vector2 size,
+                                           ref float value,
+                                           ref bool  isDragging,
+                                           ref float dragStartY,
+                                           ref float dragStartVal,
+                                           string    tooltip = "")
+    {
+        ImGui.PushID(id);
+        ImGui.InvisibleButton($"##vf_{id}", size);
+
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+        var dl  = ImGui.GetWindowDrawList();
+
+        var grooveInset = 4f;
+        var thumbH      = 12f;
+        var thumbInset  = thumbH * 0.5f + grooveInset;
+        var thumbTravel = size.Y - 2f * thumbInset;
+
+        // ---- Interaction ----
+        var isHovered = ImGui.IsItemHovered();
+        var io        = ImGui.GetIO();
+        var trackTopY = min.Y + thumbInset;
+
+        if (isHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+        {
+            // fader value 0 = bottom, 1 = top → invert mouse delta
+            var clickedVal = 1f - (io.MousePos.Y - trackTopY) / thumbTravel;
+            value        = ClampF(clickedVal, 0f, 1f);
+            isDragging   = true;
+            dragStartY   = io.MousePos.Y;
+            dragStartVal = value;
+        }
+
+        if (isDragging)
+        {
+            if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
+            {
+                var delta  = io.MousePos.Y - dragStartY;
+                var newVal = dragStartVal - delta / thumbTravel; // subtract: up = higher value
+                value = ClampF(newVal, 0f, 1f);
+            }
+            else
+            {
+                isDragging = false;
+            }
+        }
+
+        // ---- Drawing ----
+        var bgColor      = ImGui.GetColorU32(new Vector4(0.18f, 0.18f, 0.20f, 1f));
+        var grooveColor  = ImGui.GetColorU32(new Vector4(0.12f, 0.12f, 0.14f, 1f));
+        var tickMajorCol = ImGui.GetColorU32(new Vector4(0.55f, 0.55f, 0.58f, 1f));
+        var tickMinorCol = ImGui.GetColorU32(new Vector4(0.38f, 0.38f, 0.40f, 1f));
+        var thumbCol     = ImGui.GetColorU32(UiColors.Text.Rgba);
+
+        // Background
+        dl.AddRectFilled(min, max, bgColor, 3f);
+
+        // Groove — narrow vertical slot down the centre
+        var grooveX = (min.X + max.X) * 0.5f;
+        var grooveW = 3f;
+        dl.AddRectFilled(
+            new Vector2(grooveX - grooveW * 0.5f, min.Y + grooveInset),
+            new Vector2(grooveX + grooveW * 0.5f, max.Y - grooveInset),
+            grooveColor, 1f);
+
+        // Tick marks — major at 0 / 25 / 50 / 75 / 100 %, minor subdivisions between
+        var majorHalfW = size.X * 0.28f;   // extends either side of groove
+        var minorHalfW = size.X * 0.14f;
+
+        for (var i = 0; i <= 8; i++)   // i=0..8 gives 0%, 12.5% … 100%
+        {
+            var t       = i / 8f;
+            var ty      = trackTopY + thumbTravel * (1f - t);
+            var isMajor = (i % 2 == 0);
+            var hw      = isMajor ? majorHalfW : minorHalfW;
+            var col     = isMajor ? tickMajorCol : tickMinorCol;
+            dl.AddLine(new Vector2(grooveX - hw, ty), new Vector2(grooveX + hw, ty), col, 1f);
+        }
+
+        // Thumb — a short wide flat bar that slides along the groove
+        var thumbY   = trackTopY + thumbTravel * (1f - ClampF(value, 0f, 1f));
+        var tHalf    = 5f;    // half-height of the thumb bar
+        var thumbXL  = min.X + 3f;
+        var thumbXR  = max.X - 3f;
+        dl.AddRectFilled(
+            new Vector2(thumbXL, thumbY - tHalf),
+            new Vector2(thumbXR, thumbY + tHalf),
+            thumbCol, 2f);
+
+        if (!string.IsNullOrEmpty(tooltip))
+            DrawTooltipIfHovered(tooltip);
+
+        ImGui.PopID();
+    }
+
     #endregion
 
     #region State / Utility
