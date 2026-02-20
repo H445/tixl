@@ -23,7 +23,6 @@ internal static class Apc40Mk1LayoutView
     private static bool  _crossfaderDragging;
     private static float _crossfaderDragStartX;   // screen-X where drag started
     private static float _crossfaderDragStartVal; // _crossfaderValue at drag start
-    private static float _crossfaderTrackMinX;    // track min screen-X (updated every frame)
 
     /// <summary>
     /// Entry point – draws the full APC40 MK1 physical layout.
@@ -51,16 +50,16 @@ internal static class Apc40Mk1LayoutView
         var scale = T3Ui.UiScaleFactor;
 
         // Compute and return commonly used layout values. Returning a named tuple keeps the call site clean.
-        (Vector2 clipBtnSize, Vector2 smallBtnSize, float btnW, float columnWidth, float baseSpacing, float framePadding, float cellPad, float innerBorder, float interPanelPadding, float minRightPanel) ComputeLayout(float contentWidth, float s)
+        (Vector2 clipBtnSize, Vector2 smallBtnSize, float btnW, float columnWidth, float baseSpacing, float framePadding, float cellPad, float innerBorder, float interPanelPadding, float minRightPanel) ComputeLayout(float contentWidth, float scaleFactor)
         {
-            var baseSpacingLocal   = 3f * s;          // gap between cells
-            var framePaddingLocal  = 2f * s;          // inner padding for buttons
+            var baseSpacingLocal   = 3f * scaleFactor;          // gap between cells
+            var framePaddingLocal  = 2f * scaleFactor;          // inner padding for buttons
             var cellPadLocal       = baseSpacingLocal * 0.5f;
-            var innerBorderLocal   = 4f * s;          // inset from panel edges
-            var interPanelLocal    = 8f * s;          // gap between left and right panels
-            var minRightLocal      = 150f * s;        // reserve for right panel
-            var minBtnLocal        = 14f * s;
-            var maxBtnLocal        = 34f * s;
+            var innerBorderLocal   = 4f * scaleFactor;          // inset from panel edges
+            var interPanelLocal    = 8f * scaleFactor;          // gap between left and right panels
+            var minRightLocal      = 150f * scaleFactor;        // reserve for right panel
+            var minBtnLocal        = 14f * scaleFactor;
+            var maxBtnLocal        = 34f * scaleFactor;
 
             // available width for content (exclude outer inner borders on both sides)
             var avail = Math.Max(0f, contentWidth - 2f * innerBorderLocal);
@@ -76,18 +75,16 @@ internal static class Apc40Mk1LayoutView
             var btnWidth = MathF.Floor(ClampF(cellW - 2f * cellPadLocal, minBtnLocal, maxBtnLocal));
 
             var clipSize = new Vector2(MathF.Max(8f, btnWidth - 2f), MathF.Max(8f, btnWidth - 2f));
-            var smallSize = new Vector2(btnWidth, MathF.Max(11f * s, btnWidth * 0.45f));
+            var smallSize = new Vector2(btnWidth, MathF.Max(11f * scaleFactor, btnWidth * 0.45f));
 
             return (clipSize, smallSize, btnWidth, cellW, baseSpacingLocal, framePaddingLocal, cellPadLocal, innerBorderLocal, interPanelLocal, minRightLocal);
         }
 
         var contentWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
-        var windowPos = ImGui.GetWindowPos();
         var layout = ComputeLayout(contentWidth, scale);
 
         var clipBtnSize  = layout.clipBtnSize;
         var smallBtnSize = layout.smallBtnSize;
-        var btnW         = layout.btnW;
         var columnWidth  = layout.columnWidth;
         var baseSpacing  = layout.baseSpacing;
         var framePadding = layout.framePadding;
@@ -160,7 +157,7 @@ internal static class Apc40Mk1LayoutView
         var clipH   = clipBtnSize.Y;
         var smallW  = smallBtnSize.X;
         var smallH  = smallBtnSize.Y;
-        // Make faders taller to better fill taller windows
+        // Make faders taller
         var faderH  = smallH * 4.0f + 6f * scale;
 
         for (var cc = 0; cc < clipCols; cc++)
@@ -358,7 +355,15 @@ internal static class Apc40Mk1LayoutView
 
         DrawTransportButtons(s, blinkOn, scale);
         ImGui.Spacing();
-        DrawCrossfader(s, scale);
+        // Use the centralized crossfader helper (from MidiLayoutDrawHelpers)
+        DrawCrossfader("apc40_xfader", scale,
+                       ref _crossfaderValue,
+                       ref _crossfaderDragging,
+                       ref _crossfaderDragStartX,
+                       ref _crossfaderDragStartVal,
+                       s,
+                       Apc40Mk1.AbFader.StartIndex,
+                       blinkOn);
 
         ImGui.PopStyleVar();
     }
@@ -510,121 +515,6 @@ internal static class Apc40Mk1LayoutView
         DrawTooltipIfHovered("Record");
     }
 
-    /// <summary>Draws the A-B Crossfader with a live slider reading CC 15 and mouse drag support.</summary>
-    private static void DrawCrossfader(MidiDeviceStatus s, float scale)
-    {
-        var crossfaderCc = Apc40Mk1.AbFader.StartIndex;
-        var valIdx = 0 * 128 + crossfaderCc;
-
-        // Only sync from hardware when the user is not dragging
-        if (!_crossfaderDragging &&
-            s.ControllerValues != null &&
-            valIdx >= 0 && valIdx < s.ControllerValues.Length)
-        {
-            _crossfaderValue = s.ControllerValues[valIdx];
-        }
-
-        var width  = 140f * scale;
-        var height = 22f * scale;
-        var size   = new Vector2(width, height);
-
-        // Layout constants – must match the drawing below
-        var grooveInset = 4f * scale;
-        var thumbW      = 12f * scale;
-        var thumbInset  = thumbW * 0.5f + grooveInset;
-        var thumbTravel = width - 2f * thumbInset;
-
-        ImGui.PushID("xfader");
-        ImGui.InvisibleButton("##xfader", size);
-
-        var min = ImGui.GetItemRectMin();
-        var max = ImGui.GetItemRectMax();
-        var dl  = ImGui.GetWindowDrawList();
-
-        // Store track min for drag math (updated every frame)
-        _crossfaderTrackMinX = min.X + thumbInset;
-
-        // ---- Interaction ----
-        var isHovered = ImGui.IsItemHovered();
-        var io        = ImGui.GetIO();
-
-        if (isHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-        {
-            // Immediately jump to clicked position
-            var clickedVal = (io.MousePos.X - _crossfaderTrackMinX) / thumbTravel;
-            _crossfaderValue      = ClampF(clickedVal, 0f, 1f);
-            _crossfaderDragging   = true;
-            _crossfaderDragStartX = io.MousePos.X;
-            _crossfaderDragStartVal = _crossfaderValue;
-        }
-
-        if (_crossfaderDragging)
-        {
-            if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
-            {
-                var delta = io.MousePos.X - _crossfaderDragStartX;
-                var newVal = _crossfaderDragStartVal + delta / thumbTravel;
-                _crossfaderValue = ClampF(newVal, 0f, 1f);
-            }
-            else
-            {
-                _crossfaderDragging = false;
-            }
-        }
-
-        // ---- Drawing ----
-        var bgColor      = ImGui.GetColorU32(new Vector4(0.18f, 0.18f, 0.20f, 1f));
-        var grooveColor  = ImGui.GetColorU32(new Vector4(0.12f, 0.12f, 0.14f, 1f));
-        var tickMajorCol = ImGui.GetColorU32(new Vector4(0.55f, 0.55f, 0.58f, 1f));
-        var tickMinorCol = ImGui.GetColorU32(new Vector4(0.38f, 0.38f, 0.40f, 1f));
-        var thumbCol     = ImGui.GetColorU32(UiColors.Text.Rgba);
-        var labelColor   = ImGui.GetColorU32(new Vector4(0.5f,  0.5f,  0.55f, 1f));
-
-        // Background
-        dl.AddRectFilled(min, max, bgColor, 3f);
-
-        // Groove — narrow horizontal slot through the centre
-        var grooveY = (min.Y + max.Y) * 0.5f;
-        var grooveH = 3f;
-        dl.AddRectFilled(
-            new Vector2(min.X + grooveInset, grooveY - grooveH * 0.5f),
-            new Vector2(max.X - grooveInset, grooveY + grooveH * 0.5f),
-            grooveColor, 1f);
-
-        // Tick marks — major at 0 / 50 / 100 %, minor at 25 / 75 %
-        var majorHalfH = height * 0.35f;
-        var minorHalfH = height * 0.18f;
-
-        foreach (var (t, isMajor) in new[] { (0.25f, false), (0.5f, true), (0.75f, false) })
-        {
-            var tx  = min.X + thumbInset + thumbTravel * t;
-            var hh  = isMajor ? majorHalfH : minorHalfH;
-            var col = isMajor ? tickMajorCol : tickMinorCol;
-            dl.AddLine(new Vector2(tx, grooveY - hh), new Vector2(tx, grooveY + hh), col, 1f);
-        }
-
-        // Thumb — a short vertical flat bar that slides along the groove
-        var thumbX  = min.X + thumbInset + thumbTravel * ClampF(_crossfaderValue, 0f, 1f);
-        var tHalf   = 4f;   // half-width of the thumb bar
-        var thumbYT = min.Y + 3f;
-        var thumbYB = max.Y - 3f;
-        dl.AddRectFilled(
-            new Vector2(thumbX - tHalf, thumbYT),
-            new Vector2(thumbX + tHalf, thumbYB),
-            thumbCol, 2f);
-
-        // A / B labels
-        ImGui.PushFont(Fonts.FontSmall);
-        var aSize = ImGui.CalcTextSize("A");
-        var bSize = ImGui.CalcTextSize("B");
-        dl.AddText(new Vector2(min.X + grooveInset,         grooveY - aSize.Y * 0.5f), labelColor, "A");
-        dl.AddText(new Vector2(max.X - grooveInset - bSize.X, grooveY - bSize.Y * 0.5f), labelColor, "B");
-        ImGui.PopFont();
-
-        DrawTooltipIfHovered($"A-B Crossfader: {Math.Round(_crossfaderValue * 100)}%");
-
-        ImGui.PopID();
-    }
 
     // -------------------------------------------------------------------------
     // Shared sub-widgets
