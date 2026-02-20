@@ -11,8 +11,7 @@ namespace T3.Editor.Gui.Interaction.Midi;
 ///   <item><see cref="GenericMidiLayoutView"/> — generic clip-grid fallback for all other devices</item>
 /// </list>
 /// Shared drawing primitives live in <see cref="MidiLayoutDrawHelpers"/>.
-/// The optional MIDI Debug panel (mappings and live CC values) is shown below each
-/// controller layout so it doesn't interfere with the layout rendering.
+/// Optional MIDI Debug panel (mappings and live CC values) is shown below each controller layout
 /// </summary>
 internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 {
@@ -109,10 +108,16 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         var matches = new List<int>(Math.Min(len, 256));
         for (var i = 0; i < len; i++)
         {
-            var hasVal = i < vals.Length && Math.Abs(vals[i]) > 1e-6f;
-            var hasCol = i < cols.Length && cols[i] != 0;
-            if (!_debugShowZeros && !hasVal && !hasCol)
+            // Consider a value 'zero' if the raw controller value equals 0.
+            var hasValDisplay = i < vals.Length && vals[i] != 0f;
+
+            // Treat color codes <= 0 as 'no color' (<=0 covers 0=Off and -1=unknown/uninitialized).
+            var hasCol = i < cols.Length && cols[i] > 0;
+
+            // If the UI is hiding zero-values, skip entries that both have no visible value and no meaningful color (i.e. both value is zero and color code is <= 0).
+            if (!_debugShowZeros && !hasValDisplay && !hasCol)
                 continue;
+
             matches.Add(i);
         }
 
@@ -120,7 +125,7 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         if (!_debugShowAll && toShow > _debugMaxRows)
             toShow = _debugMaxRows;
 
-        if (ImGui.BeginTable("debug_table", 5, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
+        if (ImGui.BeginTable("debug_table", 5, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
         {
             ImGui.TableSetupColumn("Index");
             ImGui.TableSetupColumn("Ch");
@@ -128,7 +133,9 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
             ImGui.TableSetupColumn("Value");
             ImGui.TableSetupColumn("ColorCode");
 
-            ImGui.TableNextRow();
+            // Freeze the top row as a sticky header
+            ImGui.TableSetupScrollFreeze(0, 1);
+            ImGui.TableHeadersRow();
             for (var ri = 0; ri < toShow; ri++)
             {
                 var idx = matches[ri];
@@ -142,7 +149,14 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
                 ImGui.TableSetColumnIndex(1); ImGui.TextUnformatted(ch.ToString());
                 ImGui.TableSetColumnIndex(2); ImGui.TextUnformatted(cc.ToString());
                 ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{Math.Round(val * 100)}%");
-                ImGui.TableSetColumnIndex(4); ImGui.TextUnformatted(col.ToString());
+                ImGui.TableSetColumnIndex(4);
+                var colLabel = col switch
+                {
+                    -1 => "unknown",
+                     0 => "off",
+                    _  => col.ToString()
+                };
+                ImGui.TextUnformatted(colLabel);
             }
 
             ImGui.EndTable();
