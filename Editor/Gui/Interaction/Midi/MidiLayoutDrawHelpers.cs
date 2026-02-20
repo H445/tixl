@@ -1,6 +1,10 @@
 using ImGuiNET;
+using System;
 using T3.Core.Utils;
 using T3.Editor.Gui.Styling;
+using Operators.Utils; // for MidiConnectionManager.TryGetMidiOut
+using NAudio.Midi;
+using System.Collections.Generic;
 
 namespace T3.Editor.Gui.Interaction.Midi;
 
@@ -10,6 +14,12 @@ namespace T3.Editor.Gui.Interaction.Midi;
 /// </summary>
 internal static class MidiLayoutDrawHelpers
 {
+    // Persisted local state for knob interaction (avoid creating these inside the method)
+    private static readonly Dictionary<string, int> _lastSentCc = new();
+    private static readonly Dictionary<string, float> _localControllerOverrides = new();
+    private static readonly Dictionary<string, int> _overrideSetTimeMs = new();
+    private static readonly Dictionary<string, float> _lastSeenDeviceValue = new();
+
     #region Color Constants
 
     internal static readonly Vector4 GreenColor  = new(0.1f,  0.85f, 0.2f,  1f);
@@ -218,12 +228,22 @@ internal static class MidiLayoutDrawHelpers
         ImGui.PopStyleVar(1);
     }
 
+    // ---- Per-knob LED Ring Mode state (persisted across frames) ----
+    // Key: "prefix_cc", Value: 0=Off, 1=Single, 2=Volume, 3=Pan  (APC40 protocol)
+    private static readonly Dictionary<string, int> _knobRingModes = new();
+    private static readonly string[] _ringModeNames = { "Off", "Single", "Volume", "Pan" };
+
+    /// <summary>Gets the ring mode for a specific knob, defaulting to Single (1).</summary>
+    private static int GetKnobRingMode(string key) =>
+        _knobRingModes.TryGetValue(key, out var mode) ? mode : 1;
+
     /// <summary>Draws a knob grid (rows × cols) reading CC values starting at <paramref name="ccStart"/>.</summary>
     internal static void DrawKnobGrid(string idPrefix, int ccStart, int cols, int rows, Vector2 size,
                                       MidiDeviceStatus s, bool blinkOn)
     {
         var dl      = ImGui.GetWindowDrawList();
         var padding = 2f;
+
 
         if (!ImGui.BeginTable($"knobTable_{idPrefix}", cols, ImGuiTableFlags.SizingFixedFit))
             return;
@@ -251,32 +271,173 @@ internal static class MidiLayoutDrawHelpers
                 dl.AddCircleFilled(center, radius * 0.7f, ImGui.GetColorU32(UiColors.BackgroundFull.Rgba));
 
                 float value = 0f;
+                var overrideKey = idPrefix + "_" + cc;
+                // read authoritative device value first (channel 1 assumed)
+                var valIdx = 0 * 128 + cc;
                 if (s.ControllerValues != null)
                 {
-                    var valIdx = 0 * 128 + cc;
                     if (valIdx >= 0 && valIdx < s.ControllerValues.Length)
                         value = s.ControllerValues[valIdx];
                 }
 
+                // Compute a canonical device-reported value for this controller (first available channel)
+                var deviceCanonVal = float.NaN;
+                if (s.ControllerValues != null)
+                {
+                    for (var ch0 = 0; ch0 < 16; ch0++)
+                    {
+                        var idxCh = ch0 * 128 + cc;
+                        if (idxCh < 0 || idxCh >= s.ControllerValues.Length)
+                            continue;
+                        deviceCanonVal = s.ControllerValues[idxCh];
+                        break;
+                    }
+                }
+
+                var eps = 1f / 127f;
+                // If device value changed since last frame, and we have an override, clear it so hardware regains control
+                if (!float.IsNaN(deviceCanonVal))
+                {
+                    if (_lastSeenDeviceValue.TryGetValue(overrideKey, out var prevDev))
+                    {
+                        if (Math.Abs(deviceCanonVal - prevDev) > eps && _localControllerOverrides.ContainsKey(overrideKey) && !ImGui.IsItemActive())
+                        {
+                            _localControllerOverrides.Remove(overrideKey);
+                            _lastSentCc.Remove(overrideKey);
+                        }
+                    }
+                    _lastSeenDeviceValue[overrideKey] = deviceCanonVal;
+                }
+
+                // If we have a local UI override but the device later reports a different value,
+                // remove the override (unless the user is actively interacting) so the physical
+                // controller regains control.
+                if (_localControllerOverrides.TryGetValue(overrideKey, out var ov))
+                {
+                    if (s.ControllerValues != null)
+                    {
+                        var foundDifferent = false;
+                        for (var ch0 = 0; ch0 < 16; ch0++)
+                        {
+                            var idxCh = ch0 * 128 + cc;
+                            if (idxCh < 0 || idxCh >= s.ControllerValues.Length)
+                                continue;
+                            var deviceVal = s.ControllerValues[idxCh];
+                            if (Math.Abs(deviceVal - ov) > eps)
+                            {
+                                foundDifferent = true;
+                                break;
+                            }
+                        }
+
+                        if (!ImGui.IsItemActive() && foundDifferent)
+                        {
+                            _localControllerOverrides.Remove(overrideKey);
+                            _lastSentCc.Remove(overrideKey);
+                        }
+                        else if (!ImGui.IsItemActive())
+                        {
+                            if (_overrideSetTimeMs.TryGetValue(overrideKey, out var setMs))
+                            {
+                                var age = Math.Abs(Environment.TickCount - setMs);
+                                if (age > 200)
+                                {
+                                    _localControllerOverrides.Remove(overrideKey);
+                                    _lastSentCc.Remove(overrideKey);
+                                    _overrideSetTimeMs.Remove(overrideKey);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // apply any remaining local UI override for immediate feedback
+                if (_localControllerOverrides.TryGetValue(overrideKey, out var ov2))
+                    value = ov2;
+
+                // If the user just released the mouse, clear overrides so hardware regains control.
+                if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) && !ImGui.IsItemActive())
+                {
+                    if (_localControllerOverrides.ContainsKey(overrideKey))
+                    {
+                        _localControllerOverrides.Remove(overrideKey);
+                        _lastSentCc.Remove(overrideKey);
+                        _overrideSetTimeMs.Remove(overrideKey);
+                    }
+                }
+
+                // ---- Draw knob indicator (position dot) ----
                 var startAngle     = -MathF.PI * 0.75f;
                 var endAngle       = MathF.PI  * 0.75f;
-                var angle          = startAngle + (endAngle - startAngle) * ClampF(value, 0f, 1f);
+                var angle          = startAngle + (endAngle - startAngle) * ClampF(value, 0f, 1f) - MathF.PI * 0.5f;
                 var indicatorLen   = radius * 0.5f;
                 var indicatorPos   = new Vector2(
                     center.X + MathF.Cos(angle) * indicatorLen,
                     center.Y + MathF.Sin(angle) * indicatorLen);
                 dl.AddCircleFilled(indicatorPos, radius * 0.12f, ImGui.GetColorU32(UiColors.Text.Rgba));
 
-                var colorCode = GetColorCode(s, cc);
-                var ringCol   = ColorForSimpleLed(colorCode, blinkOn);
-                dl.AddCircle(center, radius, ImGui.GetColorU32(ringCol), 32, 2f);
+                // ---- Draw LED ring segments per APC40 protocol ring mode ----
+                var knobRingMode = GetKnobRingMode(overrideKey);
+                DrawEncoderRing(dl, center, radius, value, knobRingMode, blinkOn);
 
-                if (ImGui.IsItemHovered())
+                var isHovered = ImGui.IsItemHovered();
+                var io = ImGui.GetIO();
+
+                // ---- Right-click context menu to change LED ring type ----
+                if (isHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+                    ImGui.OpenPopup($"ringCtx_{overrideKey}");
+
+                if (ImGui.BeginPopup($"ringCtx_{overrideKey}"))
+                {
+                    ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
+                    ImGui.Separator();
+                    for (var mi = 0; mi < _ringModeNames.Length; mi++)
+                    {
+                        var selected = knobRingMode == mi;
+                        if (ImGui.Selectable(_ringModeNames[mi], selected))
+                        {
+                            _knobRingModes[overrideKey] = mi;
+                            // Send ring type CC to hardware for this specific knob
+                            SendKnobRingTypeToHardware(s, idPrefix, idx, mi);
+                        }
+                    }
+                    ImGui.EndPopup();
+                }
+
+                // Interaction: allow dragging to change the controller value.
+                if (ImGui.IsItemActive() || (isHovered && ImGui.IsMouseDown(ImGuiMouseButton.Left)))
                 {
                     ImGui.BeginTooltip();
                     ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
-                    ImGui.TextUnformatted($"Value: {Math.Round(value * 100)}%");
+                    ImGui.TextUnformatted($"Value: {Math.Round(value * 100)}%  ({(int)MathF.Round(value * 127f)}/127)");
                     ImGui.EndTooltip();
+
+                    var sensitivity = 0.005f * MathF.Max(1f, size.X / 40f);
+                    var delta = -io.MouseDelta.Y * sensitivity;
+                    if (Math.Abs(delta) > 0)
+                    {
+                        var newVal = ClampF(value + delta, 0f, 1f);
+                        _localControllerOverrides[overrideKey] = newVal;
+                        _overrideSetTimeMs[overrideKey] = Environment.TickCount;
+
+                        var intVal = (int)MathF.Round(newVal * 127f);
+                        if (!_lastSentCc.TryGetValue(overrideKey, out var last) || last != intVal)
+                        {
+                            _lastSentCc[overrideKey] = intVal;
+                            if (MidiConnectionManager.TryGetMidiOut(s.ProductName, out var midiOut))
+                            {
+                                try
+                                {
+                                    var ccEvt = new ControlChangeEvent(0, 1, (MidiController)cc, intVal);
+                                    midiOut.Send(ccEvt.GetAsShortMessage());
+                                }
+                                catch (Exception e)
+                                {
+                                    Log.Warning($"Failed to send CC for {overrideKey}: {e.Message}");
+                                }
+                            }
+                        }
+                    }
                 }
 
                 ImGui.PopID();
@@ -284,6 +445,182 @@ internal static class MidiLayoutDrawHelpers
         }
 
         ImGui.EndTable();
+    }
+
+    /// <summary>
+    /// Draws the APC40 encoder LED ring around the knob center using arcs.
+    /// Implements the exact LED segment patterns from the APC40 Communications Protocol.
+    /// ringMode: 0=Off, 1=Single, 2=Volume, 3=Pan
+    /// </summary>
+    private static void DrawEncoderRing(ImDrawListPtr dl, Vector2 center, float radius,
+                                        float value01, int ringMode, bool blinkOn)
+    {
+        const int ledCount = 15;
+        // The ring arc spans 270° (from -135° to +135°), rotated -90° so 0 is at the top.
+        var arcStart = -MathF.PI * 0.75f - MathF.PI * 0.5f; // -225° = 135° (top-left)
+        var arcEnd   =  MathF.PI * 0.75f - MathF.PI * 0.5f; //  45° (top-right)
+        var arcSpan  = arcEnd - arcStart;
+        var segAngle = arcSpan / ledCount;
+        var gap      = segAngle * 0.15f; // small gap between LED segments
+
+        var intVal = (int)MathF.Round(ClampF(value01, 0f, 1f) * 127f);
+
+        // Compute which LEDs are ON based on ring mode (bool array, 15 LEDs left-to-right)
+        Span<bool> leds = stackalloc bool[ledCount];
+        switch (ringMode)
+        {
+            case 0: // Off - no LEDs
+                break;
+            case 1: // Single - one or two LEDs lit at position
+                ComputeSingleRing(intVal, leds);
+                break;
+            case 2: // Volume - fill from left
+                ComputeVolumeRing(intVal, leds);
+                break;
+            case 3: // Pan - from center outward
+                ComputePanRing(intVal, leds);
+                break;
+            default: // treat 4-127 as Single per protocol
+                ComputeSingleRing(intVal, leds);
+                break;
+        }
+
+        var onColor  = ImGui.GetColorU32(new Vector4(0.2f, 0.9f, 0.3f, 1f)); // green LED
+        var offColor = ImGui.GetColorU32(new Vector4(0.18f, 0.18f, 0.18f, 0.6f)); // dim off
+
+        for (var i = 0; i < ledCount; i++)
+        {
+            var a0 = arcStart + i * segAngle + gap * 0.5f;
+            var a1 = arcStart + (i + 1) * segAngle - gap * 0.5f;
+            var col = leds[i] ? onColor : offColor;
+            dl.PathArcTo(center, radius, a0, a1, 4);
+            dl.PathStroke(col, ImDrawFlags.None, 2.5f);
+        }
+    }
+
+    /// <summary>Single mode: one or two adjacent LEDs per the APC40 PDF table A.</summary>
+    private static void ComputeSingleRing(int v, Span<bool> leds)
+    {
+        // Exact breakpoints from the APC40 protocol PDF (29 ranges for 15 LEDs)
+        // Each entry: (min, max, led0, led1) where led1=-1 means single LED
+        ReadOnlySpan<int> table = stackalloc int[]
+        {
+        //  min, max, led0, led1
+            0,   3,   0, -1,
+            4,   8,   0,  1,
+            9,  12,   1, -1,
+           13,  17,   1,  2,
+           18,  21,   2, -1,
+           22,  25,   2,  3,
+           26,  30,   3, -1,
+           31,  34,   3,  4,
+           35,  38,   4, -1,
+           39,  43,   4,  5,
+           44,  47,   5, -1,
+           48,  52,   5,  6,
+           53,  56,   6, -1,
+           57,  60,   6,  7,
+           61,  65,   7, -1,
+           66,  69,   7,  8,
+           70,  73,   8, -1,
+           74,  78,   8,  9,
+           79,  82,   9, -1,
+           83,  87,   9, 10,
+           88,  91,  10, -1,
+           92,  95,  10, 11,
+           96, 100,  11, -1,
+          101, 104,  11, 12,
+          105, 108,  12, -1,
+          109, 113,  12, 13,
+          114, 117,  13, -1,
+          118, 122,  13, 14,
+          123, 127,  14, -1,
+        };
+        for (var i = 0; i < table.Length; i += 4)
+        {
+            if (v >= table[i] && v <= table[i + 1])
+            {
+                leds[table[i + 2]] = true;
+                if (table[i + 3] >= 0) leds[table[i + 3]] = true;
+                return;
+            }
+        }
+    }
+
+    /// <summary>Volume mode: fill from left per the APC40 PDF table B.</summary>
+    private static void ComputeVolumeRing(int v, Span<bool> leds)
+    {
+        // 16 ranges: 0=none, 1-9=1 LED, ... 127=all 15
+        int litCount;
+        if (v == 0) litCount = 0;
+        else if (v <= 9) litCount = 1;
+        else if (v <= 18) litCount = 2;
+        else if (v <= 27) litCount = 3;
+        else if (v <= 36) litCount = 4;
+        else if (v <= 45) litCount = 5;
+        else if (v <= 54) litCount = 6;
+        else if (v <= 63) litCount = 7;
+        else if (v <= 71) litCount = 8;
+        else if (v <= 80) litCount = 9;
+        else if (v <= 89) litCount = 10;
+        else if (v <= 98) litCount = 11;
+        else if (v <= 107) litCount = 12;
+        else if (v <= 116) litCount = 13;
+        else if (v <= 126) litCount = 14;
+        else litCount = 15;
+
+        for (var i = 0; i < litCount && i < leds.Length; i++)
+            leds[i] = true;
+    }
+
+    /// <summary>Pan mode: center-outward per the APC40 PDF table C.</summary>
+    private static void ComputePanRing(int v, Span<bool> leds)
+    {
+        // Center LED = index 7 (0-based). Pan spreads outward from center.
+        // Left of center: value 0..62 fills LEDs 0..7 (center always lit when <=64)
+        // Right of center: value 65..127 fills LEDs 7..14
+        // Center (63-64): only LED 7
+        if (v <= 8)       { for (var i = 0; i <= 7; i++) leds[i] = true; } // 8 LEDs (0..7)
+        else if (v <= 17) { for (var i = 1; i <= 7; i++) leds[i] = true; }
+        else if (v <= 26) { for (var i = 2; i <= 7; i++) leds[i] = true; }
+        else if (v <= 35) { for (var i = 3; i <= 7; i++) leds[i] = true; }
+        else if (v <= 44) { for (var i = 4; i <= 7; i++) leds[i] = true; }
+        else if (v <= 53) { for (var i = 5; i <= 7; i++) leds[i] = true; }
+        else if (v <= 62) { leds[6] = true; leds[7] = true; }
+        else if (v <= 64) { leds[7] = true; }
+        else if (v <= 73) { leds[7] = true; leds[8] = true; }
+        else if (v <= 82) { for (var i = 7; i <= 9;  i++) leds[i] = true; }
+        else if (v <= 91) { for (var i = 7; i <= 10; i++) leds[i] = true; }
+        else if (v <= 100){ for (var i = 7; i <= 11; i++) leds[i] = true; }
+        else if (v <= 109){ for (var i = 7; i <= 12; i++) leds[i] = true; }
+        else if (v <= 118){ for (var i = 7; i <= 13; i++) leds[i] = true; }
+        else              { for (var i = 7; i <= 14; i++) leds[i] = true; }
+    }
+
+    /// <summary>
+    /// Sends a ring type CC to the hardware for a single knob.
+    /// Track knobs: CC 0x38+knobIndex on channel 1 (all share channel 1 per protocol)
+    /// Device knobs: CC 0x18+knobIndex on channel 1 (channel selects track; we target Track 1)
+    /// The protocol's channel column for device knobs means "which track's device knobs",
+    /// not "which knob". All 8 device knobs in a single view are on the same channel.
+    /// </summary>
+    private static void SendKnobRingTypeToHardware(MidiDeviceStatus s, string idPrefix, int knobIndex, int ringType)
+    {
+        if (!MidiConnectionManager.TryGetMidiOut(s.ProductName, out var midiOut))
+            return;
+        if (knobIndex < 0 || knobIndex > 7)
+            return;
+
+        var isDevice = idPrefix.Contains("device", StringComparison.OrdinalIgnoreCase);
+        var ctrlBase = isDevice ? 0x18 : 0x38;
+        var controlId = ctrlBase + knobIndex;
+
+        try
+        {
+            var cc = new ControlChangeEvent(0, 1, (MidiController)controlId, ringType);
+            midiOut.Send(cc.GetAsShortMessage());
+        }
+        catch { /* ignore */ }
     }
 
     /// <summary>
@@ -548,5 +885,17 @@ internal static class MidiLayoutDrawHelpers
 
     #endregion
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 

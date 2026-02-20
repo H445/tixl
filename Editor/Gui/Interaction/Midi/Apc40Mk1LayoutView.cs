@@ -2,6 +2,7 @@ using ImGuiNET;
 using T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
 using T3.Editor.Gui.Styling;
 using static T3.Editor.Gui.Interaction.Midi.MidiLayoutDrawHelpers;
+using Operators.Utils; // for MidiConnectionManager
 
 namespace T3.Editor.Gui.Interaction.Midi;
 
@@ -358,11 +359,13 @@ internal static class Apc40Mk1LayoutView
 
         ImGui.Spacing();
 
+
         DrawBankSelectNavigation(s, blinkOn, scale);
 
         ImGui.Spacing();
 
         DrawKnobGrid("device", Apc40Mk1.RightPerBankKnobs.StartIndex, cols, 2, knobRender, s, blinkOn);
+
 
         ImGui.Spacing();
 
@@ -560,6 +563,7 @@ internal static class Apc40Mk1LayoutView
     // Shared sub-widgets
     // -------------------------------------------------------------------------
 
+
     /// <summary>Draws the compact Cue Level knob (CC 47) into the given cell size.</summary>
     private static void DrawCueKnob(MidiDeviceStatus s, Vector2 size)
     {
@@ -593,3 +597,9 @@ internal static class Apc40Mk1LayoutView
         ImGui.PopID();
     }
 }
+
+
+
+
+
+
