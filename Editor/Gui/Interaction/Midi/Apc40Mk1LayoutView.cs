@@ -7,8 +7,6 @@ namespace T3.Editor.Gui.Interaction.Midi;
 
 /// <summary>
 /// Renders the full APC40 MK1 physical hardware layout.
-/// Separated from the window shell so the drawing logic can be referenced
-/// by other views (e.g. standalone overlays or per-device pop-outs).
 /// Uses <see cref="MidiLayoutDrawHelpers"/> for all shared drawing primitives.
 /// </summary>
 internal static class Apc40Mk1LayoutView
@@ -225,12 +223,9 @@ internal static class Apc40Mk1LayoutView
             ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, ImGui.GetStyle().ItemSpacing.Y));
             ImGui.VSliderFloat($"##fader{c}", new Vector2(btnW, faderH), ref _channelFaderValues[c], 0f, 1f, "");
-            ImGui.PopStyleVar(2);
+            ImGui.PopStyleVar(2); 
+            DrawTooltipIfHovered($"Track Fader {c + 1}: {Math.Round(_channelFaderValues[c] * 100)}%");
 
-            if (ImGui.IsItemHovered())
-            {
-                DrawTooltipIfHovered($"Track Fader {c + 1}: {Math.Round(_channelFaderValues[c] * 100)}%");
-            }
             ImGui.PopID();
         }
 
@@ -243,10 +238,8 @@ internal static class Apc40Mk1LayoutView
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
         ImGui.VSliderFloat("##faderM", new Vector2(btnW, faderH), ref _channelFaderValues[8], 0f, 1f, "");
         ImGui.PopStyleVar();
-        if (ImGui.IsItemHovered())
-        {
-            DrawTooltipIfHovered($"Master Fader: {Math.Round(_channelFaderValues[8] * 100)}%");
-        }
+        DrawTooltipIfHovered($"Master Fader: {Math.Round(_channelFaderValues[8] * 100)}%");
+
         ImGui.PopID();
 
         ImGui.EndTable();
@@ -476,11 +469,8 @@ internal static class Apc40Mk1LayoutView
             center.X + MathF.Cos(angle) * radius * 0.55f,
             center.Y + MathF.Sin(angle) * radius * 0.55f);
         dl.AddCircleFilled(dotPos, radius * 0.18f, ImGui.GetColorU32(UiColors.Text.Rgba));
+        DrawTooltipIfHovered($"Cue Level (CC 47): {Math.Round(cueVal * 100)}%");
 
-        if (ImGui.IsItemHovered())
-        {
-            DrawTooltipIfHovered($"Cue Level (CC 47): {Math.Round(cueVal * 100)}%");
-        }
 
         ImGui.PopID();
     }
