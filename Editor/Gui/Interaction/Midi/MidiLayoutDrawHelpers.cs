@@ -127,14 +127,13 @@ internal static class MidiLayoutDrawHelpers
     {
         ImGui.PushStyleColor(ImGuiCol.Button, col);
         ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
-        // Reduce top padding for compact/small buttons so they don't appear vertically offset
-        // compared to other compact elements. Keep horizontal padding from current style.
         var currentPadX = ImGui.GetStyle().FramePadding.X;
-        // Use a small fraction of the button height for vertical padding (rounded down)
         var reducedPadY = MathF.Floor(Math.Max(0f, size.Y * 0.12f));
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(currentPadX, reducedPadY));
 
-        ImGui.Button($"{label}##{noteId}", size);
+        ImGui.PushID(noteId);
+        ImGui.Button(label, size);
+        ImGui.PopID();
         DrawTooltipIfHovered(tooltip);
 
         ImGui.PopStyleColor(2);
@@ -145,7 +144,9 @@ internal static class MidiLayoutDrawHelpers
     internal static void DrawSimpleButton(MidiDeviceStatus s, string label, int noteId, Vector2 size, string tooltipLabel)
     {
         var col = ColorForSimpleLed(GetColorCode(s, noteId));
-        DrawLedButton(label, noteId, col, size, $"{tooltipLabel} (Note {noteId})");
+        // Only build the tooltip string when hovered to avoid per-frame allocation
+        var tooltip = ImGui.IsItemHovered() ? $"{tooltipLabel} (Note {noteId})" : string.Empty;
+        DrawLedButton(label, noteId, col, size, tooltip);
     }
 
     /// <summary>Draws an icon button with background color based on LED state.</summary>
@@ -214,14 +215,14 @@ internal static class MidiLayoutDrawHelpers
     /// Pushes common button styling, emits an invisible button, then invokes <paramref name="drawContent"/>
     /// to render an icon or custom shape on top.
     /// </summary>
-    internal static void DrawStyledButton(object idKey, Vector4 bgCol, CustomComponents.ButtonStates state, Vector2 size, Action drawContent)
+    internal static void DrawStyledButton(int noteId, Vector4 bgCol, CustomComponents.ButtonStates state, Vector2 size, Action drawContent)
     {
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
         ImGui.PushStyleColor(ImGuiCol.ButtonActive,   UiColors.BackgroundButtonActivated.Rgba);
         ImGui.PushStyleColor(ImGuiCol.Button,         bgCol);
         ImGui.PushStyleColor(ImGuiCol.ButtonHovered,  BrightenColor(bgCol, 1.2f));
 
-        ImGui.PushID(idKey?.ToString() ?? string.Empty);
+        ImGui.PushID(noteId);
         ImGui.Button(string.Empty, size);
         ImGui.PopID();
 
@@ -334,7 +335,6 @@ internal static class MidiLayoutDrawHelpers
         var dl      = ImGui.GetWindowDrawList();
         var padding = 2f;
 
-
         if (!ImGui.BeginTable($"knobTable_{idPrefix}", cols, ImGuiTableFlags.SizingFixedFit))
             return;
 
@@ -350,8 +350,8 @@ internal static class MidiLayoutDrawHelpers
                 var idx = r * cols + c;
                 var cc  = ccStart + idx;
 
-                ImGui.PushID($"{idPrefix}_{cc}");
-                ImGui.InvisibleButton($"##knob{cc}", size);
+                ImGui.PushID(cc);
+                ImGui.InvisibleButton("##knob", size);
 
                 var min    = ImGui.GetItemRectMin();
                 var max    = ImGui.GetItemRectMax();
@@ -360,15 +360,15 @@ internal static class MidiLayoutDrawHelpers
 
                 dl.AddCircleFilled(center, radius * 0.7f, ImGui.GetColorU32(UiColors.BackgroundFull.Rgba));
 
-                var overrideKey = idPrefix + "_" + cc;
+                var overrideKey = $"{idPrefix}_{cc}";
                 var value = ResolveKnobValue(overrideKey, cc, s);
 
                 // ---- Draw knob indicator (position dot) ----
-                var startAngle     = -MathF.PI * 0.75f;
-                var endAngle       = MathF.PI  * 0.75f;
-                var angle          = startAngle + (endAngle - startAngle) * ClampF(value, 0f, 1f) - MathF.PI * 0.5f;
-                var indicatorLen   = radius * 0.5f;
-                var indicatorPos   = new Vector2(
+                var startAngle   = -MathF.PI * 0.75f;
+                var endAngle     =  MathF.PI * 0.75f;
+                var angle        = startAngle + (endAngle - startAngle) * ClampF(value, 0f, 1f) - MathF.PI * 0.5f;
+                var indicatorLen = radius * 0.5f;
+                var indicatorPos = new Vector2(
                     center.X + MathF.Cos(angle) * indicatorLen,
                     center.Y + MathF.Sin(angle) * indicatorLen);
                 dl.AddCircleFilled(indicatorPos, radius * 0.12f, ImGui.GetColorU32(UiColors.Text.Rgba));
@@ -378,13 +378,14 @@ internal static class MidiLayoutDrawHelpers
                 DrawEncoderRing(dl, center, radius, value, knobRingMode);
 
                 var isHovered = ImGui.IsItemHovered();
-                var io = ImGui.GetIO();
+                var io        = ImGui.GetIO();
 
                 // ---- Right-click context menu to change LED ring type ----
+                var popupId = $"ringCtx_{overrideKey}";
                 if (isHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-                    ImGui.OpenPopup($"ringCtx_{overrideKey}");
+                    ImGui.OpenPopup(popupId);
 
-                if (ImGui.BeginPopup($"ringCtx_{overrideKey}"))
+                if (ImGui.BeginPopup(popupId))
                 {
                     ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
                     ImGui.Separator();
@@ -394,7 +395,6 @@ internal static class MidiLayoutDrawHelpers
                         if (ImGui.Selectable(_ringModeNames[mi], selected))
                         {
                             _knobRingModes[overrideKey] = mi;
-                            // Send ring type CC to hardware for this specific knob
                             SendKnobRingTypeToHardware(s, idPrefix, idx, mi);
                         }
                     }
@@ -404,10 +404,13 @@ internal static class MidiLayoutDrawHelpers
                 // Interaction: allow dragging to change the controller value.
                 if (ImGui.IsItemActive() || (isHovered && ImGui.IsMouseDown(ImGuiMouseButton.Left)))
                 {
-                    ImGui.BeginTooltip();
-                    ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
-                    ImGui.TextUnformatted($"Value: {Math.Round(value * 100)}%  ({(int)MathF.Round(value * 127f)}/127)");
-                    ImGui.EndTooltip();
+                    if (isHovered)
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
+                        ImGui.TextUnformatted($"Value: {(int)Math.Round(value * 100)}%  ({(int)MathF.Round(value * 127f)}/127)");
+                        ImGui.EndTooltip();
+                    }
 
                     var sensitivity = 0.005f * MathF.Max(1f, size.X / 40f);
                     var delta = -io.MouseDelta.Y * sensitivity;
@@ -415,7 +418,7 @@ internal static class MidiLayoutDrawHelpers
                     {
                         var newVal = ClampF(value + delta, 0f, 1f);
                         _localControllerOverrides[overrideKey] = newVal;
-                        _overrideSetTimeMs[overrideKey] = Environment.TickCount;
+                        _overrideSetTimeMs[overrideKey]        = Environment.TickCount;
 
                         var intVal = (int)MathF.Round(newVal * 127f);
                         if (!_lastSentCc.TryGetValue(overrideKey, out var last) || last != intVal)
@@ -622,26 +625,16 @@ internal static class MidiLayoutDrawHelpers
 
     /// <summary>
     /// Draws a realistic vertical fader that visually matches the crossfader style.
-    /// Handles click-to-set and drag interaction; only syncs <paramref name="value"/>
-    /// from the caller when <paramref name="isDragging"/> is false.
-    /// Returns true while the user is actively dragging.
     /// </summary>
-    /// <param name="id">Unique ImGui id string.</param>
-    /// <param name="size">Widget size in pixels.</param>
-    /// <param name="value">Current fader value in [0,1]; updated by interaction.</param>
-    /// <param name="isDragging">Drag state persisted by the caller across frames.</param>
-    /// <param name="dragStartY">Screen-Y captured at drag start (persisted by caller).</param>
-    /// <param name="dragStartVal">Value captured at drag start (persisted by caller).</param>
-    /// <param name="tooltip">Optional tooltip text shown on hover.</param>
     internal static void DrawVerticalFader(string id, Vector2 size,
                                            ref float value,
                                            ref bool  isDragging,
                                            ref float dragStartY,
                                            ref float dragStartVal,
-                                           string    tooltip = "")
+                                           Func<string>? tooltip = null)
     {
         ImGui.PushID(id);
-        ImGui.InvisibleButton($"##vf_{id}", size);
+        ImGui.InvisibleButton("##vf", size);
 
         var min = ImGui.GetItemRectMin();
         var max = ImGui.GetItemRectMax();
@@ -723,8 +716,8 @@ internal static class MidiLayoutDrawHelpers
             new Vector2(thumbXr, thumbY + tHalf),
             thumbCol, 2f);
 
-        if (!string.IsNullOrEmpty(tooltip))
-            DrawTooltipIfHovered(tooltip);
+        if (tooltip != null && ImGui.IsItemHovered())
+            DrawTooltipIfHovered(tooltip());
 
         ImGui.PopID();
     }
@@ -855,7 +848,8 @@ internal static class MidiLayoutDrawHelpers
         dl.AddText(new Vector2(max.X - grooveInset - bSize.X, grooveY - bSize.Y * 0.5f), labelColor, "B");
         ImGui.PopFont();
 
-        DrawTooltipIfHovered($"A-B Crossfader: {Math.Round(value * 100)}%");
+        if (ImGui.IsItemHovered())
+            DrawTooltipIfHovered($"A-B Crossfader: {(int)Math.Round(value * 100)}%");
 
         ImGui.PopID();
     }
@@ -880,6 +874,9 @@ internal static class MidiLayoutDrawHelpers
 
     #endregion
 }
+
+
+
 
 
 

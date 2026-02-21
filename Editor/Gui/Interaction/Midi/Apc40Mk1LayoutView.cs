@@ -18,6 +18,9 @@ internal static class Apc40Mk1LayoutView
     private static readonly float[] _faderDragStartY      = new float[9];
     private static readonly float[] _faderDragStartVal    = new float[9];
 
+    // Pre-built fader ID strings – reused every frame to avoid per-frame allocations.
+    private static readonly string[] _faderIds = Enumerable.Range(0, 8).Select(i => $"fader{i}").Append("faderM").ToArray();
+
     // Crossfader UI value (CC 15, channel 0).
     private static float _crossfaderValue;
     private static bool  _crossfaderDragging;
@@ -295,12 +298,13 @@ internal static class Apc40Mk1LayoutView
             if (!_faderDragging[c] && s.ControllerValues != null && idx >= 0 && idx < s.ControllerValues.Length)
                 _channelFaderValues[c] = s.ControllerValues[idx];
 
-            DrawVerticalFader($"fader{c}", new Vector2(smallW, faderH),
+            var cc2 = c; // capture for lambda
+            DrawVerticalFader(_faderIds[c], new Vector2(smallW, faderH),
                               ref _channelFaderValues[c],
                               ref _faderDragging[c],
                               ref _faderDragStartY[c],
                               ref _faderDragStartVal[c],
-                              $"{Apc40Mk1.FaderDef.Tip} {c + 1}: {Math.Round(_channelFaderValues[c] * 100)}%");
+                              () => $"{Apc40Mk1.FaderDef.Tip} {cc2 + 1}: {Math.Round(_channelFaderValues[cc2] * 100)}%");
         }
 
         ImGui.TableSetColumnIndex(clipCols);
@@ -315,7 +319,7 @@ internal static class Apc40Mk1LayoutView
                               ref _faderDragging[mi],
                               ref _faderDragStartY[mi],
                               ref _faderDragStartVal[mi],
-                              $"{Apc40Mk1.MasterFaderDef.Tip}: {Math.Round(_channelFaderValues[mi] * 100)}%");
+                              () => $"{Apc40Mk1.MasterFaderDef.Tip}: {Math.Round(_channelFaderValues[mi] * 100)}%");
         }
 
         ImGui.EndTable();
