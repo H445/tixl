@@ -1,5 +1,4 @@
-﻿using NAudio;
-using NAudio.Midi;
+﻿using NAudio.Midi;
 using T3.Editor.Gui.Interaction.Midi.CommandProcessing;
 using T3.Editor.Gui.Interaction.Variations;
 using T3.Editor.Gui.Interaction.Variations.Model;
@@ -45,19 +44,19 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
                                               CommandTriggerCombination.ExecutesAt.SingleRangeButtonPressed),
 
                 // Stop blending - press Stop All Clips to stop blend operation
-                new CommandTriggerCombination(BlendActions.StopBlendingTowards, InputModes.Default, [ClipStopAll],
+                new CommandTriggerCombination(BlendActions.StopBlendingTowards, InputModes.Default, [ClipStopAllDef],
                                               CommandTriggerCombination.ExecutesAt.SingleActionButtonPressed),
 
                 // Update blend progress with crossfader
-                new CommandTriggerCombination(BlendActions.UpdateBlendingTowardsProgress, InputModes.Default, [AbFader],
+                new CommandTriggerCombination(BlendActions.UpdateBlendingTowardsProgress, InputModes.Default, [CrossfaderDef],
                                               CommandTriggerCombination.ExecutesAt.ControllerChange),
 
                 // Update blend progress with Master Fader
-                new CommandTriggerCombination(BlendActions.UpdateBlendingTowardsProgress, InputModes.Default, [MasterFader],
+                new CommandTriggerCombination(BlendActions.UpdateBlendingTowardsProgress, InputModes.Default, [MasterFaderDef],
                                               CommandTriggerCombination.ExecutesAt.ControllerChange),
 
                 // Update blend values with channel faders
-                new CommandTriggerCombination(BlendActions.UpdateBlendValues, InputModes.Default, [Fader1To8],
+                new CommandTriggerCombination(BlendActions.UpdateBlendValues, InputModes.Default, [FaderDef],
                                               CommandTriggerCombination.ExecutesAt.ControllerChange),
 
                 // Mode switching - Shift + Record/Arm 1/2/3 to switch between modes
@@ -69,9 +68,9 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
 
         ModeButtons =
             [
-                new ModeButton(SceneLaunch1, InputModes.Delete),
-                new ModeButton(SceneLaunch2, InputModes.BlendTo),
-                new ModeButton(Shift, InputModes.Save)
+                new ModeButton(SceneLaunchDefs[0], InputModes.Delete),
+                new ModeButton(SceneLaunchDefs[1], InputModes.BlendTo),
+                new ModeButton(ShiftDef, InputModes.Save)
             ];
     }
 
@@ -184,7 +183,7 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
             SendNoteRaw(ch, note, 0);
 
         // Clear scene launch LEDs
-        foreach (var note in SceneLaunchNotes.Indices())
+        foreach (var note in ControlDef.Range(SceneLaunchDefs).Indices())
             SendNoteRaw(MidiChannels1To8.StartIndex, note, 0);
 
         // Clear Record/Arm LEDs - Generic mode (Notes 48-55 on Channel 1)
@@ -273,7 +272,7 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
         }
 
         // Clear scene launch LEDs
-        foreach (var i in SceneLaunchNotes.Indices())
+        foreach (var i in ControlDef.Range(SceneLaunchDefs).Indices())
         {
             CacheControllerColors[i] = -1;
             SendColor(MidiOutConnection, i, (int)Apc40Mk1Colors.Off);
@@ -330,7 +329,7 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
                          };
 
         for (var i = 0; i < colors.Length; i++)
-            SendColor(MidiOutConnection, SceneLaunchNotes.StartIndex + i, (int)colors[i]);
+            SendColor(MidiOutConnection, SceneLaunchDefs[i].Id, (int)colors[i]);
     }
 
     private int AddModeHighlight(int index, int orgColor)
@@ -357,13 +356,12 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     /// </summary>
     protected override void SendColor(MidiOut midiOut, int apcControlIndex, int colorCode)
     {
-        // colorCode may encode a behavior in the upper byte: (behavior << 8) | color
+        // colorCode is Mk1 color (velocity). No behavior is encoded for Mk1.
         if (apcControlIndex < 0 || apcControlIndex >= CacheControllerColors.Length)
             return;
 
         var color = (Apc40Mk1Colors)(colorCode & 0xFF);
-        var behavior = (LedBehavior)((colorCode >> 8) & 0xFF);
-        SendLedState(midiOut, apcControlIndex, new LedState(color, behavior));
+        SendLedState(midiOut, apcControlIndex, new LedState(color));
     }
 
     /// <summary>
@@ -448,165 +446,160 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     // Base ID for track select buttons to avoid collision with other button IDs
     private const int TrackSelectBaseId = 1000;
 
-    #region MIDI Note/Channel Mapping Constants
 
-    // ===== Common to both modes =====
-    private const int ShiftButtonNote = 98;
-    internal const int ClipGridSize = 40; // 5 rows x 8 columns
+    #region Control Definitions — every physical APC40 control
+
+    // ---- Grid dimensions ----
+    internal const int ClipGridSize = 40;
     internal const int ClipGridColumns = 8;
     internal const int ClipGridRows = 5;
 
-    // ===== Channel range for multi-channel mappings =====
+    // ---- Scene Launch (right side of clip grid) ----
+    internal static readonly ControlDef[] SceneLaunchDefs =
+    {
+        new(82, "S1", "Scene Launch 1"), new(83, "S2", "Scene Launch 2"),
+        new(84, "S3", "Scene Launch 3"), new(85, "S4", "Scene Launch 4"),
+        new(86, "S5", "Scene Launch 5"), new(87, "S6", "Scene Launch 6"),
+        new(88, "S7", "Scene Launch 7"), new(89, "S8", "Scene Launch 8")
+    };
+
+    // ---- Clip Stop (one per track) ----
+    internal static readonly ControlDef[] ClipStopDefs =
+    {
+        new(52, "1", "Clip Stop Track 1"), new(53, "2", "Clip Stop Track 2"),
+        new(54, "3", "Clip Stop Track 3"), new(55, "4", "Clip Stop Track 4"),
+        new(56, "5", "Clip Stop Track 5"), new(57, "6", "Clip Stop Track 6"),
+        new(58, "7", "Clip Stop Track 7"), new(59, "8", "Clip Stop Track 8")
+    };
+
+    internal static readonly ControlDef ClipStopAllDef = new(81, "STOP ALL", "Stop All Clips");
+
+    // ---- Track Select row ----
+    internal static readonly ControlDef MasterTrackDef = new(0,  "MST", "Master Track Select");
+    internal static readonly ControlDef TrackSelectDef = new(51, "SEL", "Track Select");
+
+    // ---- Activator / Solo-Cue / Record Arm rows ----
+    internal static readonly ControlDef[] ActivatorDefs =
+    {
+        new(66, "A1", "Activator Track 1"), new(67, "A2", "Activator Track 2"),
+        new(68, "A3", "Activator Track 3"), new(69, "A4", "Activator Track 4"),
+        new(70, "A5", "Activator Track 5"), new(71, "A6", "Activator Track 6"),
+        new(72, "A7", "Activator Track 7"), new(73, "A8", "Activator Track 8")
+    };
+
+    internal static readonly ControlDef[] SoloCueDefs =
+    {
+        new(50, "S1", "Solo/Cue Track 1"), new(50, "S2", "Solo/Cue Track 2"),
+        new(50, "S3", "Solo/Cue Track 3"), new(50, "S4", "Solo/Cue Track 4"),
+        new(50, "S5", "Solo/Cue Track 5"), new(50, "S6", "Solo/Cue Track 6"),
+        new(50, "S7", "Solo/Cue Track 7"), new(50, "S8", "Solo/Cue Track 8")
+    };
+
+    internal static readonly ControlDef[] RecordArmDefs =
+    {
+        new(48, "R1", "Record Arm Track 1"), new(48, "R2", "Record Arm Track 2"),
+        new(48, "R3", "Record Arm Track 3"), new(48, "R4", "Record Arm Track 4"),
+        new(48, "R5", "Record Arm Track 5"), new(48, "R6", "Record Arm Track 6"),
+        new(48, "R7", "Record Arm Track 7"), new(48, "R8", "Record Arm Track 8")
+    };
+
+    // ---- Navigation / Bank Select ----
+    internal static readonly ControlDef ShiftDef      = new(98,  "SHIFT",  "Shift");
+    internal static readonly ControlDef BankUpDef     = new(94,  "▲",      "Bank Up");
+    internal static readonly ControlDef BankDownDef   = new(95,  "▼",      "Bank Down");
+    internal static readonly ControlDef BankLeftDef   = new(97,  "◄",      "Bank Left");
+    internal static readonly ControlDef BankRightDef  = new(96,  "►",      "Bank Right");
+    internal static readonly ControlDef TapTempoDef   = new(99,  "TAP",    "Tap Tempo");
+    internal static readonly ControlDef NudgeMinusDef = new(100, "NU-",    "Nudge -");
+    internal static readonly ControlDef NudgePlusDef  = new(101, "NU+",    "Nudge +");
+
+    // ---- Transport ----
+    internal static readonly ControlDef PlayDef    = new(91,  "PLAY",    "Play");
+    internal static readonly ControlDef StopDef    = new(92,  "STOP",    "Stop");
+    internal static readonly ControlDef RecordDef  = new(93,  "REC",     "Record");
+    internal static readonly ControlDef SessionDef = new(102, "SESSION", "Session / Clip Track");
+
+    // ---- Mode knob select buttons (PAN / SEND) ----
+    internal static readonly ControlDef[] ModeKnobDefs =
+    {
+        new(87, "PAN",   "Pan Mode"),
+        new(88, "Snd A", "Send A Mode"),
+        new(89, "Snd B", "Send B Mode"),
+        new(90, "Snd C", "Send C Mode")
+    };
+
+    // ---- Device control buttons (2 rows × 4) ----
+    // Per APC40 Communications Protocol: notes 0x3A..0x41
+    internal const int DeviceLeftId  = 60;
+    internal const int DeviceRightId = 61;
+
+    internal static readonly ControlDef[] DeviceControlDefs =
+    {
+        new(58,            "CLIP/DEV", "Clip / Device View"),
+        new(59,            "DEVI",     "Device On/Off"),
+        new(DeviceLeftId,  "◄",        "Device Left"),
+        new(DeviceRightId, "►",        "Device Right"),
+        new(62,            "DETAIL",   "Detail View"),
+        new(63,            "REC Q",    "Rec Quantization"),
+        new(64,            "MIDI",     "MIDI Overdub"),
+        new(65,            "METRO",    "Metronome")
+    };
+
+    // ---- Faders and knobs (CC-based) ----
+    internal static readonly ControlDef FaderDef       = new(7,  "FADER",  "Track Fader");
+    internal static readonly ControlDef MasterFaderDef = new(14, "MASTER", "Master Fader");
+    internal static readonly ControlDef CrossfaderDef  = new(15, "A/B",    "A-B Crossfader");
+    internal static readonly ControlDef CueLevelDef    = new(47, "CUE",    "Cue Level");
+    internal static readonly ControlDef TempoDef       = new(13, "TEMPO",  "Tempo");
+
+    // ---- Track knobs (CC 0x30..0x37 = 48..55) ----
+    internal static readonly ControlDef[] TrackKnobDefs =
+    {
+        new(48, "TK1", "Track Knob 1"), new(49, "TK2", "Track Knob 2"),
+        new(50, "TK3", "Track Knob 3"), new(51, "TK4", "Track Knob 4"),
+        new(52, "TK5", "Track Knob 5"), new(53, "TK6", "Track Knob 6"),
+        new(54, "TK7", "Track Knob 7"), new(55, "TK8", "Track Knob 8")
+    };
+
+    // ---- Device knobs (CC 0x10..0x17 = 16..23) ----
+    internal static readonly ControlDef[] DeviceKnobDefs =
+    {
+        new(16, "DK1", "Device Knob 1"), new(17, "DK2", "Device Knob 2"),
+        new(18, "DK3", "Device Knob 3"), new(19, "DK4", "Device Knob 4"),
+        new(20, "DK5", "Device Knob 5"), new(21, "DK6", "Device Knob 6"),
+        new(22, "DK7", "Device Knob 7"), new(23, "DK8", "Device Knob 8")
+    };
+
+
+    #endregion
+
+    #region ButtonRanges — only for protocol internals that are not physical controls
+
+    private const int ShiftButtonNote = 98;
     private static readonly ButtonRange MidiChannels1To8 = new(1, 8);
 
-    // ===== Generic Mode (0x40) MIDI Mappings =====
-    // Clip Launch Grid: Notes 0-39 on Channel 1
+    // Generic Mode (0x40) MIDI mappings (ConvertNoteToButtonId, ClearAllLedsRaw)
     private static readonly ButtonRange GenericClipGridNotes = new(0, 39);
-
-    // Record/Arm: Notes 48-55 on Channel 1
     private static readonly ButtonRange GenericRecordArmNotes = new(48, 55);
-
-    // Track Select: Notes 58-65 on Channel 1
     private static readonly ButtonRange GenericTrackSelectNotes = new(58, 65);
 
-    // ===== Ableton Live Mode (0x41) MIDI Mappings =====
-    // Clip Launch Grid: Notes 53-57 on Channels 1-8 (5 rows x 8 columns)
+    // Ableton Live Mode (0x41) MIDI mappings (ConvertNoteToButtonId, ClearAllLedsRaw)
     private static readonly ButtonRange AbletonClipGridNotes = new(53, 57);
     private const int AbletonClipGridColumns = 8;
-
-    // Record/Arm: Note 48 on Channels 1-8
     private const int AbletonRecordArmNote = 48;
-
-    // Track Select: Note 51 on Channels 1-8
     private const int AbletonTrackSelectNote = 51;
 
-    // ===== Scene Launch buttons (same in both modes) =====
-    internal static readonly ButtonRange SceneLaunchNotes = new(82, 86);
+    // Clip grid trigger range (CommandTriggerCombination) — uses the grid as a logical range, not a physical control
+    private static readonly ButtonRange SceneTrigger1To40 = new(0, 39);
+
+    // Record/Arm virtual IDs for mode switching (not real MIDI notes)
+    private const int RecordArmBaseId = 2000;
+    private static readonly ButtonRange RecordArmButtons = new(RecordArmBaseId, RecordArmBaseId + 7);
+
 
     #endregion
 
     private int _updateCount;
-
-    // APC40 Mk1 Clip Launch Button Grid (8 columns x 5 rows = 40 buttons)
-    // Notes 0-7 = Row 1, Notes 8-15 = Row 2, etc. (all on channel 1)
-    // The grid layout from bottom-left to top-right:
-    // Row 5: 32-39
-    // Row 4: 24-31
-    // Row 3: 16-23
-    // Row 2: 8-15
-    // Row 1: 0-7
-    private static readonly ButtonRange SceneTrigger1To40 = new(0, 39);
-
-    // Scene Launch buttons (right side of the grid)
-    private static readonly ButtonRange SceneLaunch1 = new(82);
-    private static readonly ButtonRange SceneLaunch2 = new(83);
-    private static readonly ButtonRange SceneLaunch3 = new(84);
-    private static readonly ButtonRange SceneLaunch4 = new(85);
-    private static readonly ButtonRange SceneLaunch5 = new(86);
-
-    // Track control buttons (below the clip grid)
-    internal static readonly ButtonRange ClipStopButtons1To8 = new(52, 59);
-    private static readonly ButtonRange ClipSelectButtons1To8 = new(51, 51); // Note 51 with different channels
-    internal static readonly ButtonRange ClipSoloButtons1To8 = new(50, 50); // Note 50 with different channels  
-    internal static readonly ButtonRange ClipRecArmButtons1To8 = new(48, 48); // Note 48 with different channels
-    internal static readonly ButtonRange ClipABButtons1To8 = new(66, 73);
-
-    // Record/Arm buttons (bottom row - used for mode switching with Shift)
-    // In Ableton mode: Note 48 on Channels 1-8
-    // In Generic mode: Notes 50-57 on Channel 1
-    // Mapped to button IDs 2000-2007 via ConvertNoteToButtonId
-    private const int RecordArmBaseId = 2000;
-    private static readonly ButtonRange RecordArmButtons = new(RecordArmBaseId, RecordArmBaseId + 7);
-
-    // Track Select buttons (mapped to button IDs 1000-1007 via ConvertNoteToButtonId)
-    private static readonly ButtonRange TrackSelectButtons = new(TrackSelectBaseId, TrackSelectBaseId + 7);
-
-    // Stop all clips button
-    internal static readonly ButtonRange ClipStopAll = new(81);
-
-    // Navigation buttons
-    internal static readonly ButtonRange BankSelectUp = new(94);
-    internal static readonly ButtonRange BankSelectDown = new(95);
-    internal static readonly ButtonRange BankSelectRight = new(96);
-    internal static readonly ButtonRange BankSelectLeft = new(97);
-    internal static readonly ButtonRange Shift = new(98);
-
-    // Transport buttons
-    internal static readonly ButtonRange TapTempo = new(99);
-    internal static readonly ButtonRange NudgeMinus = new(100);
-    internal static readonly ButtonRange NudgePlus = new(101);
-    private static readonly ButtonRange Session = new(102); // Also called "Clip/Track" on some models
-
-    // Transport play/stop/record
-    internal static readonly ButtonRange Play = new(91);
-    internal static readonly ButtonRange Stop = new(92);
-    internal static readonly ButtonRange Record = new(93);
-
-    // Device control buttons
-    private static readonly ButtonRange DeviceLeftArrow = new(58);
-    private static readonly ButtonRange DeviceRightArrow = new(59);
-    internal static readonly ButtonRange BankLeftArrow = new(60);
-    internal static readonly ButtonRange BankRightArrow = new(61);
-    private static readonly ButtonRange DevOnOff = new(62);
-    private static readonly ButtonRange DevLock = new(63);
-    private static readonly ButtonRange ClipDevView = new(64);
-    private static readonly ButtonRange DetailView = new(65);
-
-    // Public mapping for device control buttons in physical left-to-right/top-to-bottom order
-    // This maps the two rows (4 buttons each) that appear under the "Device Control" area on the APC40 MK1.
-    // According to the APC40 Communications Protocol (notes 0x3A..0x41) the labels are:
-    //  0x3A (58) = CLIP/TRACK (1)
-    //  0x3B (59) = DEVICE ON/OFF (2)
-    //  0x3C (60) = Device Left (3)
-    //  0x3D (61) = Device Right (4)
-    //  0x3E (62) = DETAIL VIEW (5)
-    //  0x3F (63) = REC QUANTIZATION (6)
-    //  0x40 (64) = MIDI OVERDUB (7)
-    //  0x41 (65) = METRONOME (8)
-    public static readonly int[] DeviceControlNoteOrder = new[] { 58, 59, 60, 61, 62, 63, 64, 65 };
-
-    public static readonly string[] DeviceControlLabels = new[]
-                                                              {
-                                                                  "CLIP/TRACK", // 58 (0x3A)
-                                                                  "DEVICE ON/OFF", // 59 (0x3B)
-                                                                  "Device Left", // 60 (0x3C)
-                                                                  "Device Right", // 61 (0x3D)
-                                                                  "DETAIL VIEW", // 62 (0x3E)
-                                                                  "REC QUANT", // 63 (0x3F)
-                                                                  "MIDI OVERDUB", // 64 (0x40)
-                                                                  "METRONOME" // 65 (0x41)
-                                                              };
-
-    // Mode buttons
-    private static readonly ButtonRange Pan = new(87);
-    private static readonly ButtonRange Sends = new(88);
-    private static readonly ButtonRange User = new(89);
-    private static readonly ButtonRange Metronome = new(90);
-
-    // Public mapping of mode buttons in the physical left-to-right/top-to-bottom order
-    // Exposed so the GUI can render the buttons in the exact physical arrangement of the APC40 Mk1.
-    public static readonly int[] ModeButtonNoteOrder = new[] { 87, 88, 89, 90 };
-    public static readonly string[] ModeButtonLabels = new[] { "PAN", "Snd A", "Snd B", "Snd C" };
-
-    // Faders and knobs (Control Change messages)
-    internal static readonly ButtonRange Fader1To8 = new(7, 7); // CC 7 on channels 1-8
-    internal static readonly ButtonRange MasterFader = new(14); // CC 14 on channel 1
-    internal static readonly ButtonRange AbFader = new(15); // CC 15 on channel 1 (Crossfader)
-    internal static readonly ButtonRange TopKnobs1To8 = new(48, 55); // CC 48-55 on channel 1
-    internal static readonly ButtonRange CueLevelKnob = new(47); // CC 47 on channel 1
-    private static readonly ButtonRange TempoKnob = new(13); // CC 13 on channel 1
-    internal static readonly ButtonRange RightPerBankKnobs = new(16, 23); // CC 16-23 on channel 1
-
-    // Controller ID bases from the APC40 protocol (hex):
-    // TRACK knob controllers: 0x30..0x37 (48..55) -> physical knob CCs (TopKnobs1To8)
-    // TRACK knob LED ring types: 0x38..0x3F (56..63)
-    private const int TrackKnobCtrlBase = 0x30; // 48 decimal
-    private const int TrackKnobRingBase = 0x38; // 56 decimal
-
-    // DEVICE knob controllers: 0x10..0x17 (16..23) -> RightPerBankKnobs
-    // DEVICE knob LED ring types: 0x18..0x1F (24..31)
-    private const int DeviceKnobCtrlBase = 0x10; // 16 decimal
-    private const int DeviceKnobRingBase = 0x18; // 24 decimal
 
     /// <summary>
     /// Sends a Controller Value Update (MIDI CC) to the APC40 for the given channel and control ID.
@@ -633,50 +626,21 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     }
 
     /// <summary>
-    /// Sets the LED ring type for a TRACK knob (0-7) using controller IDs 0x38..0x3F.
-    /// ringType: 0=Off,1=Single,2=Volume,3=Pan,4-127=Single (per PDF)
-    /// All TRACK knobs share channel 1 (no MIDI Channel column in the protocol table).
+    /// Sets the LED ring type for a knob by index. Ring CCs are always knob CCs + 8.
     /// </summary>
-    public void SetTrackKnobRingType(int trackIndex, int ringType)
+    private void SetKnobRingType(ControlDef[] knobDefs, int knobIndex, int ringType)
     {
-        if (trackIndex < 0 || trackIndex > 7) return;
-        var controlId = TrackKnobRingBase + trackIndex; // 0x38 + i
-        SendControllerValueUpdate(1, controlId, ringType); // channel 1 for all track knobs
+        if (knobIndex < 0 || knobIndex >= knobDefs.Length) return;
+        SendControllerValueUpdate(1, knobDefs[0].Id + 8 + knobIndex, ringType);
     }
 
     /// <summary>
-    /// Sets the LED ring type for a DEVICE knob (0-7) using controller IDs 0x18..0x1F.
-    /// The protocol's MIDI Channel column (0-8) selects which track's device knobs to address.
-    /// We target Track 1 (channel 1) since we display one set of 8 device knobs.
+    /// Updates the absolute controller value for a knob by index, driving its LED ring display.
     /// </summary>
-    public void SetDeviceKnobRingType(int deviceKnobIndex, int ringType)
+    private void UpdateKnobValue(ControlDef[] knobDefs, int knobIndex, int value)
     {
-        if (deviceKnobIndex < 0 || deviceKnobIndex > 7) return;
-        var controlId = DeviceKnobRingBase + deviceKnobIndex; // 0x18 + i
-        SendControllerValueUpdate(1, controlId, ringType); // channel 1 for Track 1
-    }
-
-    /// <summary>
-    /// Updates the absolute controller value for a TRACK knob (0-7) using controller IDs 0x30..0x37.
-    /// value must be in 0..127. This drives the LED ring display according to the currently selected ring type.
-    /// All TRACK knobs share channel 1 (no MIDI Channel column in the protocol table).
-    /// </summary>
-    public void UpdateTrackKnobValue(int trackIndex, int value)
-    {
-        if (trackIndex < 0 || trackIndex > 7) return;
-        var controlId = TrackKnobCtrlBase + trackIndex; // 0x30 + i
-        SendControllerValueUpdate(1, controlId, Math.Clamp(value, 0, 127)); // channel 1 for all track knobs
-    }
-
-    /// <summary>
-    /// Updates the absolute controller value for a DEVICE knob (0-7) using controller IDs 0x10..0x17.
-    /// Channel 1 targets Track 1's device knobs (the protocol's channel column selects the track).
-    /// </summary>
-    public void UpdateDeviceKnobValue(int deviceKnobIndex, int value)
-    {
-        if (deviceKnobIndex < 0 || deviceKnobIndex > 7) return;
-        var controlId = DeviceKnobCtrlBase + deviceKnobIndex; // 0x10 + i
-        SendControllerValueUpdate(1, controlId, Math.Clamp(value, 0, 127)); // channel 1 for Track 1
+        if (knobIndex < 0 || knobIndex >= knobDefs.Length) return;
+        SendControllerValueUpdate(1, knobDefs[0].Id + knobIndex, Math.Clamp(value, 0, 127));
     }
 
     /// <summary>
@@ -696,33 +660,22 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
             _ => 0
         };
 
-        // If apcControlIndex falls into TopKnobs1To8 or RightPerBankKnobs ranges, set via CC
-        if (Apc40Mk1.TopKnobs1To8.IncludesButtonIndex(apcControlIndex))
+        // If apcControlIndex falls into track or device knob CC ranges, set via CC
+        if (apcControlIndex >= TrackKnobDefs[0].Id && apcControlIndex <= TrackKnobDefs[^1].Id)
         {
-            var trackIdx = Apc40Mk1.TopKnobs1To8.GetMappedIndex(apcControlIndex);
-            SetTrackKnobRingType(trackIdx, ringType);
+            SetKnobRingType(TrackKnobDefs, apcControlIndex - TrackKnobDefs[0].Id, ringType);
             return;
         }
 
-        if (Apc40Mk1.RightPerBankKnobs.IncludesButtonIndex(apcControlIndex))
+        if (apcControlIndex >= DeviceKnobDefs[0].Id && apcControlIndex <= DeviceKnobDefs[^1].Id)
         {
-            var devIdx = Apc40Mk1.RightPerBankKnobs.GetMappedIndex(apcControlIndex);
-            SetDeviceKnobRingType(devIdx, ringType);
+            SetKnobRingType(DeviceKnobDefs, apcControlIndex - DeviceKnobDefs[0].Id, ringType);
             return;
         }
 
-        // Fallback: preserve legacy behavior (send as LED Note on)
-        var behavior = mode switch
-        {
-            EncoderRingMode.Off => LedBehavior.Solid,
-            EncoderRingMode.Absolute => LedBehavior.Solid,
-            EncoderRingMode.Relative => LedBehavior.Blink1_8,
-            EncoderRingMode.Fill => LedBehavior.Pulse1_8,
-            EncoderRingMode.Single => LedBehavior.Blink1_16,
-            _ => LedBehavior.Solid
-        };
-
-        var composite = ((int)behavior << 8) | (int)color;
+        // Fallback: preserve legacy behavior (send as LED Note on).
+        // APC40 Mk1 doesn't know about LedBehavior here — encode color only.
+        var composite = (int)color;
         TrySendLed(apcControlIndex, composite);
     }
 
@@ -730,48 +683,36 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     /// Sends a raw encoder ring update using explicit color and behavior. For knobs this will send
     /// controller value updates (where applicable) to drive the LED rings according to the protocol.
     /// </summary>
-    public void SendEncoderRingRaw(int apcControlIndex, Apc40Mk1Colors color, LedBehavior behavior)
+    public void SendEncoderRingRaw(int apcControlIndex, Apc40Mk1Colors color)
     {
         // If this is a track or device knob, send a controller value update instead of NoteOn.
-        if (Apc40Mk1.TopKnobs1To8.IncludesButtonIndex(apcControlIndex))
+        // Map color to a best-effort numeric value for LED ring display.
+        var knobValue = color switch
         {
-            var idx = Apc40Mk1.TopKnobs1To8.GetMappedIndex(apcControlIndex);
-            // derive a numeric value from color/behavior - best-effort: map colors to 0/127 ranges
-            var value = color switch
-            {
-                Apc40Mk1Colors.Off => 0,
-                Apc40Mk1Colors.Green => 64,
-                Apc40Mk1Colors.GreenBlinking => 64,
-                Apc40Mk1Colors.Red => 127,
-                Apc40Mk1Colors.RedBlinking => 127,
-                Apc40Mk1Colors.Orange => 90,
-                Apc40Mk1Colors.OrangeBlinking => 90,
-                _ => 0
-            };
-            UpdateTrackKnobValue(idx, value);
+            Apc40Mk1Colors.Off => 0,
+            Apc40Mk1Colors.Green => 64,
+            Apc40Mk1Colors.GreenBlinking => 64,
+            Apc40Mk1Colors.Red => 127,
+            Apc40Mk1Colors.RedBlinking => 127,
+            Apc40Mk1Colors.Orange => 90,
+            Apc40Mk1Colors.OrangeBlinking => 90,
+            _ => 0
+        };
+
+        if (apcControlIndex >= TrackKnobDefs[0].Id && apcControlIndex <= TrackKnobDefs[^1].Id)
+        {
+            UpdateKnobValue(TrackKnobDefs, apcControlIndex - TrackKnobDefs[0].Id, knobValue);
             return;
         }
 
-        if (Apc40Mk1.RightPerBankKnobs.IncludesButtonIndex(apcControlIndex))
+        if (apcControlIndex >= DeviceKnobDefs[0].Id && apcControlIndex <= DeviceKnobDefs[^1].Id)
         {
-            var idx = Apc40Mk1.RightPerBankKnobs.GetMappedIndex(apcControlIndex);
-            var value = color switch
-            {
-                Apc40Mk1Colors.Off => 0,
-                Apc40Mk1Colors.Green => 64,
-                Apc40Mk1Colors.GreenBlinking => 64,
-                Apc40Mk1Colors.Red => 127,
-                Apc40Mk1Colors.RedBlinking => 127,
-                Apc40Mk1Colors.Orange => 90,
-                Apc40Mk1Colors.OrangeBlinking => 90,
-                _ => 0
-            };
-            UpdateDeviceKnobValue(idx, value);
+            UpdateKnobValue(DeviceKnobDefs, apcControlIndex - DeviceKnobDefs[0].Id, knobValue);
             return;
         }
 
-        // Fallback to legacy NoteOn LED behavior
-        var composite = ((int)behavior << 8) | (int)color;
+        // Fallback to legacy NoteOn LED behavior — encode color only for Mk1 devices.
+        var composite = (int)color;
         TrySendLed(apcControlIndex, composite);
     }
 
@@ -794,29 +735,13 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     }
 
     /// <summary>
-    /// LED behavior types reused from Mk2-style mapping. For APC40 Mk1 we map behaviors
-    /// to MIDI channels (channels 9-15) for special ring/behavior modes when available.
+    /// Represents an LED state for APC40 Mk1 (color only). Mk1 doesn't support separate
+    /// LedBehavior values — behavior is not encoded here.
     /// </summary>
-    public enum LedBehavior
-    {
-        Solid = 0,
-        Pulse1_16 = 1,
-        Pulse1_8 = 2,
-        Blink1_24 = 3,
-        Blink1_16 = 4,
-        Blink1_8 = 5,
-        Blink1_4 = 6,
-        Blink1_2 = 7,
-    }
-
-    /// <summary>
-    /// Represents an LED state for APC40 Mk1 (color + behavior). Behavior is optional and
-    /// encoded into cache keys so SendLedState can avoid redundant updates.
-    /// </summary>
-    private readonly record struct LedState(Apc40Mk1Colors Color, LedBehavior Behavior = LedBehavior.Solid)
+    private readonly record struct LedState(Apc40Mk1Colors Color)
     {
         public static readonly LedState Off = new(Apc40Mk1Colors.Off);
-        public int ToCacheKey() => ((int)Behavior << 8) | (int)Color;
+        public int ToCacheKey() => (int)Color;
     }
 
     /// <summary>
@@ -868,53 +793,29 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
         int channel;
         int noteNumber;
 
+        // APC40 Mk1 does not use behavior channels — always use solid-style mappings.
         if (controlIndex < ClipGridSize)
         {
             if (_useGenericMode)
             {
                 // Generic: notes 0-39 on channel 1
-                if (state.Behavior == LedBehavior.Solid)
-                {
-                    channel = MidiChannels1To8.StartIndex; // channel 1
-                    noteNumber = controlIndex;
-                }
-                else
-                {
-                    // Use behavior channels 9..15 as a practical fallback for blinking/pulse
-                    channel = 8 + (int)state.Behavior; // 9..15
-                    noteNumber = controlIndex;
-                }
+                channel = MidiChannels1To8.StartIndex; // channel 1
+                noteNumber = controlIndex;
             }
             else
             {
-                // Ableton mode: solid uses column channels, behaviors use 9..15
+                // Ableton mode: use column channels for solid indication
                 var row = controlIndex / AbletonClipGridColumns;
                 var col = controlIndex % AbletonClipGridColumns;
-                if (state.Behavior == LedBehavior.Solid)
-                {
-                    channel = col + MidiChannels1To8.StartIndex; // 1..8
-                    noteNumber = row + AbletonClipGridNotes.StartIndex; // 53..57
-                }
-                else
-                {
-                    channel = 8 + (int)state.Behavior;
-                    noteNumber = controlIndex; // fallback
-                }
+                channel = col + MidiChannels1To8.StartIndex; // 1..8
+                noteNumber = row + AbletonClipGridNotes.StartIndex; // 53..57
             }
         }
         else
         {
-            // Non-grid buttons: send on channel 1 for solid; map behavior to channels otherwise
-            if (state.Behavior == LedBehavior.Solid)
-            {
-                channel = MidiChannels1To8.StartIndex;
-                noteNumber = controlIndex;
-            }
-            else
-            {
-                channel = 8 + (int)state.Behavior;
-                noteNumber = controlIndex;
-            }
+            // Non-grid buttons: send on channel 1
+            channel = MidiChannels1To8.StartIndex;
+            noteNumber = controlIndex;
         }
 
         try

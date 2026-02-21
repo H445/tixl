@@ -237,6 +237,93 @@ internal static class MidiLayoutDrawHelpers
     private static int GetKnobRingMode(string key) =>
         _knobRingModes.TryGetValue(key, out var mode) ? mode : 1;
 
+    /// <summary>
+    /// Resolves the display value for a knob by reading the device CC value,
+    /// applying any active UI override, and clearing stale overrides when the
+    /// hardware regains control. Keeps DrawKnobGrid focused on rendering.
+    /// </summary>
+    private static float ResolveKnobValue(string overrideKey, int cc, MidiDeviceStatus s)
+    {
+        const float eps = 1f / 127f;
+        var isActive = ImGui.IsItemActive();
+
+        // 1. Read base value from device (channel 1)
+        float value = 0f;
+        var valIdx = cc; // channel 0 * 128 + cc
+        if (s.ControllerValues != null && valIdx >= 0 && valIdx < s.ControllerValues.Length)
+            value = s.ControllerValues[valIdx];
+
+        // 2. Find canonical device value (first channel that has data)
+        var deviceVal = float.NaN;
+        if (s.ControllerValues != null)
+        {
+            for (var ch = 0; ch < 16; ch++)
+            {
+                var idx = ch * 128 + cc;
+                if (idx >= 0 && idx < s.ControllerValues.Length)
+                {
+                    deviceVal = s.ControllerValues[idx];
+                    break;
+                }
+            }
+        }
+
+        // 3. Clear override if hardware moved
+        if (!float.IsNaN(deviceVal))
+        {
+            if (_lastSeenDeviceValue.TryGetValue(overrideKey, out var prev) &&
+                Math.Abs(deviceVal - prev) > eps &&
+                _localControllerOverrides.ContainsKey(overrideKey) && !isActive)
+            {
+                ClearOverride(overrideKey);
+            }
+            _lastSeenDeviceValue[overrideKey] = deviceVal;
+        }
+
+        // 4. Clear override if device disagrees and user isn't dragging, or after timeout
+        if (_localControllerOverrides.TryGetValue(overrideKey, out var ov) && s.ControllerValues != null)
+        {
+            var differs = false;
+            for (var ch = 0; ch < 16; ch++)
+            {
+                var idx = ch * 128 + cc;
+                if (idx < 0 || idx >= s.ControllerValues.Length) continue;
+                if (Math.Abs(s.ControllerValues[idx] - ov) > eps) { differs = true; break; }
+            }
+
+            if (!isActive && differs)
+            {
+                ClearOverride(overrideKey);
+            }
+            else if (!isActive && _overrideSetTimeMs.TryGetValue(overrideKey, out var setMs) &&
+                     Math.Abs(Environment.TickCount - setMs) > 200)
+            {
+                ClearOverride(overrideKey);
+            }
+        }
+
+        // 5. Apply surviving override
+        if (_localControllerOverrides.TryGetValue(overrideKey, out var ov2))
+            value = ov2;
+
+        // 6. Clear on mouse release
+        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) && !isActive &&
+            _localControllerOverrides.ContainsKey(overrideKey))
+        {
+            ClearOverride(overrideKey);
+        }
+
+        return value;
+    }
+
+    /// <summary>Removes all cached state for a knob override key.</summary>
+    private static void ClearOverride(string key)
+    {
+        _localControllerOverrides.Remove(key);
+        _lastSentCc.Remove(key);
+        _overrideSetTimeMs.Remove(key);
+    }
+
     /// <summary>Draws a knob grid (rows × cols) reading CC values starting at <paramref name="ccStart"/>.</summary>
     internal static void DrawKnobGrid(string idPrefix, int ccStart, int cols, int rows, Vector2 size,
                                       MidiDeviceStatus s, bool blinkOn)
@@ -270,101 +357,8 @@ internal static class MidiLayoutDrawHelpers
 
                 dl.AddCircleFilled(center, radius * 0.7f, ImGui.GetColorU32(UiColors.BackgroundFull.Rgba));
 
-                float value = 0f;
                 var overrideKey = idPrefix + "_" + cc;
-                // read authoritative device value first (channel 1 assumed)
-                var valIdx = 0 * 128 + cc;
-                if (s.ControllerValues != null)
-                {
-                    if (valIdx >= 0 && valIdx < s.ControllerValues.Length)
-                        value = s.ControllerValues[valIdx];
-                }
-
-                // Compute a canonical device-reported value for this controller (first available channel)
-                var deviceCanonVal = float.NaN;
-                if (s.ControllerValues != null)
-                {
-                    for (var ch0 = 0; ch0 < 16; ch0++)
-                    {
-                        var idxCh = ch0 * 128 + cc;
-                        if (idxCh < 0 || idxCh >= s.ControllerValues.Length)
-                            continue;
-                        deviceCanonVal = s.ControllerValues[idxCh];
-                        break;
-                    }
-                }
-
-                var eps = 1f / 127f;
-                // If device value changed since last frame, and we have an override, clear it so hardware regains control
-                if (!float.IsNaN(deviceCanonVal))
-                {
-                    if (_lastSeenDeviceValue.TryGetValue(overrideKey, out var prevDev))
-                    {
-                        if (Math.Abs(deviceCanonVal - prevDev) > eps && _localControllerOverrides.ContainsKey(overrideKey) && !ImGui.IsItemActive())
-                        {
-                            _localControllerOverrides.Remove(overrideKey);
-                            _lastSentCc.Remove(overrideKey);
-                        }
-                    }
-                    _lastSeenDeviceValue[overrideKey] = deviceCanonVal;
-                }
-
-                // If we have a local UI override but the device later reports a different value,
-                // remove the override (unless the user is actively interacting) so the physical
-                // controller regains control.
-                if (_localControllerOverrides.TryGetValue(overrideKey, out var ov))
-                {
-                    if (s.ControllerValues != null)
-                    {
-                        var foundDifferent = false;
-                        for (var ch0 = 0; ch0 < 16; ch0++)
-                        {
-                            var idxCh = ch0 * 128 + cc;
-                            if (idxCh < 0 || idxCh >= s.ControllerValues.Length)
-                                continue;
-                            var deviceVal = s.ControllerValues[idxCh];
-                            if (Math.Abs(deviceVal - ov) > eps)
-                            {
-                                foundDifferent = true;
-                                break;
-                            }
-                        }
-
-                        if (!ImGui.IsItemActive() && foundDifferent)
-                        {
-                            _localControllerOverrides.Remove(overrideKey);
-                            _lastSentCc.Remove(overrideKey);
-                        }
-                        else if (!ImGui.IsItemActive())
-                        {
-                            if (_overrideSetTimeMs.TryGetValue(overrideKey, out var setMs))
-                            {
-                                var age = Math.Abs(Environment.TickCount - setMs);
-                                if (age > 200)
-                                {
-                                    _localControllerOverrides.Remove(overrideKey);
-                                    _lastSentCc.Remove(overrideKey);
-                                    _overrideSetTimeMs.Remove(overrideKey);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // apply any remaining local UI override for immediate feedback
-                if (_localControllerOverrides.TryGetValue(overrideKey, out var ov2))
-                    value = ov2;
-
-                // If the user just released the mouse, clear overrides so hardware regains control.
-                if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) && !ImGui.IsItemActive())
-                {
-                    if (_localControllerOverrides.ContainsKey(overrideKey))
-                    {
-                        _localControllerOverrides.Remove(overrideKey);
-                        _lastSentCc.Remove(overrideKey);
-                        _overrideSetTimeMs.Remove(overrideKey);
-                    }
-                }
+                var value = ResolveKnobValue(overrideKey, cc, s);
 
                 // ---- Draw knob indicator (position dot) ----
                 var startAngle     = -MathF.PI * 0.75f;

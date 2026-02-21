@@ -187,9 +187,9 @@ internal static class Apc40Mk1LayoutView
             }
 
             ImGui.TableSetColumnIndex(clipCols);
-            var sceneIdx = Apc40Mk1.SceneLaunchNotes.StartIndex + r;
-            var sceneCol = ColorForSimpleLed(GetColorCode(s, sceneIdx), blinkOn);
-            DrawLedButton($"S{r + 1}", sceneIdx, sceneCol, new Vector2(clipW, clipH), $"Scene Launch {r + 1}");
+            var sceneDef = Apc40Mk1.SceneLaunchDefs[r];
+            var sceneCol = ColorForSimpleLed(GetColorCode(s, sceneDef.Id), blinkOn);
+            DrawLedButton(sceneDef.Label, sceneDef.Id, sceneCol, new Vector2(clipW, clipH), sceneDef.Tip);
         }
 
         // --- Clip Stop row ---
@@ -197,17 +197,15 @@ internal static class Apc40Mk1LayoutView
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
-            var note = Apc40Mk1.ClipStopButtons1To8.StartIndex + c;
-            var col  = ColorForSimpleLed(GetColorCode(s, note), blinkOn);
-            // Use full clip button height for the stop row so they match the clip launch buttons
-            DrawLedButton((c + 1).ToString(), note, col, new Vector2(clipW, clipH), $"Clip Stop Track {c + 1}");
+            var def = Apc40Mk1.ClipStopDefs[c];
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            DrawLedButton(def.Label, def.Id, col, new Vector2(clipW, clipH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
-        var stopAllNote = Apc40Mk1.ClipStopAll.StartIndex;
-        ImGui.PushStyleColor(ImGuiCol.Button, ColorForSimpleLed(GetColorCode(s, stopAllNote), blinkOn));
-        // STOP ALL should also be full-height to align visually with the stop buttons
-        ImGui.Button("STOP ALL", new Vector2(clipW, clipH));
-        DrawTooltipIfHovered("Stop All Clips");
+        var stopAllDef = Apc40Mk1.ClipStopAllDef;
+        ImGui.PushStyleColor(ImGuiCol.Button, ColorForSimpleLed(GetColorCode(s, stopAllDef.Id), blinkOn));
+        ImGui.Button($"{stopAllDef.Label}##{stopAllDef.Id}", new Vector2(clipW, clipH));
+        DrawTooltipIfHovered(stopAllDef.Tip);
         ImGui.PopStyleColor();
 
         // Spacer between small control rows; use the same base spacing as the matrix buttons
@@ -226,8 +224,8 @@ internal static class Apc40Mk1LayoutView
         }
         ImGui.TableSetColumnIndex(clipCols);
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.35f, 0.35f, 0.4f, 1f));
-        ImGui.Button("MST##trkselM", new Vector2(smallW, smallH));
-        DrawTooltipIfHovered("Master Track Select");
+        ImGui.Button($"{Apc40Mk1.MasterTrackDef.Label}##trkselM", new Vector2(smallW, smallH));
+        DrawTooltipIfHovered(Apc40Mk1.MasterTrackDef.Tip);
         ImGui.PopStyleColor();
 
         // Spacer
@@ -241,15 +239,14 @@ internal static class Apc40Mk1LayoutView
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
-            var note = Apc40Mk1.ClipABButtons1To8.StartIndex + c;
-            var col  = ColorForSimpleLed(GetColorCode(s, note), blinkOn);
-            // activator should be smallH
-            DrawLedButton($"A{c + 1}", note, col, new Vector2(smallW, smallH), $"Activator Track {c + 1}");
+            var def = Apc40Mk1.ActivatorDefs[c];
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            DrawLedButton(def.Label, def.Id, col, new Vector2(smallW, smallH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
-        // remember the top-left of the scene cell so we can draw the larger cue knob later
+        // remember the top-left of the cell so we can draw the larger cue knob later
         var cueCellPos = ImGui.GetCursorScreenPos();
-        // place a small dummy to keep this scene cell height equal to the small rows
+        // place a small dummy to keep this cell height equal to the small rows
         ImGui.Dummy(new Vector2(smallW, smallH));
 
         // --- Solo/Cue row (cue knob occupies the scene column) ---
@@ -257,9 +254,9 @@ internal static class Apc40Mk1LayoutView
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
-            var col = ColorForSimpleLed(GetColorCode(s, Apc40Mk1.ClipSoloButtons1To8.StartIndex), blinkOn);
-            // solo/cue track buttons should be smallH
-            DrawLedButton($"S{c + 1}", Apc40Mk1.ClipSoloButtons1To8.StartIndex, col, new Vector2(smallW, smallH), $"Solo/Cue Track {c + 1}");
+            var def = Apc40Mk1.SoloCueDefs[c];
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            DrawLedButton(def.Label, def.Id, col, new Vector2(smallW, smallH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
         ImGui.Dummy(new Vector2(smallW, smallH));
@@ -269,10 +266,9 @@ internal static class Apc40Mk1LayoutView
         for (var c = 0; c < clipCols; c++)
         {
             ImGui.TableSetColumnIndex(c);
-            var note = Apc40Mk1.ClipRecArmButtons1To8.StartIndex + c;
-            var col  = ColorForSimpleLed(GetColorCode(s, note), blinkOn);
-            // match height for alignment
-            DrawLedButton($"R{c + 1}", note, col, new Vector2(smallW, smallH), $"Record Arm Track {c + 1}");
+            var def = Apc40Mk1.RecordArmDefs[c];
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            DrawLedButton(def.Label, def.Id, col, new Vector2(smallW, smallH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
         ImGui.Dummy(new Vector2(smallW, smallH));
@@ -296,7 +292,7 @@ internal static class Apc40Mk1LayoutView
         {
             ImGui.TableSetColumnIndex(c);
             var ch  = Math.Max(0, Math.Min(7, c));
-            var idx = ch * 128 + Apc40Mk1.Fader1To8.StartIndex;
+            var idx = ch * 128 + Apc40Mk1.FaderDef.Id;
             if (!_faderDragging[c] && s.ControllerValues != null && idx >= 0 && idx < s.ControllerValues.Length)
                 _channelFaderValues[c] = s.ControllerValues[idx];
 
@@ -305,13 +301,13 @@ internal static class Apc40Mk1LayoutView
                               ref _faderDragging[c],
                               ref _faderDragStartY[c],
                               ref _faderDragStartVal[c],
-                              $"Track Fader {c + 1}: {Math.Round(_channelFaderValues[c] * 100)}%");
+                              $"{Apc40Mk1.FaderDef.Tip} {c + 1}: {Math.Round(_channelFaderValues[c] * 100)}%");
         }
 
         ImGui.TableSetColumnIndex(clipCols);
         {
             const int mi = 8;
-            var idxM = 0 * 128 + Apc40Mk1.MasterFader.StartIndex;
+            var idxM = 0 * 128 + Apc40Mk1.MasterFaderDef.Id;
             if (!_faderDragging[mi] && s.ControllerValues != null && idxM >= 0 && idxM < s.ControllerValues.Length)
                 _channelFaderValues[mi] = s.ControllerValues[idxM];
 
@@ -320,7 +316,7 @@ internal static class Apc40Mk1LayoutView
                               ref _faderDragging[mi],
                               ref _faderDragStartY[mi],
                               ref _faderDragStartVal[mi],
-                              $"Master Fader: {Math.Round(_channelFaderValues[mi] * 100)}%");
+                              $"{Apc40Mk1.MasterFaderDef.Tip}: {Math.Round(_channelFaderValues[mi] * 100)}%");
         }
 
         ImGui.EndTable();
@@ -354,7 +350,7 @@ internal static class Apc40Mk1LayoutView
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(1.5f * scale, 4f * scale));
 
         // Use computedColumnW for the knob grid and for aligning other right-panel controls.
-        DrawKnobGrid("track",  Apc40Mk1.TopKnobs1To8.StartIndex, cols, 2, knobRender, s, blinkOn);
+        DrawKnobGrid("track",  Apc40Mk1.TrackKnobDefs[0].Id, cols, 2, knobRender, s, blinkOn);
         DrawModeKnobLabels(new Vector2(computedColumnW, smallBtnSize.Y), s, computedColumnW);
 
         ImGui.Spacing();
@@ -364,7 +360,7 @@ internal static class Apc40Mk1LayoutView
 
         ImGui.Spacing();
 
-        DrawKnobGrid("device", Apc40Mk1.RightPerBankKnobs.StartIndex, cols, 2, knobRender, s, blinkOn);
+        DrawKnobGrid("device", Apc40Mk1.DeviceKnobDefs[0].Id, cols, 2, knobRender, s, blinkOn);
 
 
         ImGui.Spacing();
@@ -389,7 +385,7 @@ internal static class Apc40Mk1LayoutView
                        ref _crossfaderDragStartX,
                        ref _crossfaderDragStartVal,
                        s,
-                       Apc40Mk1.AbFader.StartIndex,
+                       Apc40Mk1.CrossfaderDef.Id,
                        blinkOn);
         // Restore cursor X to the left edge of the right panel content so subsequent items
         // continue at the expected column alignment.
@@ -405,11 +401,7 @@ internal static class Apc40Mk1LayoutView
     /// <summary>Draws PAN / SEND A / SEND B / SEND C mode-select buttons aligned to knob columns.</summary>
     private static void DrawModeKnobLabels(Vector2 btnSize, MidiDeviceStatus s, float columnWidth)
     {
-        var isApc40 = s.DeviceTypeName?.IndexOf("Apc40", StringComparison.OrdinalIgnoreCase) >= 0;
-        if (!isApc40) return;
-
-        var modeNotes  = Apc40Mk1.ModeButtonNoteOrder;
-        var modeLabels = Apc40Mk1.ModeButtonLabels;
+        var defs = Apc40Mk1.ModeKnobDefs;
 
         if (!ImGui.BeginTable("mode_labels_table_" + s.ProductName, 4, ImGuiTableFlags.SizingFixedFit))
             return;
@@ -418,20 +410,13 @@ internal static class Apc40Mk1LayoutView
             ImGui.TableSetupColumn(null, ImGuiTableColumnFlags.WidthFixed, columnWidth);
 
         ImGui.TableNextRow();
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 4 && i < defs.Length; i++)
         {
             ImGui.TableSetColumnIndex(i);
-            if (i < modeNotes.Length && i < modeLabels.Length)
-            {
-                var noteId    = modeNotes[i];
-                var colorCode = GetColorCode(s, noteId);
-                var col       = colorCode > 0 ? GreenColor : OffColor;
-                DrawLedButton(modeLabels[i], noteId, col, btnSize, $"{modeLabels[i]} (Note {noteId})");
-            }
-            else
-            {
-                ImGui.TextUnformatted("");
-            }
+            var def       = defs[i];
+            var colorCode = GetColorCode(s, def.Id);
+            var col       = colorCode > 0 ? GreenColor : OffColor;
+            DrawLedButton(def.Label, def.Id, col, btnSize, def.Tip);
         }
 
         ImGui.EndTable();
@@ -460,25 +445,25 @@ internal static class Apc40Mk1LayoutView
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0); ImGui.Dummy(btn);
         ImGui.TableSetColumnIndex(1); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowUp,    Apc40Mk1.BankSelectUp.StartIndex, btn, blinkOn, "Bank Up");
+        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowUp, Apc40Mk1.BankUpDef.Id, btn, blinkOn, Apc40Mk1.BankUpDef.Tip);
         ImGui.TableSetColumnIndex(3); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "TAP", Apc40Mk1.TapTempo.StartIndex, btn, blinkOn, "Tap Tempo");
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.TapTempoDef.Label, Apc40Mk1.TapTempoDef.Id, btn, blinkOn, Apc40Mk1.TapTempoDef.Tip);
 
         // Row 1: SHIFT | ← | empty | → | NUD-
         ImGui.TableNextRow();
-        ImGui.TableSetColumnIndex(0); DrawSimpleButton(s, "SHIFT", Apc40Mk1.Shift.StartIndex, btn, blinkOn, "Shift");
-        ImGui.TableSetColumnIndex(1); DrawIconButton(s, Icon.ArrowLeft,  Apc40Mk1.BankSelectLeft.StartIndex, btn, blinkOn, "Bank Left");
+        ImGui.TableSetColumnIndex(0); DrawSimpleButton(s, Apc40Mk1.ShiftDef.Label, Apc40Mk1.ShiftDef.Id, btn, blinkOn, Apc40Mk1.ShiftDef.Tip);
+        ImGui.TableSetColumnIndex(1); DrawIconButton(s, Icon.ArrowLeft, Apc40Mk1.BankLeftDef.Id, btn, blinkOn, Apc40Mk1.BankLeftDef.Tip);
         ImGui.TableSetColumnIndex(2); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(3); DrawIconButton(s, Icon.ArrowRight, Apc40Mk1.BankSelectRight.StartIndex, btn, blinkOn, "Bank Right");
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "NU-", Apc40Mk1.NudgeMinus.StartIndex, btn, blinkOn, "Nudge -");
+        ImGui.TableSetColumnIndex(3); DrawIconButton(s, Icon.ArrowRight, Apc40Mk1.BankRightDef.Id, btn, blinkOn, Apc40Mk1.BankRightDef.Tip);
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.NudgeMinusDef.Label, Apc40Mk1.NudgeMinusDef.Id, btn, blinkOn, Apc40Mk1.NudgeMinusDef.Tip);
 
         // Row 2: empty | empty | ↓ | empty | NUD+
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0); ImGui.Dummy(btn);
         ImGui.TableSetColumnIndex(1); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowDown,  Apc40Mk1.BankSelectDown.StartIndex, btn, blinkOn, "Bank Down");
+        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowDown, Apc40Mk1.BankDownDef.Id, btn, blinkOn, Apc40Mk1.BankDownDef.Tip);
         ImGui.TableSetColumnIndex(3); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, "NU+", Apc40Mk1.NudgePlus.StartIndex, btn, blinkOn, "Nudge +");
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.NudgePlusDef.Label, Apc40Mk1.NudgePlusDef.Id, btn, blinkOn, Apc40Mk1.NudgePlusDef.Tip);
 
         ImGui.EndTable();
     }
@@ -487,14 +472,7 @@ internal static class Apc40Mk1LayoutView
     private static void DrawDeviceControlButtons(MidiDeviceStatus s, bool blinkOn,
                                                  Vector2 btnSize, float columnWidth)
     {
-        var isApc40 = s.DeviceTypeName?.IndexOf("Apc40", StringComparison.OrdinalIgnoreCase) >= 0;
-        // For non-APC40 devices we don't provide APC40 fallbacks here. A generic
-        // fallback layout view will render appropriate controls for other devices.
-        if (!isApc40) return;
-
-        var notes   = Apc40Mk1.DeviceControlNoteOrder;
-        var labels  = Apc40Mk1.DeviceControlLabels;
-
+        var defs = Apc40Mk1.DeviceControlDefs;
         const int cols = 4;
         if (!ImGui.BeginTable("deviceCtrlBtnTable_" + s.ProductName, cols, ImGuiTableFlags.SizingFixedFit))
             return;
@@ -502,24 +480,20 @@ internal static class Apc40Mk1LayoutView
         for (var c = 0; c < cols; c++)
             ImGui.TableSetupColumn(null, ImGuiTableColumnFlags.WidthFixed, columnWidth);
 
-        var total = Math.Min(notes.Length, labels.Length);
-        for (var i = 0; i < total; i++)
+        for (var i = 0; i < defs.Length; i++)
         {
             if (i % cols == 0) ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(i % cols);
 
-            var noteId   = notes[i];
-            var label    = labels[i];
+            var def      = defs[i];
             var cellSize = new Vector2(columnWidth, btnSize.Y);
 
-            switch (noteId)
-            {
-                case var _ when noteId == Apc40Mk1.BankLeftArrow.StartIndex:
-                    DrawIconButton(s, Icon.ChevronLeft,  noteId, cellSize, blinkOn, "Device Left");  break;
-                case var _ when noteId == Apc40Mk1.BankRightArrow.StartIndex:
-                    DrawIconButton(s, Icon.ChevronRight, noteId, cellSize, blinkOn, "Device Right"); break;
-                default: DrawSimpleButton(s, label, noteId, cellSize, blinkOn, label);               break;
-            }
+            if (def.Id == Apc40Mk1.DeviceLeftId)
+                DrawIconButton(s, Icon.ChevronLeft,  def.Id, cellSize, blinkOn, def.Tip);
+            else if (def.Id == Apc40Mk1.DeviceRightId)
+                DrawIconButton(s, Icon.ChevronRight, def.Id, cellSize, blinkOn, def.Tip);
+            else
+                DrawSimpleButton(s, def.Label, def.Id, cellSize, blinkOn, def.Tip);
         }
 
         ImGui.EndTable();
@@ -530,8 +504,6 @@ internal static class Apc40Mk1LayoutView
     {
         var size = new Vector2(40 * scale, 22 * scale);
 
-        // Center the three transport buttons horizontally within the current content region.
-        // Compute total width (3 buttons + spacing between them) and offset the cursor accordingly.
         var style = ImGui.GetStyle();
         var itemSpacing = style.ItemSpacing.X;
         var totalButtons = 3;
@@ -543,19 +515,19 @@ internal static class Apc40Mk1LayoutView
             ImGui.SetCursorPosX(curX + (avail - totalWidth) * 0.5f);
         }
 
-        var colorCode = GetColorCode(s, Apc40Mk1.Play.StartIndex);
+        var colorCode = GetColorCode(s, Apc40Mk1.PlayDef.Id);
         var state     = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
         var bgCol     = colorCode > 0 ? new Vector4(0.1f, 0.85f, 0.2f, 1f) : OffColor;
         DrawIconButtonWithBg(Icon.PlayForwards, size, bgCol, state);
-        DrawTooltipIfHovered("Play");
+        DrawTooltipIfHovered(Apc40Mk1.PlayDef.Tip);
 
         ImGui.SameLine();
-        DrawStopButton(Apc40Mk1.Stop.StartIndex, s, size, blinkOn);
-        DrawTooltipIfHovered("Stop");
+        DrawStopButton(Apc40Mk1.StopDef.Id, s, size, blinkOn);
+        DrawTooltipIfHovered(Apc40Mk1.StopDef.Tip);
 
         ImGui.SameLine();
-        DrawRecordButton(Apc40Mk1.Record.StartIndex, s, size, blinkOn);
-        DrawTooltipIfHovered("Record");
+        DrawRecordButton(Apc40Mk1.RecordDef.Id, s, size, blinkOn);
+        DrawTooltipIfHovered(Apc40Mk1.RecordDef.Tip);
     }
 
 
@@ -578,7 +550,7 @@ internal static class Apc40Mk1LayoutView
         float cueVal = 0f;
         if (s.ControllerValues != null)
         {
-            var valIdx = 0 * 128 + Apc40Mk1.CueLevelKnob.StartIndex;
+            var valIdx = 0 * 128 + Apc40Mk1.CueLevelDef.Id;
             if (valIdx >= 0 && valIdx < s.ControllerValues.Length)
                 cueVal = s.ControllerValues[valIdx];
         }
@@ -591,7 +563,7 @@ internal static class Apc40Mk1LayoutView
             center.X + MathF.Cos(angle) * radius * 0.55f,
             center.Y + MathF.Sin(angle) * radius * 0.55f);
         dl.AddCircleFilled(dotPos, radius * 0.18f, ImGui.GetColorU32(UiColors.Text.Rgba));
-        DrawTooltipIfHovered($"Cue Level: {Math.Round(cueVal * 100)}%");
+        DrawTooltipIfHovered($"{Apc40Mk1.CueLevelDef.Tip}: {Math.Round(cueVal * 100)}%");
 
 
         ImGui.PopID();
