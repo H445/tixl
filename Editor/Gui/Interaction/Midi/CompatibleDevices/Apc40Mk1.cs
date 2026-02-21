@@ -447,86 +447,158 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     private const int TrackSelectBaseId = 1000;
 
 
+    #region Device Descriptor
+
+    /// <summary>
+    /// Device-wide metadata for the APC40 Mk1.
+    /// Exposes grid dimensions, palette family, and capability flags without reflection.
+    /// </summary>
+    internal static readonly DeviceDescriptor Descriptor = new(
+        clipGridRows: 5,
+        clipGridColumns: 8,
+        palette: ColorPaletteFamily.SevenState,
+        supportsBehavior: false,
+        hasShift: true,
+        sysExInit: new byte[] { 0xF0, 0x47, 0x00, 0x73, 0x60, 0x00, 0x04 },
+        defaultModeByte: 0x40,
+        supportsMultipleModes: true
+    );
+
+    protected internal override DeviceDescriptor GetDescriptor() => Descriptor;
+    protected internal override bool? GetUseGenericMode() => _useGenericMode;
+
+    #endregion
+
     #region Control Definitions — every physical APC40 control
 
-    // ---- Grid dimensions ----
-    internal const int ClipGridSize = 40;
-    internal const int ClipGridColumns = 8;
-    internal const int ClipGridRows = 5;
+    // ---- Grid dimensions (derived from Descriptor) ----
+    internal static int ClipGridSize    => Descriptor.ClipGridSize;   // 40
+    internal static int ClipGridColumns => Descriptor.ClipGridColumns; // 8
+    internal static int ClipGridRows    => Descriptor.ClipGridRows;    // 5
+
+    // ---- Clip Launch Grid (5 × 8 = 40 pads) ----
+    // IDs 0–39 are logical indices; physical MIDI mapping depends on Generic vs Ableton mode.
+    internal static readonly ControlDef[] ClipGridDefs = CreateClipGridDefs();
+
+    private static ControlDef[] CreateClipGridDefs()
+    {
+        var defs = new ControlDef[Descriptor.ClipGridSize];
+        for (var i = 0; i < defs.Length; i++)
+        {
+            var row = i / Descriptor.ClipGridColumns;
+            var col = i % Descriptor.ClipGridColumns;
+            defs[i] = new ControlDef(
+                Id: i,
+                Label: $"",
+                Tooltip: $"Clip Launch R{row + 1}C{col + 1}",
+                Type: ControlType.Pad,
+                Color: ColorCapability.BiColor,
+                MidiType: MidiMessageType.Note);
+        }
+        return defs;
+    }
 
     // ---- Scene Launch (right side of clip grid) ----
     internal static readonly ControlDef[] SceneLaunchDefs =
-    {
-        new(82, "S1", "Scene Launch 1"), new(83, "S2", "Scene Launch 2"),
-        new(84, "S3", "Scene Launch 3"), new(85, "S4", "Scene Launch 4"),
-        new(86, "S5", "Scene Launch 5"), new(87, "S6", "Scene Launch 6"),
-        new(88, "S7", "Scene Launch 7"), new(89, "S8", "Scene Launch 8")
-    };
+    [
+        new(82, "S1", "Scene Launch 1", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(83, "S2", "Scene Launch 2", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(84, "S3", "Scene Launch 3", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(85, "S4", "Scene Launch 4", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(86, "S5", "Scene Launch 5", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(87, "S6", "Scene Launch 6", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(88, "S7", "Scene Launch 7", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(89, "S8", "Scene Launch 8", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+    ];
 
     // ---- Clip Stop (one per track) ----
     internal static readonly ControlDef[] ClipStopDefs =
-    {
-        new(52, "1", "Clip Stop Track 1"), new(53, "2", "Clip Stop Track 2"),
-        new(54, "3", "Clip Stop Track 3"), new(55, "4", "Clip Stop Track 4"),
-        new(56, "5", "Clip Stop Track 5"), new(57, "6", "Clip Stop Track 6"),
-        new(58, "7", "Clip Stop Track 7"), new(59, "8", "Clip Stop Track 8")
-    };
+    [
+        new(52, "1", "Clip Stop Track 1", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(53, "2", "Clip Stop Track 2", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(54, "3", "Clip Stop Track 3", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(55, "4", "Clip Stop Track 4", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(56, "5", "Clip Stop Track 5", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(57, "6", "Clip Stop Track 6", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(58, "7", "Clip Stop Track 7", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(59, "8", "Clip Stop Track 8", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+    ];
 
-    internal static readonly ControlDef ClipStopAllDef = new(81, "STOP ALL", "Stop All Clips");
+    internal static readonly ControlDef ClipStopAllDef = new(81, "STOP ALL", "Stop All Clips",
+        Type: ControlType.Button, Color: ColorCapability.SingleColor);
 
     // ---- Track Select row ----
-    internal static readonly ControlDef MasterTrackDef = new(0,  "MST", "Master Track Select");
-    internal static readonly ControlDef TrackSelectDef = new(51, "SEL", "Track Select");
+    internal static readonly ControlDef MasterTrackDef = new(0,  "MST", "Master Track Select",
+        Type: ControlType.Button);
+    internal static readonly ControlDef TrackSelectDef = new(51, "SEL", "Track Select",
+        Type: ControlType.Button);
 
     // ---- Activator / Solo-Cue / Record Arm rows ----
     internal static readonly ControlDef[] ActivatorDefs =
-    {
-        new(66, "A1", "Activator Track 1"), new(67, "A2", "Activator Track 2"),
-        new(68, "A3", "Activator Track 3"), new(69, "A4", "Activator Track 4"),
-        new(70, "A5", "Activator Track 5"), new(71, "A6", "Activator Track 6"),
-        new(72, "A7", "Activator Track 7"), new(73, "A8", "Activator Track 8")
-    };
+    [
+        new(66, "A1", "Activator Track 1", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(67, "A2", "Activator Track 2", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(68, "A3", "Activator Track 3", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(69, "A4", "Activator Track 4", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(70, "A5", "Activator Track 5", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(71, "A6", "Activator Track 6", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(72, "A7", "Activator Track 7", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(73, "A8", "Activator Track 8", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+    ];
 
+    // Note: SoloCueDefs all share MIDI note 50 (channel-differentiated in Ableton mode).
+    // IDs here are for layout display only; they are not used as ButtonRange sources.
     internal static readonly ControlDef[] SoloCueDefs =
-    {
-        new(50, "S1", "Solo/Cue Track 1"), new(50, "S2", "Solo/Cue Track 2"),
-        new(50, "S3", "Solo/Cue Track 3"), new(50, "S4", "Solo/Cue Track 4"),
-        new(50, "S5", "Solo/Cue Track 5"), new(50, "S6", "Solo/Cue Track 6"),
-        new(50, "S7", "Solo/Cue Track 7"), new(50, "S8", "Solo/Cue Track 8")
-    };
+    [
+        new(50, "S1", "Solo/Cue Track 1", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S2", "Solo/Cue Track 2", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S3", "Solo/Cue Track 3", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S4", "Solo/Cue Track 4", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S5", "Solo/Cue Track 5", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S6", "Solo/Cue Track 6", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S7", "Solo/Cue Track 7", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(50, "S8", "Solo/Cue Track 8", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+    ];
 
+    // Record Arm buttons use virtual IDs (RecordArmBaseId + 0..7) because the physical
+    // MIDI mapping differs between Generic mode (Notes 48-55 on Ch1) and Ableton mode
+    // (Note 48 on Ch1-8). ConvertNoteToButtonId maps both to these virtual IDs.
     internal static readonly ControlDef[] RecordArmDefs =
-    {
-        new(48, "R1", "Record Arm Track 1"), new(48, "R2", "Record Arm Track 2"),
-        new(48, "R3", "Record Arm Track 3"), new(48, "R4", "Record Arm Track 4"),
-        new(48, "R5", "Record Arm Track 5"), new(48, "R6", "Record Arm Track 6"),
-        new(48, "R7", "Record Arm Track 7"), new(48, "R8", "Record Arm Track 8")
-    };
+    [
+        new(RecordArmBaseId + 0, "R1", "Record Arm Track 1", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 1, "R2", "Record Arm Track 2", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 2, "R3", "Record Arm Track 3", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 3, "R4", "Record Arm Track 4", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 4, "R5", "Record Arm Track 5", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 5, "R6", "Record Arm Track 6", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 6, "R7", "Record Arm Track 7", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+        new(RecordArmBaseId + 7, "R8", "Record Arm Track 8", Type: ControlType.Button, Color: ColorCapability.SingleColor, IsVirtual: true),
+    ];
 
     // ---- Navigation / Bank Select ----
-    internal static readonly ControlDef ShiftDef      = new(98,  "SHIFT",  "Shift");
-    internal static readonly ControlDef BankUpDef     = new(94,  "▲",      "Bank Up");
-    internal static readonly ControlDef BankDownDef   = new(95,  "▼",      "Bank Down");
-    internal static readonly ControlDef BankLeftDef   = new(97,  "◄",      "Bank Left");
-    internal static readonly ControlDef BankRightDef  = new(96,  "►",      "Bank Right");
-    internal static readonly ControlDef TapTempoDef   = new(99,  "TAP",    "Tap Tempo");
-    internal static readonly ControlDef NudgeMinusDef = new(100, "NU-",    "Nudge -");
-    internal static readonly ControlDef NudgePlusDef  = new(101, "NU+",    "Nudge +");
+    internal static readonly ControlDef ShiftDef      = new(98,  "SHIFT",  "Shift",   Type: ControlType.Button);
+    internal static readonly ControlDef BankUpDef     = new(94,  "▲",      "Bank Up", Type: ControlType.Button);
+    internal static readonly ControlDef BankDownDef   = new(95,  "▼",      "Bank Down", Type: ControlType.Button);
+    internal static readonly ControlDef BankLeftDef   = new(97,  "◄",      "Bank Left", Type: ControlType.Button);
+    internal static readonly ControlDef BankRightDef  = new(96,  "►",      "Bank Right", Type: ControlType.Button);
+    internal static readonly ControlDef TapTempoDef   = new(99,  "TAP",    "Tap Tempo", Type: ControlType.Button);
+    internal static readonly ControlDef NudgeMinusDef = new(100, "NU-",    "Nudge -", Type: ControlType.Button);
+    internal static readonly ControlDef NudgePlusDef  = new(101, "NU+",    "Nudge +", Type: ControlType.Button);
 
     // ---- Transport ----
-    internal static readonly ControlDef PlayDef    = new(91,  "PLAY",    "Play");
-    internal static readonly ControlDef StopDef    = new(92,  "STOP",    "Stop");
-    internal static readonly ControlDef RecordDef  = new(93,  "REC",     "Record");
-    internal static readonly ControlDef SessionDef = new(102, "SESSION", "Session / Clip Track");
+    internal static readonly ControlDef PlayDef    = new(91,  "PLAY",    "Play",    Type: ControlType.Button, Color: ColorCapability.SingleColor);
+    internal static readonly ControlDef StopDef    = new(92,  "STOP",    "Stop",    Type: ControlType.Button, Color: ColorCapability.SingleColor);
+    internal static readonly ControlDef RecordDef  = new(93,  "REC",     "Record",  Type: ControlType.Button, Color: ColorCapability.SingleColor);
+    internal static readonly ControlDef SessionDef = new(102, "SESSION", "Session / Clip Track", Type: ControlType.Button);
 
     // ---- Mode knob select buttons (PAN / SEND) ----
     internal static readonly ControlDef[] ModeKnobDefs =
-    {
-        new(87, "PAN",   "Pan Mode"),
-        new(88, "Snd A", "Send A Mode"),
-        new(89, "Snd B", "Send B Mode"),
-        new(90, "Snd C", "Send C Mode")
-    };
+    [
+        new(87, "PAN",   "Pan Mode",    Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(88, "Snd A", "Send A Mode", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(89, "Snd B", "Send B Mode", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+        new(90, "Snd C", "Send C Mode", Type: ControlType.Button, Color: ColorCapability.SingleColor),
+    ];
 
     // ---- Device control buttons (2 rows × 4) ----
     // Per APC40 Communications Protocol: notes 0x3A..0x41
@@ -534,68 +606,74 @@ public sealed class Apc40Mk1 : CompatibleMidiDevice
     internal const int DeviceRightId = 61;
 
     internal static readonly ControlDef[] DeviceControlDefs =
-    {
-        new(58,            "CLIP/DEV", "Clip / Device View"),
-        new(59,            "DEVI",     "Device On/Off"),
-        new(DeviceLeftId,  "◄",        "Device Left"),
-        new(DeviceRightId, "►",        "Device Right"),
-        new(62,            "DETAIL",   "Detail View"),
-        new(63,            "REC Q",    "Rec Quantization"),
-        new(64,            "MIDI",     "MIDI Overdub"),
-        new(65,            "METRO",    "Metronome")
-    };
+    [
+        new(58,            "CLIP/DEV", "Clip / Device View", Type: ControlType.Button),
+        new(59,            "DEVI",     "Device On/Off",      Type: ControlType.Button),
+        new(DeviceLeftId,  "◄",        "Device Left",        Type: ControlType.Button),
+        new(DeviceRightId, "►",        "Device Right",       Type: ControlType.Button),
+        new(62,            "DETAIL",   "Detail View",        Type: ControlType.Button),
+        new(63,            "REC Q",    "Rec Quantization",   Type: ControlType.Button),
+        new(64,            "MIDI",     "MIDI Overdub",       Type: ControlType.Button),
+        new(65,            "METRO",    "Metronome",          Type: ControlType.Button),
+    ];
 
     // ---- Faders and knobs (CC-based) ----
-    internal static readonly ControlDef FaderDef       = new(7,  "FADER",  "Track Fader");
-    internal static readonly ControlDef MasterFaderDef = new(14, "MASTER", "Master Fader");
-    internal static readonly ControlDef CrossfaderDef  = new(15, "A/B",    "A-B Crossfader");
-    internal static readonly ControlDef CueLevelDef    = new(47, "CUE",    "Cue Level");
-    internal static readonly ControlDef TempoDef       = new(13, "TEMPO",  "Tempo");
+    internal static readonly ControlDef FaderDef       = new(7,  "FADER",  "Track Fader",    Type: ControlType.Fader,  MidiType: MidiMessageType.ControlChange);
+    internal static readonly ControlDef MasterFaderDef = new(14, "MASTER", "Master Fader",   Type: ControlType.Fader,  MidiType: MidiMessageType.ControlChange);
+    internal static readonly ControlDef CrossfaderDef  = new(15, "A/B",    "A-B Crossfader", Type: ControlType.Fader,  MidiType: MidiMessageType.ControlChange);
+    internal static readonly ControlDef CueLevelDef    = new(47, "CUE",    "Cue Level",      Type: ControlType.Knob,   MidiType: MidiMessageType.ControlChange);
+    internal static readonly ControlDef TempoDef       = new(13, "TEMPO",  "Tempo",          Type: ControlType.Knob,   MidiType: MidiMessageType.ControlChange);
 
     // ---- Track knobs (CC 0x30..0x37 = 48..55) ----
     internal static readonly ControlDef[] TrackKnobDefs =
-    {
-        new(48, "TK1", "Track Knob 1"), new(49, "TK2", "Track Knob 2"),
-        new(50, "TK3", "Track Knob 3"), new(51, "TK4", "Track Knob 4"),
-        new(52, "TK5", "Track Knob 5"), new(53, "TK6", "Track Knob 6"),
-        new(54, "TK7", "Track Knob 7"), new(55, "TK8", "Track Knob 8")
-    };
+    [
+        new(48, "TK1", "Track Knob 1", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(49, "TK2", "Track Knob 2", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(50, "TK3", "Track Knob 3", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(51, "TK4", "Track Knob 4", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(52, "TK5", "Track Knob 5", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(53, "TK6", "Track Knob 6", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(54, "TK7", "Track Knob 7", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(55, "TK8", "Track Knob 8", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+    ];
 
     // ---- Device knobs (CC 0x10..0x17 = 16..23) ----
     internal static readonly ControlDef[] DeviceKnobDefs =
-    {
-        new(16, "DK1", "Device Knob 1"), new(17, "DK2", "Device Knob 2"),
-        new(18, "DK3", "Device Knob 3"), new(19, "DK4", "Device Knob 4"),
-        new(20, "DK5", "Device Knob 5"), new(21, "DK6", "Device Knob 6"),
-        new(22, "DK7", "Device Knob 7"), new(23, "DK8", "Device Knob 8")
-    };
-
+    [
+        new(16, "DK1", "Device Knob 1", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(17, "DK2", "Device Knob 2", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(18, "DK3", "Device Knob 3", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(19, "DK4", "Device Knob 4", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(20, "DK5", "Device Knob 5", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(21, "DK6", "Device Knob 6", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(22, "DK7", "Device Knob 7", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+        new(23, "DK8", "Device Knob 8", Type: ControlType.Knob, MidiType: MidiMessageType.ControlChange),
+    ];
 
     #endregion
 
-    #region ButtonRanges — only for protocol internals that are not physical controls
+    #region ButtonRanges — derived from ControlDefs where possible, protocol internals otherwise
 
     private const int ShiftButtonNote = 98;
     private static readonly ButtonRange MidiChannels1To8 = new(1, 8);
 
-    // Generic Mode (0x40) MIDI mappings (ConvertNoteToButtonId, ClearAllLedsRaw)
+    // Generic Mode (0x40) MIDI mappings — protocol-internal, not physical controls
     private static readonly ButtonRange GenericClipGridNotes = new(0, 39);
     private static readonly ButtonRange GenericRecordArmNotes = new(48, 55);
     private static readonly ButtonRange GenericTrackSelectNotes = new(58, 65);
 
-    // Ableton Live Mode (0x41) MIDI mappings (ConvertNoteToButtonId, ClearAllLedsRaw)
+    // Ableton Live Mode (0x41) MIDI mappings — protocol-internal
     private static readonly ButtonRange AbletonClipGridNotes = new(53, 57);
     private const int AbletonClipGridColumns = 8;
     private const int AbletonRecordArmNote = 48;
     private const int AbletonTrackSelectNote = 51;
 
-    // Clip grid trigger range (CommandTriggerCombination) — uses the grid as a logical range, not a physical control
-    private static readonly ButtonRange SceneTrigger1To40 = new(0, 39);
+    // Clip grid trigger range — derived from ClipGridDefs (single source of truth)
+    private static readonly ButtonRange SceneTrigger1To40 = ControlDef.Range(ClipGridDefs);
 
-    // Record/Arm virtual IDs for mode switching (not real MIDI notes)
+    // Record/Arm trigger range — derived from RecordArmDefs (single source of truth)
     private const int RecordArmBaseId = 2000;
-    private static readonly ButtonRange RecordArmButtons = new(RecordArmBaseId, RecordArmBaseId + 7);
-
+    private static readonly ButtonRange RecordArmButtons = ControlDef.Range(RecordArmDefs);
 
     #endregion
 

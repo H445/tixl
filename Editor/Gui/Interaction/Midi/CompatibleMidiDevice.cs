@@ -31,6 +31,18 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
     }
 
     /// <summary>
+    /// Returns the <see cref="DeviceDescriptor"/> for this device, or null if not yet migrated.
+    /// Override in derived classes to provide device-specific metadata without reflection.
+    /// </summary>
+    protected internal virtual DeviceDescriptor GetDescriptor() => null;
+
+    /// <summary>
+    /// Returns whether this device is using "Generic" MIDI mode (as opposed to Ableton mode).
+    /// Override in derived classes that support mode switching. Default is null (not applicable).
+    /// </summary>
+    protected internal virtual bool? GetUseGenericMode() => null;
+
+    /// <summary>
     /// Returns a threadsafe snapshot of the device state for UI rendering.
     /// </summary>
     protected internal MidiDeviceStatus GetStatusSnapshot()
@@ -51,32 +63,40 @@ public abstract class CompatibleMidiDevice : MidiConnectionManager.IMidiConsumer
             Array.Copy(CacheControllerValues, cacheValuesCopy, CacheControllerValues.Length);
         }
 
-        // Try to obtain a device-specific ClipGridSize constant if present (e.g. APC40 defines it)
-        int? clipGridSize = null;
-        try
+        // Obtain device metadata from the descriptor (no reflection needed)
+        var descriptor = GetDescriptor();
+        var clipGridSize = descriptor?.ClipGridSize;
+        var useGenericMode = GetUseGenericMode();
+
+        // Fallback: if no descriptor, try reflection for backward compatibility with un-migrated devices
+        if (clipGridSize == null)
         {
-            var t = GetType();
-            var f = t.GetField("ClipGridSize", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy);
-            if (f != null && f.FieldType == typeof(int))
-                clipGridSize = (int)f.GetValue(null);
-        }
-        catch
-        {
-            // ignore - optional
+            try
+            {
+                var t = GetType();
+                var f = t.GetField("ClipGridSize", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+                if (f != null && f.FieldType == typeof(int))
+                    clipGridSize = (int)f.GetValue(null);
+            }
+            catch
+            {
+                // ignore - optional
+            }
         }
 
-        // Try to obtain a device-specific _useGenericMode field (private in some devices)
-        bool? useGenericMode = null;
-        try
+        if (useGenericMode == null)
         {
-            var t = GetType();
-            var f = t.GetField("_useGenericMode", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
-            if (f != null && f.FieldType == typeof(bool))
-                useGenericMode = (bool?)f.GetValue(this);
-        }
-        catch
-        {
-            // ignore - optional
+            try
+            {
+                var t = GetType();
+                var f = t.GetField("_useGenericMode", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                if (f != null && f.FieldType == typeof(bool))
+                    useGenericMode = (bool?)f.GetValue(this);
+            }
+            catch
+            {
+                // ignore - optional
+            }
         }
 
         return new MidiDeviceStatus(

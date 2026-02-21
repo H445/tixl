@@ -47,7 +47,7 @@ internal static class Apc40Mk1LayoutView
     internal static void Draw(MidiDeviceStatus s, bool blinkOn)
     {
         // Simplified layout: move math to a small local function for clarity
-        const int leftColumns = Apc40Mk1.ClipGridColumns + 1; // clip columns + scene/control column
+        var leftColumns = Apc40Mk1.ClipGridColumns + 1; // clip columns + scene/control column
         var scale = T3Ui.UiScaleFactor;
 
         // Compute and return commonly used layout values. Returning a named tuple keeps the call site clean.
@@ -148,9 +148,9 @@ internal static class Apc40Mk1LayoutView
                                       Vector2 clipBtnSize, Vector2 smallBtnSize,
                                       float cellWidth, float baseSpacing, float scale)
     {
-        const int clipCols = Apc40Mk1.ClipGridColumns;
-        const int columns  = clipCols + 1; // extra scene/control column
-        const int clipRows = Apc40Mk1.ClipGridRows;
+        var clipCols = Apc40Mk1.ClipGridColumns;
+        var columns  = clipCols + 1; // extra scene/control column
+        var clipRows = Apc40Mk1.ClipGridRows;
 
         if (!ImGui.BeginTable("left_panel_table_" + s.ProductName, columns, ImGuiTableFlags.SizingFixedFit))
             return;
