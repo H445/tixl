@@ -9,7 +9,7 @@ namespace T3.Editor.Gui.Interaction.Midi;
 /// </summary>
 internal static class GenericMidiLayoutView
 {
-    internal static void Draw(MidiDeviceStatus s, bool blinkOn)
+    internal static void Draw(MidiDeviceStatus s)
     {
         var clipSize = s.ClipGridSize ?? 40;
         const int cols = 8;
@@ -49,7 +49,7 @@ internal static class GenericMidiLayoutView
                     ImGui.TableSetColumnIndex(c + 1);
                     var idx       = r * cols + c;
                     var colorCode = GetColorCode(s, idx);
-                    var col       = ColorForClipLaunch(colorCode, blinkOn);
+                    var col       = ColorForClipLaunch(colorCode);
 
                     ImGui.PushStyleColor(ImGuiCol.Button,        col);
                     ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));

@@ -20,9 +20,6 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         Config.Title = "MIDI Devices";
     }
 
-    private bool   _blinkOn;
-    private double _lastBlinkFlipMs;
-
     // Debug panel settings (persist across draws in this view)
     private static bool _debugShowZeros;
     private static bool _debugShowAll;
@@ -30,19 +27,6 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
     protected override void DrawContent()
     {
-        var now   = DateTime.UtcNow;
-        var nowMs = (now - DateTime.UnixEpoch).TotalMilliseconds;
-
-        if (_lastBlinkFlipMs == 0)
-        {
-            _lastBlinkFlipMs = nowMs;
-        }
-        else if (nowMs - _lastBlinkFlipMs >= 500)
-        {
-            _lastBlinkFlipMs = nowMs;
-            _blinkOn = !_blinkOn;
-        }
-
         var statuses = CompatibleMidiDeviceHandling.GetConnectedDeviceStatuses();
 
         if (statuses.Count == 0)
@@ -54,13 +38,13 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
         ImGui.BeginChild("device_list", new Vector2(-1, -1), false);
         foreach (var s in statuses)
         {
-            DrawDevice(s, _blinkOn);
+            DrawDevice(s);
             ImGui.Separator();
         }
         ImGui.EndChild();
     }
 
-    private static void DrawDevice(MidiDeviceStatus s, bool blinkOn)
+    private static void DrawDevice(MidiDeviceStatus s)
     {
         ImGui.PushID(s.ProductName);
 
@@ -71,9 +55,9 @@ internal sealed class MidiDevicesImGuiView : T3.Editor.Gui.Windows.Window
 
         // Dispatch to the correct layout view
         if (s.DeviceTypeName?.IndexOf("Apc40", StringComparison.OrdinalIgnoreCase) >= 0)
-            Apc40Mk1LayoutView.Draw(s, blinkOn);
+            Apc40Mk1LayoutView.Draw(s);
         else
-            GenericMidiLayoutView.Draw(s, blinkOn);
+            GenericMidiLayoutView.Draw(s);
 
         ImGui.Spacing();
         // Debug panel (rendered under the controller layout)

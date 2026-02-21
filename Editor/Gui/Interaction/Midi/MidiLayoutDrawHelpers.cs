@@ -20,6 +20,9 @@ internal static class MidiLayoutDrawHelpers
     private static readonly Dictionary<string, int> _overrideSetTimeMs = new();
     private static readonly Dictionary<string, float> _lastSeenDeviceValue = new();
 
+    /// <summary>True for 500 ms, false for the next 500 ms, driven purely by ImGui time.</summary>
+    private static bool BlinkOn => (int)(ImGui.GetTime() / 0.5) % 2 == 0;
+
     #region Color Constants
 
     internal static readonly Vector4 GreenColor  = new(0.1f,  0.85f, 0.2f,  1f);
@@ -32,28 +35,28 @@ internal static class MidiLayoutDrawHelpers
 
     #region Color Mapping
 
-    internal static Vector4 ColorForClipLaunch(int colorCode, bool blinkOn)
+    internal static Vector4 ColorForClipLaunch(int colorCode)
     {
         return colorCode switch
         {
             0    => OffColor,
             1    => GreenColor,
-            2    => blinkOn ? GreenColor  : DimColor,
+            2    => BlinkOn ? GreenColor  : DimColor,
             3    => RedColor,
-            4    => blinkOn ? RedColor    : DimColor,
+            4    => BlinkOn ? RedColor    : DimColor,
             5    => YellowColor,
-            6    => blinkOn ? YellowColor : DimColor,
+            6    => BlinkOn ? YellowColor : DimColor,
             >= 7 => GreenColor,
             _    => OffColor
         };
     }
 
-    internal static Vector4 ColorForSimpleLed(int colorCode, bool blinkOn)
+    internal static Vector4 ColorForSimpleLed(int colorCode)
     {
         return colorCode switch
         {
             0    => OffColor,
-            2    => blinkOn ? GreenColor : DimColor,
+            2    => BlinkOn ? GreenColor : DimColor,
             >= 1 => GreenColor,
             _    => OffColor
         };
@@ -139,18 +142,18 @@ internal static class MidiLayoutDrawHelpers
     }
 
     /// <summary>Draws a simple LED button whose color is derived from the device color cache.</summary>
-    internal static void DrawSimpleButton(MidiDeviceStatus s, string label, int noteId, Vector2 size, bool blinkOn, string tooltipLabel)
+    internal static void DrawSimpleButton(MidiDeviceStatus s, string label, int noteId, Vector2 size, string tooltipLabel)
     {
-        var col = ColorForSimpleLed(GetColorCode(s, noteId), blinkOn);
+        var col = ColorForSimpleLed(GetColorCode(s, noteId));
         DrawLedButton(label, noteId, col, size, $"{tooltipLabel} (Note {noteId})");
     }
 
     /// <summary>Draws an icon button with background color based on LED state.</summary>
-    internal static void DrawIconButton(MidiDeviceStatus s, Icon icon, int noteId, Vector2 size, bool blinkOn, string tooltip)
+    internal static void DrawIconButton(MidiDeviceStatus s, Icon icon, int noteId, Vector2 size, string tooltip)
     {
         var colorCode = GetColorCode(s, noteId);
         var state     = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-        var bgCol     = ColorForSimpleLed(colorCode, blinkOn);
+        var bgCol     = ColorForSimpleLed(colorCode);
         DrawIconButtonWithBg(icon, size, bgCol, state);
         DrawTooltipIfHovered(tooltip);
     }
@@ -162,11 +165,11 @@ internal static class MidiLayoutDrawHelpers
     }
 
     /// <summary>Draws a transport Stop button (square shape).</summary>
-    internal static void DrawStopButton(int noteId, MidiDeviceStatus s, Vector2 size, bool blinkOn)
+    internal static void DrawStopButton(int noteId, MidiDeviceStatus s, Vector2 size)
     {
         var colorCode = GetColorCode(s, noteId);
         var state     = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-        var bgCol     = ColorForSimpleLed(colorCode, blinkOn);
+        var bgCol     = ColorForSimpleLed(colorCode);
 
         DrawStyledButton(noteId, bgCol, state, size, () =>
         {
@@ -179,11 +182,11 @@ internal static class MidiLayoutDrawHelpers
     }
 
     /// <summary>Draws a transport Record button (circle shape).</summary>
-    internal static void DrawRecordButton(int noteId, MidiDeviceStatus s, Vector2 size, bool blinkOn)
+    internal static void DrawRecordButton(int noteId, MidiDeviceStatus s, Vector2 size)
     {
         var colorCode = GetColorCode(s, noteId);
         var state     = colorCode > 0 ? CustomComponents.ButtonStates.Activated : CustomComponents.ButtonStates.Dimmed;
-        var bgCol     = ColorForSimpleLed(colorCode, blinkOn);
+        var bgCol     = ColorForSimpleLed(colorCode);
 
         DrawStyledButton(noteId, bgCol, state, size, () =>
         {
@@ -326,7 +329,7 @@ internal static class MidiLayoutDrawHelpers
 
     /// <summary>Draws a knob grid (rows × cols) reading CC values starting at <paramref name="ccStart"/>.</summary>
     internal static void DrawKnobGrid(string idPrefix, int ccStart, int cols, int rows, Vector2 size,
-                                      MidiDeviceStatus s, bool blinkOn)
+                                      MidiDeviceStatus s)
     {
         var dl      = ImGui.GetWindowDrawList();
         var padding = 2f;
@@ -372,7 +375,7 @@ internal static class MidiLayoutDrawHelpers
 
                 // ---- Draw LED ring segments per APC40 protocol ring mode ----
                 var knobRingMode = GetKnobRingMode(overrideKey);
-                DrawEncoderRing(dl, center, radius, value, knobRingMode, blinkOn);
+                DrawEncoderRing(dl, center, radius, value, knobRingMode);
 
                 var isHovered = ImGui.IsItemHovered();
                 var io = ImGui.GetIO();
@@ -447,7 +450,7 @@ internal static class MidiLayoutDrawHelpers
     /// ringMode: 0=Off, 1=Single, 2=Volume, 3=Pan
     /// </summary>
     private static void DrawEncoderRing(ImDrawListPtr dl, Vector2 center, float radius,
-                                        float value01, int ringMode, bool blinkOn)
+                                        float value01, int ringMode)
     {
         const int ledCount = 15;
         // The ring arc spans 270° (from -135° to +135°), rotated -90° so 0 is at the top.
@@ -740,15 +743,13 @@ internal static class MidiLayoutDrawHelpers
     /// <param name="dragStartVal">Value captured at drag start (persisted by caller).</param>
     /// <param name="s">MIDI device status, for reading CC values.</param>
     /// <param name="cc">CC number this fader is controlling.</param>
-    /// <param name="blinkOn">Whether to use blinking colors for LED feedback.</param>
     internal static void DrawCrossfader(string id, float scale, float targetWidthPx,
                                         ref float value,
                                         ref bool  isDragging,
                                         ref float dragStartX,
                                         ref float dragStartVal,
                                         MidiDeviceStatus s,
-                                        int cc,
-                                        bool blinkOn)
+                                        int cc)
      {
          // Read from device when the user isn't dragging
          var valIdx = 0 * 128 + cc;

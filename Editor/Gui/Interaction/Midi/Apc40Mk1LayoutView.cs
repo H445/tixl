@@ -2,7 +2,6 @@ using ImGuiNET;
 using T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
 using T3.Editor.Gui.Styling;
 using static T3.Editor.Gui.Interaction.Midi.MidiLayoutDrawHelpers;
-using Operators.Utils; // for MidiConnectionManager
 
 namespace T3.Editor.Gui.Interaction.Midi;
 
@@ -44,7 +43,7 @@ internal static class Apc40Mk1LayoutView
     ///   Transport (Play, Stop, Rec)
     ///   Crossfader
     /// </summary>
-    internal static void Draw(MidiDeviceStatus s, bool blinkOn)
+    internal static void Draw(MidiDeviceStatus s)
     {
         // Simplified layout: move math to a small local function for clarity
         var leftColumns = Apc40Mk1.ClipGridColumns + 1; // clip columns + scene/control column
@@ -122,12 +121,12 @@ internal static class Apc40Mk1LayoutView
             ImGui.BeginGroup();
             
             // Pass both the clip button size, computed column width and base spacing
-            DrawLeftPanel(s, blinkOn, clipBtnSize, smallBtnSize, columnWidth, baseSpacing, T3Ui.UiScaleFactor);
+            DrawLeftPanel(s, clipBtnSize, smallBtnSize, columnWidth, baseSpacing, T3Ui.UiScaleFactor);
             ImGui.EndGroup();
 
             ImGui.TableSetColumnIndex(1);
             ImGui.BeginGroup();
-            DrawRightPanel(s, blinkOn, clipBtnSize, smallBtnSize, T3Ui.UiScaleFactor);
+            DrawRightPanel(s, clipBtnSize, smallBtnSize, T3Ui.UiScaleFactor);
             ImGui.EndGroup();
 
             ImGui.EndTable();
@@ -144,7 +143,7 @@ internal static class Apc40Mk1LayoutView
     // Left panel
     // -------------------------------------------------------------------------
 
-    private static void DrawLeftPanel(MidiDeviceStatus s, bool blinkOn,
+    private static void DrawLeftPanel(MidiDeviceStatus s,
                                       Vector2 clipBtnSize, Vector2 smallBtnSize,
                                       float cellWidth, float baseSpacing, float scale)
     {
@@ -177,7 +176,7 @@ internal static class Apc40Mk1LayoutView
                 ImGui.TableSetColumnIndex(c);
                 var idx       = r * clipCols + c;
                 var colorCode = GetColorCode(s, idx);
-                var col       = ColorForClipLaunch(colorCode, blinkOn);
+                var col       = ColorForClipLaunch(colorCode);
 
                 ImGui.PushStyleColor(ImGuiCol.Button,        col);
                 ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenColor(col, 1.2f));
@@ -188,7 +187,7 @@ internal static class Apc40Mk1LayoutView
 
             ImGui.TableSetColumnIndex(clipCols);
             var sceneDef = Apc40Mk1.SceneLaunchDefs[r];
-            var sceneCol = ColorForSimpleLed(GetColorCode(s, sceneDef.Id), blinkOn);
+            var sceneCol = ColorForSimpleLed(GetColorCode(s, sceneDef.Id));
             DrawLedButton(sceneDef.Label, sceneDef.Id, sceneCol, new Vector2(clipW, clipH), sceneDef.Tip);
         }
 
@@ -198,12 +197,12 @@ internal static class Apc40Mk1LayoutView
         {
             ImGui.TableSetColumnIndex(c);
             var def = Apc40Mk1.ClipStopDefs[c];
-            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id));
             DrawLedButton(def.Label, def.Id, col, new Vector2(clipW, clipH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
         var stopAllDef = Apc40Mk1.ClipStopAllDef;
-        ImGui.PushStyleColor(ImGuiCol.Button, ColorForSimpleLed(GetColorCode(s, stopAllDef.Id), blinkOn));
+        ImGui.PushStyleColor(ImGuiCol.Button, ColorForSimpleLed(GetColorCode(s, stopAllDef.Id)));
         ImGui.Button($"{stopAllDef.Label}##{stopAllDef.Id}", new Vector2(clipW, clipH));
         DrawTooltipIfHovered(stopAllDef.Tip);
         ImGui.PopStyleColor();
@@ -240,7 +239,7 @@ internal static class Apc40Mk1LayoutView
         {
             ImGui.TableSetColumnIndex(c);
             var def = Apc40Mk1.ActivatorDefs[c];
-            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id));
             DrawLedButton(def.Label, def.Id, col, new Vector2(smallW, smallH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
@@ -255,7 +254,7 @@ internal static class Apc40Mk1LayoutView
         {
             ImGui.TableSetColumnIndex(c);
             var def = Apc40Mk1.SoloCueDefs[c];
-            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id));
             DrawLedButton(def.Label, def.Id, col, new Vector2(smallW, smallH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
@@ -267,7 +266,7 @@ internal static class Apc40Mk1LayoutView
         {
             ImGui.TableSetColumnIndex(c);
             var def = Apc40Mk1.RecordArmDefs[c];
-            var col = ColorForSimpleLed(GetColorCode(s, def.Id), blinkOn);
+            var col = ColorForSimpleLed(GetColorCode(s, def.Id));
             DrawLedButton(def.Label, def.Id, col, new Vector2(smallW, smallH), def.Tip);
         }
         ImGui.TableSetColumnIndex(clipCols);
@@ -326,7 +325,7 @@ internal static class Apc40Mk1LayoutView
     // Right panel
     // -------------------------------------------------------------------------
 
-    private static void DrawRightPanel(MidiDeviceStatus s, bool blinkOn,
+    private static void DrawRightPanel(MidiDeviceStatus s,
                                        Vector2 clipBtnSize, Vector2 smallBtnSize,
                                        float scale)
     {
@@ -350,27 +349,26 @@ internal static class Apc40Mk1LayoutView
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(1.5f * scale, 4f * scale));
 
         // Use computedColumnW for the knob grid and for aligning other right-panel controls.
-        DrawKnobGrid("track",  Apc40Mk1.TrackKnobDefs[0].Id, cols, 2, knobRender, s, blinkOn);
+        DrawKnobGrid("track",  Apc40Mk1.TrackKnobDefs[0].Id, cols, 2, knobRender, s);
         DrawModeKnobLabels(new Vector2(computedColumnW, smallBtnSize.Y), s, computedColumnW);
 
         ImGui.Spacing();
 
-
-        DrawBankSelectNavigation(s, blinkOn, scale);
+        DrawBankSelectNavigation(s, scale);
 
         ImGui.Spacing();
 
-        DrawKnobGrid("device", Apc40Mk1.DeviceKnobDefs[0].Id, cols, 2, knobRender, s, blinkOn);
+        DrawKnobGrid("device", Apc40Mk1.DeviceKnobDefs[0].Id, cols, 2, knobRender, s);
 
 
         ImGui.Spacing();
 
         // Device control buttons should use the computed column width so columns stay aligned
-        DrawDeviceControlButtons(s, blinkOn, new Vector2(computedColumnW, smallBtnSize.Y), computedColumnW);
+        DrawDeviceControlButtons(s, new Vector2(computedColumnW, smallBtnSize.Y), computedColumnW);
 
         ImGui.Spacing();
 
-        DrawTransportButtons(s, blinkOn, scale);
+        DrawTransportButtons(s, scale);
         ImGui.Spacing();
         // Use the centralized crossfader helper (from MidiLayoutDrawHelpers)
         // Compute a target width that covers the four columns plus inter-column spacing so the
@@ -385,8 +383,7 @@ internal static class Apc40Mk1LayoutView
                        ref _crossfaderDragStartX,
                        ref _crossfaderDragStartVal,
                        s,
-                       Apc40Mk1.CrossfaderDef.Id,
-                       blinkOn);
+                       Apc40Mk1.CrossfaderDef.Id);
         // Restore cursor X to the left edge of the right panel content so subsequent items
         // continue at the expected column alignment.
         ImGui.SetCursorScreenPos(new Vector2(rightPanelStartScreen.X, ImGui.GetCursorScreenPos().Y));
@@ -428,7 +425,7 @@ internal static class Apc40Mk1LayoutView
     ///   Col 1-3: ← ↑↓ →
     ///   Col 4: TAP TEMPO, NUD-, NUD+
     /// </summary>
-    private static void DrawBankSelectNavigation(MidiDeviceStatus s, bool blinkOn, float scale)
+    private static void DrawBankSelectNavigation(MidiDeviceStatus s, float scale)
     {
         var bw  = MathF.Floor(28f * scale);
         var bh  = MathF.Floor(18f * scale);
@@ -445,31 +442,31 @@ internal static class Apc40Mk1LayoutView
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0); ImGui.Dummy(btn);
         ImGui.TableSetColumnIndex(1); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowUp, Apc40Mk1.BankUpDef.Id, btn, blinkOn, Apc40Mk1.BankUpDef.Tip);
+        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowUp, Apc40Mk1.BankUpDef.Id, btn, Apc40Mk1.BankUpDef.Tip);
         ImGui.TableSetColumnIndex(3); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.TapTempoDef.Label, Apc40Mk1.TapTempoDef.Id, btn, blinkOn, Apc40Mk1.TapTempoDef.Tip);
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.TapTempoDef.Label, Apc40Mk1.TapTempoDef.Id, btn, Apc40Mk1.TapTempoDef.Tip);
 
         // Row 1: SHIFT | ← | empty | → | NUD-
         ImGui.TableNextRow();
-        ImGui.TableSetColumnIndex(0); DrawSimpleButton(s, Apc40Mk1.ShiftDef.Label, Apc40Mk1.ShiftDef.Id, btn, blinkOn, Apc40Mk1.ShiftDef.Tip);
-        ImGui.TableSetColumnIndex(1); DrawIconButton(s, Icon.ArrowLeft, Apc40Mk1.BankLeftDef.Id, btn, blinkOn, Apc40Mk1.BankLeftDef.Tip);
+        ImGui.TableSetColumnIndex(0); DrawSimpleButton(s, Apc40Mk1.ShiftDef.Label, Apc40Mk1.ShiftDef.Id, btn, Apc40Mk1.ShiftDef.Tip);
+        ImGui.TableSetColumnIndex(1); DrawIconButton(s, Icon.ArrowLeft, Apc40Mk1.BankLeftDef.Id, btn, Apc40Mk1.BankLeftDef.Tip);
         ImGui.TableSetColumnIndex(2); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(3); DrawIconButton(s, Icon.ArrowRight, Apc40Mk1.BankRightDef.Id, btn, blinkOn, Apc40Mk1.BankRightDef.Tip);
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.NudgeMinusDef.Label, Apc40Mk1.NudgeMinusDef.Id, btn, blinkOn, Apc40Mk1.NudgeMinusDef.Tip);
+        ImGui.TableSetColumnIndex(3); DrawIconButton(s, Icon.ArrowRight, Apc40Mk1.BankRightDef.Id, btn, Apc40Mk1.BankRightDef.Tip);
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.NudgeMinusDef.Label, Apc40Mk1.NudgeMinusDef.Id, btn, Apc40Mk1.NudgeMinusDef.Tip);
 
         // Row 2: empty | empty | ↓ | empty | NUD+
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0); ImGui.Dummy(btn);
         ImGui.TableSetColumnIndex(1); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowDown, Apc40Mk1.BankDownDef.Id, btn, blinkOn, Apc40Mk1.BankDownDef.Tip);
+        ImGui.TableSetColumnIndex(2); DrawIconButton(s, Icon.ArrowDown, Apc40Mk1.BankDownDef.Id, btn, Apc40Mk1.BankDownDef.Tip);
         ImGui.TableSetColumnIndex(3); ImGui.Dummy(btn);
-        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.NudgePlusDef.Label, Apc40Mk1.NudgePlusDef.Id, btn, blinkOn, Apc40Mk1.NudgePlusDef.Tip);
+        ImGui.TableSetColumnIndex(4); DrawSimpleButton(s, Apc40Mk1.NudgePlusDef.Label, Apc40Mk1.NudgePlusDef.Id, btn, Apc40Mk1.NudgePlusDef.Tip);
 
         ImGui.EndTable();
     }
 
     /// <summary>Draws Device Control buttons (2 rows × 4) aligned to knob columns.</summary>
-    private static void DrawDeviceControlButtons(MidiDeviceStatus s, bool blinkOn,
+    private static void DrawDeviceControlButtons(MidiDeviceStatus s,
                                                  Vector2 btnSize, float columnWidth)
     {
         var defs = Apc40Mk1.DeviceControlDefs;
@@ -489,18 +486,18 @@ internal static class Apc40Mk1LayoutView
             var cellSize = new Vector2(columnWidth, btnSize.Y);
 
             if (def.Id == Apc40Mk1.DeviceLeftId)
-                DrawIconButton(s, Icon.ChevronLeft,  def.Id, cellSize, blinkOn, def.Tip);
+                DrawIconButton(s, Icon.ChevronLeft,  def.Id, cellSize, def.Tip);
             else if (def.Id == Apc40Mk1.DeviceRightId)
-                DrawIconButton(s, Icon.ChevronRight, def.Id, cellSize, blinkOn, def.Tip);
+                DrawIconButton(s, Icon.ChevronRight, def.Id, cellSize, def.Tip);
             else
-                DrawSimpleButton(s, def.Label, def.Id, cellSize, blinkOn, def.Tip);
+                DrawSimpleButton(s, def.Label, def.Id, cellSize, def.Tip);
         }
 
         ImGui.EndTable();
     }
 
     /// <summary>Draws Play / Stop / Record transport buttons.</summary>
-    private static void DrawTransportButtons(MidiDeviceStatus s, bool blinkOn, float scale)
+    private static void DrawTransportButtons(MidiDeviceStatus s, float scale)
     {
         var size = new Vector2(40 * scale, 22 * scale);
 
@@ -522,11 +519,11 @@ internal static class Apc40Mk1LayoutView
         DrawTooltipIfHovered(Apc40Mk1.PlayDef.Tip);
 
         ImGui.SameLine();
-        DrawStopButton(Apc40Mk1.StopDef.Id, s, size, blinkOn);
+        DrawStopButton(Apc40Mk1.StopDef.Id, s, size);
         DrawTooltipIfHovered(Apc40Mk1.StopDef.Tip);
 
         ImGui.SameLine();
-        DrawRecordButton(Apc40Mk1.RecordDef.Id, s, size, blinkOn);
+        DrawRecordButton(Apc40Mk1.RecordDef.Id, s, size);
         DrawTooltipIfHovered(Apc40Mk1.RecordDef.Tip);
     }
 
