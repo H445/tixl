@@ -29,7 +29,8 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         Log.Gated.Initialize(
             Config.LogAudioDetails,
             Config.LogAudioRenderingDetails,
-            Config.LogVideoRenderingDetails);
+            Config.LogVideoRenderingDetails,
+            Config.LogMidiControllerDetails);
     }
 
     public sealed class ConfigData
@@ -160,13 +161,13 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         public bool EnableFrameProfiling = true;
         public bool KeepTraceForLogMessages = false;
         public bool EnableGCProfiling = false;
-        public bool EnableMidiDebugLogging = false;
         public bool ShowOperatorStats = false;
         
         // Gated Debug Logging
         public bool LogAudioDetails = false;
         public bool LogAudioRenderingDetails = false;
         public bool LogVideoRenderingDetails = false;
+        public bool LogMidiControllerDetails = false;
 
         public CompilerOptions.Verbosity CompileCsVerbosity = CompilerOptions.Verbosity.Minimal;
 

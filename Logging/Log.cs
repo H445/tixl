@@ -26,6 +26,7 @@ public static class Log
         public static bool AudioEnabled { get; set; }
         public static bool AudioRenderEnabled { get; set; }
         public static bool VideoRenderEnabled { get; set; }
+        public static bool MidiControllerEnabled { get; set; }
         
         public static void Audio(string message)
         {
@@ -42,17 +43,24 @@ public static class Log
             if (VideoRenderEnabled) Log.Debug(message);
         }
         
+        public static void MidiController(string message)
+        {
+            if (MidiControllerEnabled) Log.Debug(message);
+        }
+        
         /// <summary>
         /// Initializes the gated debug logging configuration by enabling or disabling specific logging categories.
         /// </summary>
         /// <param name="audio">Enable logging of audio-related debug messages.</param>
         /// <param name="audioRender">Enable logging of audio rendering debug messages.</param>
         /// <param name="videoRender">Enable logging of video rendering debug messages.</param>
-        public static void Initialize(bool audio, bool audioRender, bool videoRender)
+        /// <param name="midiController">Enable logging of MIDI controller debug messages.</param>
+        public static void Initialize(bool audio, bool audioRender, bool videoRender, bool midiController)
         {
             AudioEnabled = audio;
             AudioRenderEnabled = audioRender;
             VideoRenderEnabled = videoRender;
+            MidiControllerEnabled = midiController;
         }
     }
     

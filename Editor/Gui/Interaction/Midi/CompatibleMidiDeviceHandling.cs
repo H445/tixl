@@ -2,7 +2,6 @@
 using System.Reflection;
 using Operators.Utils;
 using T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
-using T3.Editor.Gui.UiHelpers;
 using Type = System.Type;
 
 namespace T3.Editor.Gui.Interaction.Midi;
@@ -82,10 +81,10 @@ internal static class CompatibleMidiDeviceHandling
     private static void CreateConnectedCompatibleDevices()
     {
         // Log all detected MIDI input devices for debugging
-        LogMidiDebug("Scanning for compatible MIDI devices...");
+        Log.Gated.MidiController("Scanning for compatible MIDI devices...");
         foreach (var (midiIn, midiInCapabilities) in MidiConnectionManager.MidiIns)
         {
-            LogMidiDebug($"  Found MIDI input device: '{midiInCapabilities.ProductName}'");
+            Log.Gated.MidiController($"  Found MIDI input device: '{midiInCapabilities.ProductName}'");
         }
         
         foreach (var controllerType in _compatibleControllerTypes)
@@ -98,7 +97,7 @@ internal static class CompatibleMidiDeviceHandling
             }
 
             var productNames = attr.ProductNames;
-            LogMidiDebug($"  Looking for controller type {controllerType.Name} with product names: {string.Join(", ", productNames.Select(n => $"'{n}'"))}");
+            Log.Gated.MidiController($"  Looking for controller type {controllerType.Name} with product names: {string.Join(", ", productNames.Select(n => $"'{n}'"))}");
 
             foreach (var (midiIn, midiInCapabilities) in MidiConnectionManager.MidiIns)
             {
@@ -106,7 +105,7 @@ internal static class CompatibleMidiDeviceHandling
                 if (!productNames.Contains(productName))
                     continue;
                 
-                LogMidiDebug($"  Matched device '{productName}' to {controllerType.Name}");
+                Log.Gated.MidiController($"  Matched device '{productName}' to {controllerType.Name}");
                 
                 if (!MidiConnectionManager.TryGetMidiOut(productName, out var midiOut))
                 {
@@ -122,18 +121,9 @@ internal static class CompatibleMidiDeviceHandling
 
                 compatibleDevice.Initialize(midiIn, midiOut);
                 _connectedMidiDevices.Add(compatibleDevice);
-                Log.Debug($"Connected compatible midi device {compatibleDevice}");
+                Log.Gated.MidiController($"Connected compatible midi device {compatibleDevice}");
             }
         }
-    }
-
-    /// <summary>
-    /// Logs a debug message if MIDI debug logging is enabled in settings.
-    /// </summary>
-    private static void LogMidiDebug(string message)
-    {
-        if (UserSettings.Config.EnableMidiDebugLogging)
-            Log.Debug(message);
     }
 
     private static readonly List<Type> _compatibleControllerTypes;

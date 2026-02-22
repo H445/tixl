@@ -482,11 +482,11 @@ internal sealed partial class SettingsWindow : Window
                         UserSettings.Defaults.EnableGCProfiling);
                     FormInputs.AddVerticalSpace();
 
-                    // MIDI Controller Debug Logging (from origin/main)
+                    // MIDI Controller Debug Logging
                     changed |= FormInputs.AddCheckBox("MIDI Controller Debug Logging",
-                        ref UserSettings.Config.EnableMidiDebugLogging,
+                        ref UserSettings.Config.LogMidiControllerDetails,
                         "Log detailed MIDI controller messages including button mappings and mode switches. Useful for debugging custom controller implementations.",
-                        UserSettings.Defaults.EnableMidiDebugLogging);
+                        UserSettings.Defaults.LogMidiControllerDetails);
                     FormInputs.AddVerticalSpace();
 
                     // Audio System group

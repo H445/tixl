@@ -3,7 +3,6 @@ using NAudio.Midi;
 using T3.Editor.Gui.Interaction.Midi.CommandProcessing;
 using T3.Editor.Gui.Interaction.Variations;
 using T3.Editor.Gui.Interaction.Variations.Model;
-using T3.Editor.Gui.UiHelpers;
 
 namespace T3.Editor.Gui.Interaction.Midi.CompatibleDevices;
 
@@ -89,28 +88,28 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         switch (index)
         {
             case 0: // Record/Arm 1 - Generic passthrough mode (0x40)
-                LogMidiDebug("APC40 Mk2: Setting GENERIC PASSTHROUGH mode (0x40)");
+                Log.Gated.MidiController("APC40 Mk2: Setting GENERIC PASSTHROUGH mode (0x40)");
                 _useGenericMode = true;
                 SendModeInitSysEx();
                 SetControlMode(false);
                 break;
                 
             case 1: // Record/Arm 2 - Ableton passthrough mode (0x41)
-                LogMidiDebug("APC40 Mk2: Setting ABLETON PASSTHROUGH mode (0x41)");
+                Log.Gated.MidiController("APC40 Mk2: Setting ABLETON PASSTHROUGH mode (0x41)");
                 _useGenericMode = false;
                 SendModeInitSysEx();
                 SetControlMode(false);
                 break;
                 
             case 2: // Record/Arm 3 - Ableton control mode (0x41)
-                LogMidiDebug("APC40 Mk2: Setting ABLETON CONTROL mode (0x41)");
+                Log.Gated.MidiController("APC40 Mk2: Setting ABLETON CONTROL mode (0x41)");
                 _useGenericMode = false;
                 SendModeInitSysEx();
                 SetControlMode(true);
                 break;
                 
             default:
-                LogMidiDebug($"APC40 Mk2: Ignoring mode switch for index {index}");
+                Log.Gated.MidiController($"APC40 Mk2: Ignoring mode switch for index {index}");
                 return; // Don't clear signals for invalid index
         }
         
@@ -134,7 +133,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         ClearAllLedsRaw();
             
         var modeIdentifier = _useGenericMode ? (byte)0x40 : (byte)0x41;
-        LogMidiDebug($"APC40 Mk2: Sending mode SysEx (0x{modeIdentifier:X2})...");
+        Log.Gated.MidiController($"APC40 Mk2: Sending mode SysEx (0x{modeIdentifier:X2})...");
         
         var buffer = new byte[]
                          {
@@ -156,7 +155,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         {
             MidiOutConnection.SendBuffer(buffer);
             _initialized = true;
-            LogMidiDebug($"APC40 Mk2: Mode switch complete (0x{modeIdentifier:X2})");
+            Log.Gated.MidiController($"APC40 Mk2: Mode switch complete (0x{modeIdentifier:X2})");
         }
         catch (Exception e)
         {
@@ -472,7 +471,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         // Shift button - same in both modes
         if (noteNumber == ShiftButtonNote && channel == MidiChannels1To8.StartIndex)
         {
-            LogMidiDebug($"ConvertNoteToButtonId: Shift button Note={noteNumber}, Channel={channel} -> ButtonId={ShiftButtonNote}");
+            Log.Gated.MidiController($"ConvertNoteToButtonId: Shift button Note={noteNumber}, Channel={channel} -> ButtonId={ShiftButtonNote}");
             return ShiftButtonNote;
         }
 
@@ -481,7 +480,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         {
             if (GenericClipGridNotes.IncludesButtonIndex(noteNumber) && channel == MidiChannels1To8.StartIndex)
             {
-                LogMidiDebug($"ConvertNoteToButtonId [Generic]: Clip grid Note={noteNumber}, Channel={channel} -> ButtonId={noteNumber}");
+                Log.Gated.MidiController($"ConvertNoteToButtonId [Generic]: Clip grid Note={noteNumber}, Channel={channel} -> ButtonId={noteNumber}");
                 return noteNumber;
             }
         }
@@ -492,7 +491,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
                 var row = AbletonClipGridNotes.GetMappedIndex(noteNumber);
                 var col = MidiChannels1To8.GetMappedIndex(channel);
                 var buttonId = row * AbletonClipGridColumns + col;
-                LogMidiDebug($"ConvertNoteToButtonId [Ableton]: Clip grid Note={noteNumber}, Channel={channel} -> row={row}, col={col}, ButtonId={buttonId}");
+                Log.Gated.MidiController($"ConvertNoteToButtonId [Ableton]: Clip grid Note={noteNumber}, Channel={channel} -> row={row}, col={col}, ButtonId={buttonId}");
                 return buttonId;
             }
         }
@@ -501,7 +500,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         if (noteNumber == AbletonRecordArmNote && MidiChannels1To8.IncludesButtonIndex(channel))
         {
             var buttonId = RecordArmBaseId + MidiChannels1To8.GetMappedIndex(channel);
-            LogMidiDebug($"ConvertNoteToButtonId: Record/Arm (Ableton mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
+            Log.Gated.MidiController($"ConvertNoteToButtonId: Record/Arm (Ableton mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
             return buttonId;
         }
 
@@ -510,7 +509,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
             && GenericRecordArmNotes.IncludesButtonIndex(noteNumber))
         {
             var buttonId = RecordArmBaseId + GenericRecordArmNotes.GetMappedIndex(noteNumber);
-            LogMidiDebug($"ConvertNoteToButtonId: Record/Arm (Generic mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
+            Log.Gated.MidiController($"ConvertNoteToButtonId: Record/Arm (Generic mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
             return buttonId;
         }
 
@@ -520,7 +519,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
             if (channel == MidiChannels1To8.StartIndex && GenericTrackSelectNotes.IncludesButtonIndex(noteNumber))
             {
                 var buttonId = TrackSelectBaseId + GenericTrackSelectNotes.GetMappedIndex(noteNumber);
-                LogMidiDebug($"ConvertNoteToButtonId: Track Select (Generic mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
+                Log.Gated.MidiController($"ConvertNoteToButtonId: Track Select (Generic mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
                 return buttonId;
             }
         }
@@ -529,7 +528,7 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
             if (noteNumber == AbletonTrackSelectNote && MidiChannels1To8.IncludesButtonIndex(channel))
             {
                 var buttonId = TrackSelectBaseId + MidiChannels1To8.GetMappedIndex(channel);
-                LogMidiDebug($"ConvertNoteToButtonId: Track Select (Ableton mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
+                Log.Gated.MidiController($"ConvertNoteToButtonId: Track Select (Ableton mapping) Note={noteNumber}, Channel={channel} -> ButtonId={buttonId}");
                 return buttonId;
             }
         }
@@ -827,14 +826,6 @@ public sealed class Apc40Mk2 : CompatibleMidiDevice
         BrightSkyBlue = 127,        // #007FFF
     }
 
-    /// <summary>
-    /// Logs a debug message if MIDI debug logging is enabled in settings.
-    /// </summary>
-    private static void LogMidiDebug(string message)
-    {
-        if (UserSettings.Config.EnableMidiDebugLogging)
-            Log.Debug(message);
-    }
 
     private bool _initialized;
     private bool _useGenericMode = true;
