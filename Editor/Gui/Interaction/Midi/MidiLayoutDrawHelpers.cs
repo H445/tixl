@@ -330,7 +330,7 @@ internal static class MidiLayoutDrawHelpers
 
     /// <summary>Draws a knob grid (rows × cols) reading CC values starting at <paramref name="ccStart"/>.</summary>
     internal static void DrawKnobGrid(string idPrefix, int ccStart, int cols, int rows, Vector2 size,
-                                      MidiDeviceStatus s)
+                                      MidiDeviceStatus s, bool drawRing = true)
     {
         var dl      = ImGui.GetWindowDrawList();
         var padding = 2f;
@@ -358,6 +358,12 @@ internal static class MidiLayoutDrawHelpers
                 var center = (min + max) / 2f;
                 var radius = Math.Min(max.X - min.X, max.Y - min.Y) / 2f - padding;
 
+                // Compute hover using mouse position once — more reliable than calling
+                // ImGui.IsItemHovered() later after other ImGui calls (popups/tooltips can clear it).
+                var io = ImGui.GetIO();
+                var mp = io.MousePos;
+                var isHovered = mp.X >= min.X && mp.X <= max.X && mp.Y >= min.Y && mp.Y <= max.Y;
+
                 dl.AddCircleFilled(center, radius * 0.7f, ImGui.GetColorU32(UiColors.BackgroundFull.Rgba));
 
                 var overrideKey = $"{idPrefix}_{cc}";
@@ -373,32 +379,38 @@ internal static class MidiLayoutDrawHelpers
                     center.Y + MathF.Sin(angle) * indicatorLen);
                 dl.AddCircleFilled(indicatorPos, radius * 0.12f, ImGui.GetColorU32(UiColors.Text.Rgba));
 
-                // ---- Draw LED ring segments per APC40 protocol ring mode ----
-                var knobRingMode = GetKnobRingMode(overrideKey);
-                DrawEncoderRing(dl, center, radius, value, knobRingMode);
-
-                var isHovered = ImGui.IsItemHovered();
-                var io        = ImGui.GetIO();
-
-                // ---- Right-click context menu to change LED ring type ----
-                var popupId = $"ringCtx_{overrideKey}";
-                if (isHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-                    ImGui.OpenPopup(popupId);
-
-                if (ImGui.BeginPopup(popupId))
+                // ---- Draw LED ring segments per APC40 protocol ring mode (optional) ----
+                if (drawRing)
                 {
-                    ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
-                    ImGui.Separator();
-                    for (var mi = 0; mi < _ringModeNames.Length; mi++)
+                    var knobRingMode = GetKnobRingMode(overrideKey);
+                    DrawEncoderRing(dl, center, radius, value, knobRingMode);
+
+                    // ---- Right-click context menu to change LED ring type ----
+                    var popupId = $"ringCtx_{overrideKey}";
+                    if (isHovered && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+                        ImGui.OpenPopup(popupId);
+
+                    if (ImGui.BeginPopup(popupId))
                     {
-                        var selected = knobRingMode == mi;
-                        if (ImGui.Selectable(_ringModeNames[mi], selected))
+                        ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
+                        ImGui.Separator();
+                        for (var mi = 0; mi < _ringModeNames.Length; mi++)
                         {
-                            _knobRingModes[overrideKey] = mi;
-                            SendKnobRingTypeToHardware(s, idPrefix, idx, mi);
+                            var selected = knobRingMode == mi;
+                            if (ImGui.Selectable(_ringModeNames[mi], selected))
+                            {
+                                _knobRingModes[overrideKey] = mi;
+                                SendKnobRingTypeToHardware(s, idPrefix, idx, mi);
+                            }
                         }
+                        ImGui.EndPopup();
                     }
-                    ImGui.EndPopup();
+                }
+
+                // Show tooltip on hover (not only while dragging). Use the computed isHovered flag.
+                if (isHovered)
+                {
+                    ImGui.SetTooltip($"{idPrefix} {idx + 1} (CC {cc})\nValue: {(int)Math.Round(value * 100)}%  ({(int)MathF.Round(value * 127f)}/127)");
                 }
 
                 // Interaction: allow dragging to change the controller value.
@@ -406,10 +418,7 @@ internal static class MidiLayoutDrawHelpers
                 {
                     if (isHovered)
                     {
-                        ImGui.BeginTooltip();
-                        ImGui.TextUnformatted($"{idPrefix} {idx + 1} (CC {cc})");
-                        ImGui.TextUnformatted($"Value: {(int)Math.Round(value * 100)}%  ({(int)MathF.Round(value * 127f)}/127)");
-                        ImGui.EndTooltip();
+                        ImGui.SetTooltip($"{idPrefix} {idx + 1} (CC {cc})\nValue: {(int)Math.Round(value * 100)}%  ({(int)MathF.Round(value * 127f)}/127)");
                     }
 
                     var sensitivity = 0.005f * MathF.Max(1f, size.X / 40f);
@@ -874,20 +883,3 @@ internal static class MidiLayoutDrawHelpers
 
     #endregion
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

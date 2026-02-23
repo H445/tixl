@@ -280,7 +280,8 @@ internal static class Apc40Mk1LayoutView
         {
             var prevCursor = ImGui.GetCursorScreenPos();
             ImGui.SetCursorScreenPos(cueCellPos);
-            DrawCueKnob(s, new Vector2(smallW, combinedCueHeight));
+            // Use the shared knob grid helper to draw a single standard knob (no encoder LED ring)
+            DrawKnobGrid("cue", Apc40Mk1.CueLevelDef.Id, 1, 1, new Vector2(smallW, combinedCueHeight), s, drawRing: false);
             ImGui.SetCursorScreenPos(prevCursor);
         }
 
@@ -537,42 +538,4 @@ internal static class Apc40Mk1LayoutView
     // -------------------------------------------------------------------------
 
 
-    /// <summary>Draws the compact Cue Level knob (CC 47) into the given cell size.</summary>
-    private static void DrawCueKnob(MidiDeviceStatus s, Vector2 size)
-    {
-        ImGui.PushID("cue_knob");
-        ImGui.InvisibleButton("##cueKnob", size);
-
-        var min    = ImGui.GetItemRectMin();
-        var max    = ImGui.GetItemRectMax();
-        var center = (min + max) / 2f;
-        var radius = Math.Min(max.X - min.X, max.Y - min.Y) / 2f - 3f;
-
-        float cueVal = 0f;
-        if (s.ControllerValues != null)
-        {
-            var valIdx = 0 * 128 + Apc40Mk1.CueLevelDef.Id;
-            if (valIdx >= 0 && valIdx < s.ControllerValues.Length)
-                cueVal = s.ControllerValues[valIdx];
-        }
-
-        var dl = ImGui.GetWindowDrawList();
-        dl.AddCircleFilled(center, radius * 0.9f, ImGui.GetColorU32(UiColors.BackgroundFull.Rgba));
-
-        var angle  = -MathF.PI * 0.75f + MathF.PI * 1.5f * ClampF(cueVal, 0f, 1f);
-        var dotPos = new Vector2(
-            center.X + MathF.Cos(angle) * radius * 0.55f,
-            center.Y + MathF.Sin(angle) * radius * 0.55f);
-        dl.AddCircleFilled(dotPos, radius * 0.18f, ImGui.GetColorU32(UiColors.Text.Rgba));
-        DrawTooltipIfHovered($"{Apc40Mk1.CueLevelDef.Tip}: {Math.Round(cueVal * 100)}%");
-
-
-        ImGui.PopID();
-    }
 }
-
-
-
-
-
-
