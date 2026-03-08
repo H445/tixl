@@ -175,7 +175,14 @@ internal sealed class LayersArea : ITimeObjectManipulation, IValueSnapAttractor
         // All clips in all layers
         foreach (var clip in clips)
         {
-            TimeClipItem.DrawClip(clip, ref drawAttributes);
+            if (SoundtrackClipItem.IsSoundtrackClip(clip, compositionSymbolUi))
+            {
+                SoundtrackClipItem.DrawClip(clip, ref drawAttributes);
+            }
+            else
+            {
+                TimeClipItem.DrawClip(clip, ref drawAttributes);
+            }
         }
 
         ImGui.SetCursorScreenPos(min + new Vector2(0, LayerHeight));

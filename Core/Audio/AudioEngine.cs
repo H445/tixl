@@ -229,6 +229,7 @@ public static class AudioEngine
             else if (!string.IsNullOrEmpty(handle.Clip.FilePath) && 
                      SoundtrackClipStream.TryLoadSoundtrackClip(handle, out var soundtrackClipStream))
             {
+                soundtrackClipStream.TargetTime = time;
                 SoundtrackClipStreams[handle] = soundtrackClipStream;
             }
         }
@@ -240,27 +241,42 @@ public static class AudioEngine
         foreach (var (handle, clipStream) in SoundtrackClipStreams)
         {
             clipStream.IsInUse = _updatedSoundtrackClipTimes.ContainsKey(clipStream.ResourceHandle);
-            if (!clipStream.IsInUse && clipStream.ResourceHandle.Clip.DiscardAfterUse)
+            if (!clipStream.IsInUse)
             {
-                _obsoleteSoundtrackHandles.Add(handle);
+                if (clipStream.ResourceHandle.Clip.DiscardAfterUse)
+                {
+                    _obsoleteSoundtrackHandles.Add(handle);
+                }
+                else
+                {
+                    // Pause streams that are alive but not registered this frame.
+                    // This prevents SoundtrackClip streams from playing freely
+                    // when the timeline playback is outside their clip range.
+                    clipStream.UpdateSoundtrackPlaybackSpeed(0);
+                }
                 continue;
             }
+
+            if (!clipStream.ResourceHandle.Clip.IsSoundtrack)
+                continue;
 
             if (!playback.IsRenderingToFile && playbackSpeedChanged)
                 clipStream.UpdateSoundtrackPlaybackSpeed(playback.PlaybackSpeed);
 
-            if (handledMainSoundtrack || !clipStream.ResourceHandle.Clip.IsSoundtrack)
-                continue;
-
-            handledMainSoundtrack = true;
-
             if (playback.IsRenderingToFile)
-                AudioRendering.ExportAudioFrame(playback, frameDurationInSeconds, clipStream);
+            {
+                if (!handledMainSoundtrack)
+                    AudioRendering.ExportAudioFrame(playback, frameDurationInSeconds, clipStream);
+            }
             else
             {
-                UpdateFftBufferFromSoundtrack(playback);
+                if (!handledMainSoundtrack)
+                    UpdateFftBufferFromSoundtrack(playback);
+
                 clipStream.UpdateSoundtrackTime(playback);
             }
+
+            handledMainSoundtrack = true;
         }
 
         foreach (var handle in _obsoleteSoundtrackHandles)

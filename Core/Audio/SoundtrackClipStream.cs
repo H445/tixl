@@ -139,8 +139,9 @@ internal sealed class SoundtrackClipStream
                              Duration = duration,
                          };
 
-        // Start playing (unpaused in mixer)
-        stream.UpdateSoundtrackPlaybackSpeed(1.0);
+        // Start paused - UpdateSoundtrackTime will handle seeking to
+        // the correct position and unpausing on the first frame.
+        BassMix.ChannelFlags(streamHandle, BassFlags.MixerChanPause, BassFlags.MixerChanPause);
         handle.LoadingAttemptFailed = false;
         return true;
     }
@@ -178,6 +179,13 @@ internal sealed class SoundtrackClipStream
             return;
         }
 
+        // Set playback speed and unpause if needed
+        if (IsNew)
+        {
+            // Force correct speed on first use
+            UpdateSoundtrackPlaybackSpeed(playback.PlaybackSpeed);
+        }
+        
         if (isPaused)
         {
             BassMix.ChannelFlags(StreamHandle, 0, BassFlags.MixerChanPause); // Unpause
@@ -196,10 +204,19 @@ internal sealed class SoundtrackClipStream
                                  * (ProjectSettings.Config.SoundtrackMute ? 0f:1f)
                                  * (ProjectSettings.Config.GlobalMute ? 0f:1f));
         
-        // We may not fall behind or skip ahead in playback
-        var maxSoundDelta = ProjectSettings.Config.AudioResyncThreshold * Math.Abs(playback.PlaybackSpeed);
-        if (Math.Abs(soundDelta) <= maxSoundDelta)
-            return;
+        // Force resync on first frame (IsNew) to seek to correct position immediately,
+        // bypassing the threshold check that would allow playing from position 0
+        var forceResync = IsNew;
+        if (IsNew)
+            IsNew = false;
+        
+        if (!forceResync)
+        {
+            // We may not fall behind or skip ahead in playback
+            var maxSoundDelta = ProjectSettings.Config.AudioResyncThreshold * Math.Abs(playback.PlaybackSpeed);
+            if (Math.Abs(soundDelta) <= maxSoundDelta)
+                return;
+        }
 
         // Resync
         var resyncOffset = AudioTriggerDelayOffset * playback.PlaybackSpeed + AudioSyncingOffset;
