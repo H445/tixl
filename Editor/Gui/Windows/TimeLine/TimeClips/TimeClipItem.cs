@@ -1,4 +1,4 @@
-﻿#nullable enable
+﻿﻿#nullable enable
 using ImGuiNET;
 using T3.Core.Animation;
 using T3.Core.DataTypes.Vector;
@@ -62,13 +62,22 @@ internal static class TimeClipItem
         var isConnected = attr.CompositionSymbolUi.Symbol.Connections.Any(c => c.SourceParentOrChildId == timeClip.Id);
 
         var isWithinPlaybackTime = timeClip.TimeRange.Contains(attr.LayerContext.TimeCanvas.Playback.TimeInBars);
+        var isDisabled = symbolChildUi.SymbolChild.IsDisabled;
         var fadeIfInActive = (isConnected && isWithinPlaybackTime) ? 1 : 0.4f;
         
         var fadeIfNotConnected = isConnected ? 1f : 0.2f;
-        attr.DrawList.AddRectFilled(position, itemRectMax, randomColor.Fade(0.4f * fadeIfNotConnected * fadeIfInActive), rounding);
+        var fadeIfDisabled = isDisabled ? 0.3f : 1f;
+        attr.DrawList.AddRectFilled(position, itemRectMax, randomColor.Fade(0.4f * fadeIfNotConnected * fadeIfInActive * fadeIfDisabled), rounding);
 
         if (isSelected)
             attr.DrawList.AddRect(position, itemRectMax, UiColors.Selection, rounding);
+
+        // Disabled indicator (diagonal cross lines)
+        if (isDisabled)
+        {
+            DrawUtils.DrawOverlayLine(attr.DrawList, fadeIfDisabled, Vector2.Zero, Vector2.One, position, itemRectMax);
+            DrawUtils.DrawOverlayLine(attr.DrawList, fadeIfDisabled, new Vector2(1, 0), new Vector2(0, 1), position, itemRectMax);
+        }
 
 
         // Label
@@ -144,6 +153,13 @@ internal static class TimeClipItem
                 if (!isConnected)
                 {
                     ImGui.TextUnformatted("(Not connected?)");
+                }
+
+                if (isDisabled)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Text, UiColors.StatusAttention.Rgba);
+                    ImGui.TextUnformatted("(DISABLED)");
+                    ImGui.PopStyleColor();
                 }
 
                 ImGui.PushStyleColor(ImGuiCol.Text, UiColors.TextMuted.Rgba);

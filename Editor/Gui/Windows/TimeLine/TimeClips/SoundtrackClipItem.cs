@@ -69,9 +69,11 @@ internal static class SoundtrackClipItem
 
         var isConnected = attr.CompositionSymbolUi.Symbol.Connections.Any(c => c.SourceParentOrChildId == timeClip.Id);
         var isWithinPlaybackTime = timeClip.TimeRange.Contains(attr.LayerContext.TimeCanvas.Playback.TimeInBars);
+        var isDisabled = symbolChildUi.SymbolChild.IsDisabled;
         var fadeIfInActive = (isConnected && isWithinPlaybackTime) ? 1 : 0.4f;
         var fadeIfNotConnected = isConnected ? 1f : 0.2f;
-        var combinedFade = fadeIfNotConnected * fadeIfInActive;
+        var fadeIfDisabled = isDisabled ? 0.3f : 1f;
+        var combinedFade = fadeIfNotConnected * fadeIfInActive * fadeIfDisabled;
 
         // --- Waveform background ---
         var drewWaveform = TryDrawWaveformBackground(symbolChildUi.SymbolChild,
@@ -95,6 +97,13 @@ internal static class SoundtrackClipItem
         // Selection outline
         if (isSelected)
             attr.DrawList.AddRect(position, itemRectMax, UiColors.Selection, rounding);
+
+        // Disabled indicator (diagonal cross lines)
+        if (isDisabled)
+        {
+            DrawUtils.DrawOverlayLine(attr.DrawList, combinedFade, Vector2.Zero, Vector2.One, position, itemRectMax);
+            DrawUtils.DrawOverlayLine(attr.DrawList, combinedFade, new Vector2(1, 0), new Vector2(0, 1), position, itemRectMax);
+        }
 
         // --- Audio icon indicator (small speaker glyph on left) ---
         // Resolve audio file path once and conditionally draw the icon if an audio file is present
@@ -321,6 +330,13 @@ internal static class SoundtrackClipItem
             if (!isConnected)
             {
                 ImGui.TextUnformatted("(Not connected?)");
+            }
+
+            if (symbolChildUi.SymbolChild.IsDisabled)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, UiColors.StatusAttention.Rgba);
+                ImGui.TextUnformatted("(DISABLED)");
+                ImGui.PopStyleColor();
             }
 
             ImGui.PushStyleColor(ImGuiCol.Text, UiColors.TextMuted.Rgba);
