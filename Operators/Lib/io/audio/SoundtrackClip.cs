@@ -33,6 +33,8 @@ namespace Lib.io.audio
         private AudioClipResourceHandle _currentAudioHandle;
         private SoundtrackClipDefinition _currentClip;
         private string _currentFilePath = string.Empty;
+        // Ensures we only apply the file duration once per loaded file to avoid overwriting manual edits
+        private bool _appliedDurationForCurrentFile;
 
         public SoundtrackClip()
         {
@@ -70,6 +72,32 @@ namespace Lib.io.audio
                                    DiscardAfterUse = false,
                                };
                 _currentAudioHandle = new AudioClipResourceHandle(_currentClip, this);
+                _appliedDurationForCurrentFile = false;
+            }
+
+            // If the underlying audio resource has been loaded and we haven't applied its length yet,
+            // set the TimeClip duration in the timeline to exactly match the audio file length (converted to bars).
+            // This is done only once per file to avoid repeatedly overwriting manual edits.
+            if (!_appliedDurationForCurrentFile && _currentClip.LengthInSeconds > 0 && Playback.Current != null)
+            {
+                try
+                {
+                    var durationInBars = (float)Playback.Current.BarsFromSeconds(_currentClip.LengthInSeconds);
+                    // Only apply if the computed duration is reasonable (> very small)
+                    if (!float.IsNaN(durationInBars) && durationInBars > 0.0001f)
+                    {
+                        // Keep the start position, adjust duration
+                        timeClip.TimeRange.Duration = durationInBars;
+                        // Mirror source range to the clip duration so the UI shows the full file
+                        timeClip.SourceRange.Start = timeClip.TimeRange.Start;
+                        timeClip.SourceRange.Duration = durationInBars;
+                        _appliedDurationForCurrentFile = true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Warning("Failed to apply soundtrack file duration to time clip: " + e.Message);
+                }
             }
 
             // Set clip bounds and volume every frame, identical to how the global soundtrack works.

@@ -1,8 +1,8 @@
 ﻿#nullable enable
+using T3.Core.Utils;
 using ImGuiNET;
 using T3.Core.Animation;
 using T3.Core.Audio;
-using T3.Core.DataTypes.Vector;
 using T3.Core.Operator;
 using T3.Core.Operator.Slots;
 using T3.Editor.Gui.Audio;
@@ -13,6 +13,7 @@ using T3.Editor.UiModel.Commands;
 using T3.Editor.UiModel.Commands.Animation;
 using T3.Editor.UiModel.ProjectHandling;
 using T3.Editor.UiModel.Selection;
+using Color = T3.Core.DataTypes.Vector.Color;
 
 namespace T3.Editor.Gui.Windows.TimeLine.TimeClips;
 
@@ -96,28 +97,28 @@ internal static class SoundtrackClipItem
             attr.DrawList.AddRect(position, itemRectMax, UiColors.Selection, rounding);
 
         // --- Audio icon indicator (small speaker glyph on left) ---
-        if (clipWidth > 30 && LayersArea.LayerHeight > Fonts.FontSmall.FontSize)
+        // Resolve audio file path once and conditionally draw the icon if an audio file is present
+        var hasAudioFile = TryGetSoundtrackAudioFilePath(symbolChildUi.SymbolChild, out var audioFilePathForIcon);
+        var iconDrawn = false;
+        if (hasAudioFile && clipWidth > 30 && LayersArea.LayerHeight > Fonts.FontSmall.FontSize)
         {
-            attr.DrawList.AddText(Fonts.FontSmall, Fonts.FontSmall.FontSize,
-                                  position + new Vector2(4, 1),
-                                  AudioIconColor.Fade(combinedFade),
-                                  "\u266b"); // ♫ music note
+            // Use the shared icon atlas (same icon as in Asset Library) for consistent visuals
+            var iconPos = (position + new Vector2(4, 1)).Floor();
+            Icons.DrawIconAtScreenPosition(Icon.FileAudio, iconPos, attr.DrawList, AudioIconColor.Fade(combinedFade));
+            iconDrawn = true;
         }
 
         // --- Label ---
         if (LayersArea.LayerHeight > Fonts.FontSmall.FontSize)
         {
-            var audioFilePath = string.Empty;
-            TryGetSoundtrackAudioFilePath(symbolChildUi.SymbolChild, out audioFilePath);
-
-            var displayName = !string.IsNullOrEmpty(audioFilePath)
-                                  ? System.IO.Path.GetFileNameWithoutExtension(audioFilePath)
+            var displayName = !string.IsNullOrEmpty(audioFilePathForIcon)
+                                  ? System.IO.Path.GetFileNameWithoutExtension(audioFilePathForIcon)
                                   : symbolChildUi.SymbolChild.ReadableName;
 
             ImGui.PushFont(Fonts.FontSmall);
             var labelSize = ImGui.CalcTextSize(displayName);
-            // Offset label right past the audio icon
-            var labelOffset = clipWidth > 30 ? 16f : 4f;
+            // Pixel offset: leave more space if icon was drawn, otherwise small padding
+            var labelOffset = iconDrawn ? (4f + Icons.FontSize) : 4f;
             var labelMax = itemRectMax - new Vector2(3, 0);
             var needsClipping = (labelSize.X + labelOffset) > clipSize.X;
 
@@ -134,15 +135,6 @@ internal static class SoundtrackClipItem
             ImGui.PopFont();
         }
 
-        // --- Volume indicator bar along the bottom edge ---
-        {
-            var volume = TryGetSoundtrackVolume(symbolChildUi.SymbolChild);
-            var barWidth = Math.Max(2, (clipSize.X - 4) * Math.Clamp(volume, 0f, 1f));
-            attr.DrawList.AddRectFilled(
-                position + new Vector2(2, clipSize.Y - 3),
-                position + new Vector2(2 + (float)barWidth, clipSize.Y - 1),
-                AudioVolumeBarColor.Fade(0.6f * combinedFade), 1);
-        }
 
         // --- Interaction and dragging (reuses TimeClipItem patterns) ---
         ImGui.SetCursorScreenPos(showSizeHandles ? (position + _handleOffset) : position);
