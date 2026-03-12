@@ -82,6 +82,12 @@ public sealed class SoundtrackClipDefinition
     /// </summary>
     public double LengthInSeconds;
 
+    /// <summary>
+    /// Runtime-only factor used to time-remap playback (1 = normal speed).
+    /// This is not serialized and is computed by clip operators from timeline stretch.
+    /// </summary>
+    public double PlaybackRateMultiplier = 1.0;
+
     #region serialization
     internal static bool TryFromJson(JToken jToken, [NotNullWhen(true)] out SoundtrackClipDefinition? newAudioClip)
     {

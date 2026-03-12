@@ -261,7 +261,7 @@ public static class AudioEngine
                 continue;
 
             if (!playback.IsRenderingToFile && playbackSpeedChanged)
-                clipStream.UpdateSoundtrackPlaybackSpeed(playback.PlaybackSpeed);
+                clipStream.UpdateSoundtrackPlaybackSpeed(playback.PlaybackSpeed * clipStream.ResourceHandle.Clip.PlaybackRateMultiplier);
 
             if (playback.IsRenderingToFile)
             {

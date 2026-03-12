@@ -26,15 +26,13 @@ namespace Lib.io.audio
         [Input(Guid = "f2d8a5c1-3e4b-4f6a-8c1d-9e7a2b5f3c6a")]
         public readonly InputSlot<float> Panning = new();
 
-        [Input(Guid = "e1c7b4a2-8f5d-4a3e-2c6f-1a9b8e3d5f2c")]
-        public readonly InputSlot<float> Speed = new();
+        [Input(Guid = "9d3f1e7a-6c2b-4a8f-b5d1-2e7c9a4f6b3d")]
+        public readonly InputSlot<bool> AllowManualStretch = new();
 
         private Guid _operatorId = Guid.Empty;
         private AudioClipResourceHandle _currentAudioHandle;
         private SoundtrackClipDefinition _currentClip;
         private string _currentFilePath = string.Empty;
-        // Ensures we only apply the file duration once per loaded file to avoid overwriting manual edits
-        private bool _appliedDurationForCurrentFile;
 
         public SoundtrackClip()
         {
@@ -51,8 +49,8 @@ namespace Lib.io.audio
             var filePath = AudioFile.GetValue(context);
             var volume = Math.Max(0, Volume.GetValue(context));
             var mute = Mute.GetValue(context);
+            var allowManualStretch = AllowManualStretch.GetValue(context);
             Panning.GetValue(context);
-            Speed.GetValue(context);
 
             var timeClip = Output.TimeClip;
             timeClip.UsedForRegionMapping = false;
@@ -61,6 +59,7 @@ namespace Lib.io.audio
                 return;
 
             // Ensure clip handle exists
+            var clipWasRecreated = false;
             if (_currentAudioHandle == null || !string.Equals(_currentFilePath, filePath, StringComparison.OrdinalIgnoreCase))
             {
                 _currentFilePath = filePath;
@@ -72,32 +71,48 @@ namespace Lib.io.audio
                                    DiscardAfterUse = false,
                                };
                 _currentAudioHandle = new AudioClipResourceHandle(_currentClip, this);
-                _appliedDurationForCurrentFile = false;
+                clipWasRecreated = true;
             }
 
-            // If the underlying audio resource has been loaded and we haven't applied its length yet,
-            // set the TimeClip duration in the timeline to exactly match the audio file length (converted to bars).
-            // This is done only once per file to avoid repeatedly overwriting manual edits.
-            if (!_appliedDurationForCurrentFile && _currentClip.LengthInSeconds > 0 && Playback.Current != null)
+            // Keep source range aligned to the real audio file length.
+            // Time range stays 1:1 by default, but can be manually stretched when enabled.
+            if (_currentClip.LengthInSeconds > 0 && Playback.Current != null)
             {
                 try
                 {
                     var durationInBars = (float)Playback.Current.BarsFromSeconds(_currentClip.LengthInSeconds);
-                    // Only apply if the computed duration is reasonable (> very small)
                     if (!float.IsNaN(durationInBars) && durationInBars > 0.0001f)
                     {
-                        // Keep the start position, adjust duration
-                        timeClip.TimeRange.Duration = durationInBars;
-                        // Mirror source range to the clip duration so the UI shows the full file
-                        timeClip.SourceRange.Start = timeClip.TimeRange.Start;
+                        timeClip.SourceRange.Start = 0;
                         timeClip.SourceRange.Duration = durationInBars;
-                        _appliedDurationForCurrentFile = true;
+
+                        if (!allowManualStretch || clipWasRecreated || timeClip.TimeRange.Duration <= 0.0001f)
+                        {
+                            timeClip.TimeRange.Duration = durationInBars;
+                        }
+
+                        var displayedDuration = (double)Math.Abs(timeClip.TimeRange.Duration);
+                        var sourceDuration = (double)Math.Abs(timeClip.SourceRange.Duration);
+                        if (allowManualStretch && displayedDuration > 0.0001 && sourceDuration > 0.0001)
+                        {
+                            // If the clip is stretched longer, rate < 1; if compressed shorter, rate > 1.
+                            _currentClip.PlaybackRateMultiplier = sourceDuration / displayedDuration;
+                        }
+                        else
+                        {
+                            _currentClip.PlaybackRateMultiplier = 1.0;
+                        }
                     }
                 }
                 catch (Exception e)
                 {
                     Log.Warning("Failed to apply soundtrack file duration to time clip: " + e.Message);
+                    _currentClip.PlaybackRateMultiplier = 1.0;
                 }
+            }
+            else
+            {
+                _currentClip.PlaybackRateMultiplier = 1.0;
             }
 
             // Set clip bounds and volume every frame, identical to how the global soundtrack works.

@@ -38,6 +38,15 @@ internal sealed class SoundtrackClipStream
     /// </summary>
     public float GetDefaultFrequency() => DefaultPlaybackFrequency;
 
+    private double GetEffectivePlaybackSpeed(Playback playback)
+    {
+        var clipRate = ResourceHandle.Clip.PlaybackRateMultiplier;
+        if (double.IsNaN(clipRate) || double.IsInfinity(clipRate) || clipRate <= 0.0001)
+            clipRate = 1.0;
+
+        return playback.PlaybackSpeed * clipRate;
+    }
+
     internal void UpdateSoundtrackPlaybackSpeed(double newSpeed)
     {
         if (newSpeed == 0.0)
@@ -163,7 +172,12 @@ internal sealed class SoundtrackClipStream
         }
 
         var clip = ResourceHandle.Clip;
-        var localTargetTimeInSecs = TargetTime - playback.SecondsFromBars(clip.StartTime);
+        var clipRate = clip.PlaybackRateMultiplier;
+        if (double.IsNaN(clipRate) || double.IsInfinity(clipRate) || clipRate <= 0.0001)
+            clipRate = 1.0;
+
+        var localTimelineTimeInSecs = TargetTime - playback.SecondsFromBars(clip.StartTime);
+        var localTargetTimeInSecs = localTimelineTimeInSecs * clipRate;
         var isOutOfBounds = localTargetTimeInSecs < 0 || localTargetTimeInSecs >= clip.LengthInSeconds;
         
         // Check if paused in mixer
@@ -186,6 +200,9 @@ internal sealed class SoundtrackClipStream
             UpdateSoundtrackPlaybackSpeed(playback.PlaybackSpeed);
         }
         
+        // Keep stream frequency in sync with global playback speed and per-clip stretch rate.
+        UpdateSoundtrackPlaybackSpeed(GetEffectivePlaybackSpeed(playback));
+
         if (isPaused)
         {
             BassMix.ChannelFlags(StreamHandle, 0, BassFlags.MixerChanPause); // Unpause
@@ -194,7 +211,7 @@ internal sealed class SoundtrackClipStream
         // Get the current playback position from the mixer
         var currentStreamBufferPos = BassMix.ChannelGetPosition(StreamHandle);
         var currentPosInSec = Bass.ChannelBytes2Seconds(StreamHandle, currentStreamBufferPos) - AudioSyncingOffset;
-        var soundDelta = (currentPosInSec - localTargetTimeInSecs) * playback.PlaybackSpeed;
+        var soundDelta = (currentPosInSec - localTargetTimeInSecs) * GetEffectivePlaybackSpeed(playback);
 
         // Set volume on the stream
         Bass.ChannelSetAttribute(StreamHandle, ChannelAttribute.Volume, 
@@ -213,13 +230,13 @@ internal sealed class SoundtrackClipStream
         if (!forceResync)
         {
             // We may not fall behind or skip ahead in playback
-            var maxSoundDelta = ProjectSettings.Config.AudioResyncThreshold * Math.Abs(playback.PlaybackSpeed);
+            var maxSoundDelta = ProjectSettings.Config.AudioResyncThreshold * Math.Abs(GetEffectivePlaybackSpeed(playback));
             if (Math.Abs(soundDelta) <= maxSoundDelta)
                 return;
         }
 
         // Resync
-        var resyncOffset = AudioTriggerDelayOffset * playback.PlaybackSpeed + AudioSyncingOffset;
+        var resyncOffset = AudioTriggerDelayOffset * GetEffectivePlaybackSpeed(playback) + AudioSyncingOffset;
         var newStreamPos = Bass.ChannelSeconds2Bytes(StreamHandle, localTargetTimeInSecs + resyncOffset);
         BassMix.ChannelSetPosition(StreamHandle, newStreamPos, PositionFlags.Bytes | PositionFlags.MixerReset);
     }
@@ -229,8 +246,13 @@ internal sealed class SoundtrackClipStream
     /// </summary>
     internal long UpdateTimeWhileRecording(Playback playback, double fps, bool reinitialize)
     {
+        var clipRate = ResourceHandle.Clip.PlaybackRateMultiplier;
+        if (double.IsNaN(clipRate) || double.IsInfinity(clipRate) || clipRate <= 0.0001)
+            clipRate = 1.0;
+
         // Offset timing dependent on position in clip
-        var localTargetTimeInSecs = playback.TimeInSecs - playback.SecondsFromBars(ResourceHandle.Clip.StartTime) + RecordSyncingOffset;
+        var localTimelineTimeInSecs = playback.TimeInSecs - playback.SecondsFromBars(ResourceHandle.Clip.StartTime);
+        var localTargetTimeInSecs = localTimelineTimeInSecs * clipRate + RecordSyncingOffset;
         var newStreamPos = localTargetTimeInSecs < 0
                                ? -Bass.ChannelSeconds2Bytes(StreamHandle, -localTargetTimeInSecs)
                                : Bass.ChannelSeconds2Bytes(StreamHandle, localTargetTimeInSecs);
@@ -242,7 +264,7 @@ internal sealed class SoundtrackClipStream
         Bass.ChannelSetAttribute(StreamHandle, ChannelAttribute.NoRamp, 1);
         Bass.ChannelSetAttribute(StreamHandle, ChannelAttribute.Volume, 1);
         Bass.ChannelSetAttribute(StreamHandle, ChannelAttribute.ReverseDirection, 1);
-        Bass.ChannelSetAttribute(StreamHandle, ChannelAttribute.Frequency, DefaultPlaybackFrequency);
+        Bass.ChannelSetAttribute(StreamHandle, ChannelAttribute.Frequency, (float)(DefaultPlaybackFrequency * clipRate));
         
         // Position in the mixer
         BassMix.ChannelSetPosition(StreamHandle, Math.Max(newStreamPos, 0), 

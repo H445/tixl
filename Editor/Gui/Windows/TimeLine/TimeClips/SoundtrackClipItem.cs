@@ -47,7 +47,7 @@ internal static class SoundtrackClipItem
         var xStartTime = attr.LayerContext.TimeCanvas.TransformX(timeClip.TimeRange.Start) + 1;
         var xEndTime = attr.LayerContext.TimeCanvas.TransformX(timeClip.TimeRange.End) + 1;
         var position = new Vector2(xStartTime,
-                                   attr.LayerRect.Min.Y + (timeClip.LayerIndex - attr.MinLayerIndex) * LayersArea.LayerHeight);
+                                   attr.LayerContext.TimeCanvas.TransformY(timeClip.LayerIndex) + 1);
 
         var clipWidth = xEndTime - xStartTime;
         var showSizeHandles = clipWidth > 4 * HandleWidth;
@@ -74,6 +74,13 @@ internal static class SoundtrackClipItem
         var fadeIfNotConnected = isConnected ? 1f : 0.2f;
         var fadeIfDisabled = isDisabled ? 0.3f : 1f;
         var combinedFade = fadeIfNotConnected * fadeIfInActive * fadeIfDisabled;
+
+        var sourceDuration = Math.Abs(timeClip.SourceRange.Duration);
+        var visibleDuration = Math.Abs(timeClip.TimeRange.Duration);
+        var isTimeStretched = sourceDuration > 0.0001f && Math.Abs(visibleDuration - sourceDuration) > 0.001f;
+        var stretchPercent = isTimeStretched
+                                 ? sourceDuration / visibleDuration * 100f
+                                 : 100f;
 
         // --- Waveform background ---
         var drewWaveform = TryDrawWaveformBackground(symbolChildUi.SymbolChild,
@@ -109,12 +116,31 @@ internal static class SoundtrackClipItem
         // Resolve audio file path once and conditionally draw the icon if an audio file is present
         var hasAudioFile = TryGetSoundtrackAudioFilePath(symbolChildUi.SymbolChild, out var audioFilePathForIcon);
         var iconDrawn = false;
+        var audioIconPos = (position + new Vector2(4, 1)).Floor();
         if (hasAudioFile && clipWidth > 30 && LayersArea.LayerHeight > Fonts.FontSmall.FontSize)
         {
             // Use the shared icon atlas (same icon as in Asset Library) for consistent visuals
-            var iconPos = (position + new Vector2(4, 1)).Floor();
-            Icons.DrawIconAtScreenPosition(Icon.FileAudio, iconPos, attr.DrawList, AudioIconColor.Fade(combinedFade));
+            Icons.DrawIconAtScreenPosition(Icon.FileAudio, audioIconPos, attr.DrawList, AudioIconColor.Fade(combinedFade));
             iconDrawn = true;
+        }
+
+        if (isTimeStretched && iconDrawn && clipWidth > 30)
+        {
+            // Draw stretch glyph at the bottom-left of the clip for clearer alignment.
+            var stretchIconSize = 14f;
+            var stretchIconPos = new Vector2(position.X + 4, itemRectMax.Y - stretchIconSize - 2).Floor();
+
+            // Add a subtle dark backing to improve icon contrast over waveform peaks.
+            attr.DrawList.AddRectFilled(stretchIconPos - new Vector2(1, 1),
+                                        stretchIconPos + new Vector2(stretchIconSize + 1, stretchIconSize + 1),
+                                        UiColors.BackgroundFull.Fade(0.45f * combinedFade),
+                                        3f);
+
+            Icons.DrawIconAtScreenPosition(Icon.Scale,
+                                           stretchIconPos,
+                                           new Vector2(stretchIconSize, stretchIconSize),
+                                           attr.DrawList,
+                                           UiColors.Selection.Fade(0.95f * combinedFade));
         }
 
         // --- Label ---
@@ -141,6 +167,26 @@ internal static class SoundtrackClipItem
             if (needsClipping)
                 ImGui.PopClipRect();
 
+            ImGui.PopFont();
+        }
+
+        if (isTimeStretched && LayersArea.LayerHeight > Fonts.FontSmall.FontSize)
+        {
+            ImGui.PushFont(Fonts.FontSmall);
+            var stretchLabel = $"{stretchPercent:0.#}%";
+            var stretchLabelSize = ImGui.CalcTextSize(stretchLabel);
+            var stretchLabelPos = (itemRectMax - stretchLabelSize - new Vector2(3, 2)).Floor();
+            if (stretchLabelPos.X > position.X + 2 && stretchLabelPos.Y > position.Y)
+            {
+                var textColor = isSelected ? UiColors.Selection : AudioLabelColor.Fade(combinedFade);
+                // Shadow pass for readability on bright waveforms.
+                attr.DrawList.AddText(stretchLabelPos + new Vector2(1, 1),
+                                      UiColors.BackgroundFull.Fade(0.8f * combinedFade),
+                                      stretchLabel);
+                attr.DrawList.AddText(stretchLabelPos,
+                                      textColor,
+                                      stretchLabel);
+            }
             ImGui.PopFont();
         }
 
@@ -355,6 +401,16 @@ internal static class SoundtrackClipItem
 
             // Time range
             ImGui.TextUnformatted($"Range: {timeClip.TimeRange.Start:0.00} \u2013 {timeClip.TimeRange.End:0.00}");
+
+            var sourceDuration = Math.Abs(timeClip.SourceRange.Duration);
+            var visibleDuration = Math.Abs(timeClip.TimeRange.Duration);
+            var isTimeStretched = sourceDuration > 0.0001f && Math.Abs(visibleDuration - sourceDuration) > 0.001f;
+            if (isTimeStretched)
+            {
+                var stretchPercent = sourceDuration / visibleDuration * 100f;
+                ImGui.TextUnformatted($"Source: {timeClip.SourceRange.Start:0.00} \u2013 {timeClip.SourceRange.End:0.00}");
+                ImGui.TextUnformatted($"Playback speed from stretch: {stretchPercent:0.#}%");
+            }
 
             ImGui.PopStyleColor();
             ImGui.PopFont();
