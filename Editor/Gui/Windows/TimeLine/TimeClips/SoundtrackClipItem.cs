@@ -47,7 +47,7 @@ internal static class SoundtrackClipItem
         var xStartTime = attr.LayerContext.TimeCanvas.TransformX(timeClip.TimeRange.Start) + 1;
         var xEndTime = attr.LayerContext.TimeCanvas.TransformX(timeClip.TimeRange.End) + 1;
         var position = new Vector2(xStartTime,
-                                   attr.LayerContext.TimeCanvas.TransformY(timeClip.LayerIndex) + 1);
+                                   attr.LayerRect.Min.Y + (timeClip.LayerIndex - attr.MinLayerIndex) * LayersArea.LayerHeight);
 
         var clipWidth = xEndTime - xStartTime;
         var showSizeHandles = clipWidth > 4 * HandleWidth;
