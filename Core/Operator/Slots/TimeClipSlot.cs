@@ -31,6 +31,12 @@ internal interface IOutputDataUser<T> : IOutputDataUser
 /// </summary>
 public interface IPreventingTimeRemap;
 
+/// <summary>
+/// Marker for time-clip operators that must keep runtime state in sync even when
+/// the playhead is outside their clip range.
+/// </summary>
+public interface IUpdateOutsideTimeClipRange;
+
 public sealed class TimeClipSlot<T> : Slot<T>, ITimeClipProvider, IOutputDataUser<TimeClip>
 {
     public TimeClip TimeClip { get; private set; }
@@ -53,7 +59,24 @@ public sealed class TimeClipSlot<T> : Slot<T>, ITimeClipProvider, IOutputDataUse
     {
         if ((context.LocalTime < TimeClip.TimeRange.Start) || (context.LocalTime >= TimeClip.TimeRange.End))
         {
-            LastUpdateStatus = ProjectSettings.Config.TimeClipSuspending ? UpdateStates.Suspended : UpdateStates.Active;
+            if (Parent is IUpdateOutsideTimeClipRange)
+            {
+                if (_baseUpdateAction == null)
+                {
+                    Log.Warning("Ignoring invalid time clip update action", Parent);
+                }
+                else
+                {
+                    _baseUpdateAction(context);
+                }
+
+                LastUpdateStatus = UpdateStates.Active;
+            }
+            else
+            {
+                LastUpdateStatus = ProjectSettings.Config.TimeClipSuspending ? UpdateStates.Suspended : UpdateStates.Active;
+            }
+
             return;
         }
 

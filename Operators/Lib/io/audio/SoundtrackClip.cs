@@ -9,7 +9,7 @@ using T3.Core.Operator.Slots;
 namespace Lib.io.audio
 {
     [Guid("7f3e4d8a-9b2c-4a1f-8e5d-3c7b2a9d1f6e")]
-    internal sealed class SoundtrackClip : Instance<SoundtrackClip>, IPreventingTimeRemap
+    internal sealed class SoundtrackClip : Instance<SoundtrackClip>, IPreventingTimeRemap, IUpdateOutsideTimeClipRange
     {
         [Output(Guid = "b1e9d4f7-3a8c-4b2f-6e5d-1c9a7f3e2b8a", DirtyFlagTrigger = DirtyFlagTrigger.Animated)]
         public readonly TimeClipSlot<Command> Output = new();
