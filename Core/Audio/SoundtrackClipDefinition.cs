@@ -88,6 +88,12 @@ public sealed class SoundtrackClipDefinition
     /// </summary>
     public double PlaybackRateMultiplier = 1.0;
 
+    /// <summary>
+    /// Runtime-only source offset in seconds for slip-style source window positioning.
+    /// Not serialized.
+    /// </summary>
+    public double SourceOffsetInSeconds;
+
     #region serialization
     internal static bool TryFromJson(JToken jToken, [NotNullWhen(true)] out SoundtrackClipDefinition? newAudioClip)
     {

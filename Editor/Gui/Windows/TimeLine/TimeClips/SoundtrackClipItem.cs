@@ -14,6 +14,8 @@ using T3.Editor.UiModel.Commands.Animation;
 using T3.Editor.UiModel.ProjectHandling;
 using T3.Editor.UiModel.Selection;
 using Color = T3.Core.DataTypes.Vector.Color;
+using ManagedBass;
+using T3.Core.Resource.Assets;
 
 namespace T3.Editor.Gui.Windows.TimeLine.TimeClips;
 
@@ -85,6 +87,7 @@ internal static class SoundtrackClipItem
         // --- Waveform background ---
         var drewWaveform = TryDrawWaveformBackground(symbolChildUi.SymbolChild,
                                                      attr.CompositionOp,
+                                                     timeClip,
                                                      attr.DrawList,
                                                      position,
                                                      itemRectMax,
@@ -271,6 +274,7 @@ internal static class SoundtrackClipItem
 
     private static bool TryDrawWaveformBackground(Symbol.Child symbolChild,
                                                   Instance compositionOp,
+                                                  TimeClip timeClip,
                                                   ImDrawListPtr drawList,
                                                   Vector2 min,
                                                   Vector2 max,
@@ -289,8 +293,71 @@ internal static class SoundtrackClipItem
         if (!AudioWaveformTextureCache.TryGetShaderResourceView(handle, out var srv) || srv is null)
             return false;
 
-        drawList.AddImage((IntPtr)srv, min, max, Vector2.Zero, Vector2.One, UiColors.ForegroundFull.Fade(fade));
+        var uvMin = Vector2.Zero;
+        var uvMax = Vector2.One;
+
+        if (TryGetAudioDurationInBars(audioFilePath, compositionOp, out var audioDurationInBars)
+            && audioDurationInBars > 0.0001f)
+        {
+            // Show the waveform window that is actually used for playback.
+            var sourceStart = Math.Clamp(timeClip.SourceRange.Start, 0, audioDurationInBars);
+            var sourceEnd = Math.Clamp(timeClip.SourceRange.End, 0, audioDurationInBars);
+
+            var u0 = Math.Clamp(sourceStart / audioDurationInBars, 0, 1);
+            var u1 = Math.Clamp(sourceEnd / audioDurationInBars, 0, 1);
+
+            uvMin.X = Math.Min(u0, u1);
+            uvMax.X = Math.Max(u0, u1);
+
+            // Guard against zero-width UV windows which would render nothing.
+            if (Math.Abs(uvMax.X - uvMin.X) < 0.0001f)
+            {
+                uvMin.X = 0;
+                uvMax.X = 1;
+            }
+        }
+
+        drawList.AddImage((IntPtr)srv, min, max, uvMin, uvMax, UiColors.ForegroundFull.Fade(fade));
         return true;
+    }
+
+    private static bool TryGetAudioDurationInBars(string audioFilePath, Instance compositionOp, out float durationInBars)
+    {
+        durationInBars = 0;
+        if (Playback.Current == null)
+            return false;
+
+        if (_durationInSecondsByFilePath.TryGetValue(audioFilePath, out var cachedSeconds) && cachedSeconds > 0)
+        {
+            durationInBars = (float)Playback.Current.BarsFromSeconds(cachedSeconds);
+            return durationInBars > 0.0001f;
+        }
+
+        if (!AssetRegistry.TryResolveAddress(audioFilePath, compositionOp, out var absolutePath, out _))
+            return false;
+
+        var stream = AudioMixerManager.CreateOfflineAnalysisStream(absolutePath);
+        if (stream == 0)
+            return false;
+
+        try
+        {
+            var bytes = Bass.ChannelGetLength(stream);
+            if (bytes <= 0)
+                return false;
+
+            var seconds = Bass.ChannelBytes2Seconds(stream, bytes);
+            if (seconds <= 0.0001)
+                return false;
+
+            _durationInSecondsByFilePath[audioFilePath] = seconds;
+            durationInBars = (float)Playback.Current.BarsFromSeconds(seconds);
+            return durationInBars > 0.0001f;
+        }
+        finally
+        {
+            AudioMixerManager.FreeOfflineAnalysisStream(stream);
+        }
     }
 
     #endregion
@@ -408,8 +475,7 @@ internal static class SoundtrackClipItem
             if (isTimeStretched)
             {
                 var stretchPercent = sourceDuration / visibleDuration * 100f;
-                ImGui.TextUnformatted($"Source: {timeClip.SourceRange.Start:0.00} \u2013 {timeClip.SourceRange.End:0.00}");
-                ImGui.TextUnformatted($"Playback speed from stretch: {stretchPercent:0.#}%");
+                ImGui.TextUnformatted($"Playback speed: {stretchPercent:0.#}%");
             }
 
             ImGui.PopStyleColor();
@@ -573,6 +639,7 @@ internal static class SoundtrackClipItem
     private static readonly Color AudioIconColor = new(0.5f, 0.8f, 1.0f, 1.0f);
     private static readonly Color AudioVolumeBarColor = new(0.3f, 0.7f, 1.0f, 1.0f);
 
+    private static readonly Dictionary<string, double> _durationInSecondsByFilePath = new(StringComparer.OrdinalIgnoreCase);
     #endregion
 }
 

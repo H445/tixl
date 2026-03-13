@@ -177,7 +177,7 @@ internal sealed class SoundtrackClipStream
             clipRate = 1.0;
 
         var localTimelineTimeInSecs = TargetTime - playback.SecondsFromBars(clip.StartTime);
-        var localTargetTimeInSecs = localTimelineTimeInSecs * clipRate;
+        var localTargetTimeInSecs = clip.SourceOffsetInSeconds + localTimelineTimeInSecs * clipRate;
         var isOutOfBounds = localTargetTimeInSecs < 0 || localTargetTimeInSecs >= clip.LengthInSeconds;
         
         // Check if paused in mixer
@@ -250,9 +250,9 @@ internal sealed class SoundtrackClipStream
         if (double.IsNaN(clipRate) || double.IsInfinity(clipRate) || clipRate <= 0.0001)
             clipRate = 1.0;
 
-        // Offset timing dependent on position in clip
+        // Offset timing dependent on clip start and source window offset
         var localTimelineTimeInSecs = playback.TimeInSecs - playback.SecondsFromBars(ResourceHandle.Clip.StartTime);
-        var localTargetTimeInSecs = localTimelineTimeInSecs * clipRate + RecordSyncingOffset;
+        var localTargetTimeInSecs = ResourceHandle.Clip.SourceOffsetInSeconds + localTimelineTimeInSecs * clipRate + RecordSyncingOffset;
         var newStreamPos = localTargetTimeInSecs < 0
                                ? -Bass.ChannelSeconds2Bytes(StreamHandle, -localTargetTimeInSecs)
                                : Bass.ChannelSeconds2Bytes(StreamHandle, localTargetTimeInSecs);

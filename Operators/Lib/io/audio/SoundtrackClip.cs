@@ -33,6 +33,16 @@ namespace Lib.io.audio
         private AudioClipResourceHandle _currentAudioHandle;
         private SoundtrackClipDefinition _currentClip;
         private string _currentFilePath = string.Empty;
+        private const float MinDurationBars = 0.0001f;
+
+        // Non-stretch trim tracking.
+        // LayersArea moves SourceRange.Start along with TimeRange.Start on EVERY drag
+        // (body drag AND handle trim), so we can't read SourceRange.Start as a trim offset.
+        // Instead we track the trim-in offset ourselves by detecting when the start handle
+        // was dragged (TimeRange.Start moved but TimeRange.End didn't) vs body drag (both moved).
+        private float _trimInBars;
+        private float _lastTimeStart = float.NaN;
+        private float _lastTimeEnd = float.NaN;
 
         public SoundtrackClip()
         {
@@ -72,70 +82,121 @@ namespace Lib.io.audio
                                };
                 _currentAudioHandle = new AudioClipResourceHandle(_currentClip, this);
                 clipWasRecreated = true;
+                _trimInBars = 0;
+                _lastTimeStart = float.NaN;
+                _lastTimeEnd = float.NaN;
             }
 
-            // Keep source range aligned to the real audio file length.
-            // Time range stays 1:1 by default, but can be manually stretched when enabled.
             if (_currentClip.LengthInSeconds > 0 && Playback.Current != null)
             {
                 try
                 {
-                    var durationInBars = (float)Playback.Current.BarsFromSeconds(_currentClip.LengthInSeconds);
-                    if (!float.IsNaN(durationInBars) && durationInBars > 0.0001f)
+                    var audioDurationInBars = (float)Playback.Current.BarsFromSeconds(_currentClip.LengthInSeconds);
+                    if (!float.IsNaN(audioDurationInBars) && audioDurationInBars > MinDurationBars)
                     {
-                        timeClip.SourceRange.Start = 0;
-                        timeClip.SourceRange.Duration = durationInBars;
-
-                        if (!allowManualStretch || clipWasRecreated || timeClip.TimeRange.Duration <= 0.0001f)
+                        // Initialise new clips to full file duration.
+                        if (clipWasRecreated || Math.Abs(timeClip.TimeRange.Duration) <= MinDurationBars)
                         {
-                            timeClip.TimeRange.Duration = durationInBars;
+                            timeClip.TimeRange.Duration = audioDurationInBars;
+                            _trimInBars = 0;
                         }
 
-                        var displayedDuration = (double)Math.Abs(timeClip.TimeRange.Duration);
-                        var sourceDuration = (double)Math.Abs(timeClip.SourceRange.Duration);
-                        if (allowManualStretch && displayedDuration > 0.0001 && sourceDuration > 0.0001)
+                        if (!allowManualStretch)
                         {
-                            // If the clip is stretched longer, rate < 1; if compressed shorter, rate > 1.
-                            _currentClip.PlaybackRateMultiplier = sourceDuration / displayedDuration;
+                            // --- Non-stretch mode ---
+                            //
+                            // Detect trim vs body-drag by comparing how Start and End moved
+                            // since last frame:
+                            //   Body drag:        Start moved, End moved by same amount
+                            //   Start-handle trim: Start moved, End stayed
+                            //   End-handle trim:   End moved, Start stayed
+                            //
+                            // Only a start-handle trim changes the trim-in offset.
+
+                            if (!float.IsNaN(_lastTimeStart) && !float.IsNaN(_lastTimeEnd))
+                            {
+                                var dStart = timeClip.TimeRange.Start - _lastTimeStart;
+                                var dEnd = timeClip.TimeRange.End - _lastTimeEnd;
+
+                                // Start-handle moved but end didn't (or moved much less) → trim-in
+                                if (Math.Abs(dStart) > 0.0001f && Math.Abs(dEnd) < 0.0001f)
+                                {
+                                    _trimInBars += dStart;
+                                }
+                                // End-handle moved but start didn't → trim-out (no effect on trim-in)
+                                // Body drag: both moved equally → no change to trim-in
+                            }
+
+                            // Clamp trim-in to valid range
+                            _trimInBars = Math.Clamp(_trimInBars, 0, audioDurationInBars - MinDurationBars);
+
+                            // Clamp clip duration to the remaining audio after trim-in.
+                            var maxDuration = audioDurationInBars - _trimInBars;
+                            var timeStart = timeClip.TimeRange.Start;
+                            var timeEnd = timeClip.TimeRange.End;
+                            var duration = timeEnd - timeStart;
+
+                            if (duration > maxDuration)
+                                timeEnd = timeStart + maxDuration;
+
+                            if (timeEnd - timeStart < MinDurationBars)
+                                timeEnd = timeStart + MinDurationBars;
+
+                            timeClip.TimeRange.Start = timeStart;
+                            timeClip.TimeRange.End = timeEnd;
+
+                            // SourceRange mirrors the played audio window exactly (1:1, no stretch).
+                            var clampedDuration = timeEnd - timeStart;
+                            timeClip.SourceRange.Start = _trimInBars;
+                            timeClip.SourceRange.End = _trimInBars + clampedDuration;
+
+                            _currentClip.PlaybackRateMultiplier = 1.0;
+                            _currentClip.SourceOffsetInSeconds = Playback.Current.SecondsFromBars(_trimInBars);
                         }
                         else
                         {
-                            _currentClip.PlaybackRateMultiplier = 1.0;
+                            // --- Stretch mode ---
+                            // Lock SourceRange to full file; undo any trim deltas from LayersArea.
+                            timeClip.SourceRange.Start = 0;
+                            timeClip.SourceRange.End = audioDurationInBars;
+
+                            var visibleDuration = Math.Max(Math.Abs(timeClip.TimeRange.Duration), MinDurationBars);
+                            _currentClip.PlaybackRateMultiplier = audioDurationInBars / visibleDuration;
+                            _currentClip.SourceOffsetInSeconds = 0;
                         }
+
+                        // Remember this frame's TimeRange for next-frame delta detection.
+                        _lastTimeStart = timeClip.TimeRange.Start;
+                        _lastTimeEnd = timeClip.TimeRange.End;
                     }
                 }
                 catch (Exception e)
                 {
                     Log.Warning("Failed to apply soundtrack file duration to time clip: " + e.Message);
                     _currentClip.PlaybackRateMultiplier = 1.0;
+                    _currentClip.SourceOffsetInSeconds = 0;
                 }
             }
             else
             {
                 _currentClip.PlaybackRateMultiplier = 1.0;
+                _currentClip.SourceOffsetInSeconds = 0;
             }
 
-            // Set clip bounds and volume every frame, identical to how the global soundtrack works.
-            // StartTime is in bars - UpdateSoundtrackTime() uses SecondsFromBars(StartTime) internally.
+            // Set clip bounds and volume every frame.
             var clipStart = Math.Min(timeClip.TimeRange.Start, timeClip.TimeRange.End);
             var clipEnd = Math.Max(timeClip.TimeRange.Start, timeClip.TimeRange.End);
             _currentClip.StartTime = clipStart;
             _currentClip.EndTime = clipEnd;
             _currentClip.Volume = mute ? 0 : volume;
 
-            // Pass global TimeInSecs as TargetTime, exactly like the global soundtrack does.
-            // UpdateSoundtrackTime() computes: localTargetTimeInSecs = TargetTime - SecondsFromBars(clip.StartTime)
-            // and handles all pause/unpause/resync/speed logic internally.
             AudioEngine.UseSoundtrackClip(_currentAudioHandle, Playback.Current.TimeInSecs);
         }
 
         ~SoundtrackClip()
         {
-            // Clean up when operator is destroyed
             if (_operatorId != Guid.Empty)
             {
-                // The soundtrack clip will be automatically cleaned up by the audio engine
-                // when it's no longer in use (DiscardAfterUse is false, so it will persist)
             }
         }
     }
