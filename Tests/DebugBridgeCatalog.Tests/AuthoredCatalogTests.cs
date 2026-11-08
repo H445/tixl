@@ -6,6 +6,25 @@ namespace DebugBridgeCatalog.Tests;
 public sealed class AuthoredCatalogTests
 {
     [Fact]
+    public void CombinedCatalog_MatchesEveryTargetDispatchExactly()
+    {
+        var groups = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Catalog"), "*.json")
+                              .Select(file => JsonSerializer.Deserialize<CatalogDocument>(File.ReadAllText(file), CatalogDocument.JsonOptions)!)
+                              .ToArray();
+        Assert.NotEmpty(groups);
+        var first = groups[0];
+        foreach (var group in groups)
+        {
+            Assert.Equal(first.FormatVersion, group.FormatVersion);
+            Assert.Equal(first.ProtocolVersion, group.ProtocolVersion);
+            Assert.Equal(JsonSerializer.Serialize(first.Targets), JsonSerializer.Serialize(group.Targets));
+        }
+        var combined = first with { Commands = groups.SelectMany(group => group.Commands).ToArray() };
+        var source = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Source", "DebugServer.cs"));
+        Assert.Empty(CatalogValidator.Validate(combined, source));
+    }
+
+    [Fact]
     public void AuthoredGroups_HaveValidMetadataAndOnlyRealCommands()
     {
         var files = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Catalog"), "*.json");

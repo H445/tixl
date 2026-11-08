@@ -1,0 +1,280 @@
+{
+  "formatVersion": "1.0",
+  "protocolVersion": 1,
+  "targets": [
+    {
+      "name": "windows-d3d11",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    },
+    {
+      "name": "windows-vulkan",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    },
+    {
+      "name": "linux-vulkan",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    },
+    {
+      "name": "macos-vulkan",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "pumpFrames",
+      "summary": "Wait for a number of main-thread queue passes.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "count",
+          "wireType": "integer",
+          "required": false,
+          "description": "Clamped to 1..100000; this counts UI queue passes, not elapsed seconds or distinct output evaluations.",
+          "omissionBehavior": "Defaults to 1; explicit null or invalid conversion throws.",
+          "default": 1
+        }
+      ],
+      "result": "Empty object {} with envelope counters from the completion frame.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "Registers a pending reply; does not change playback speed or force a particular operator to evaluate.",
+      "completion": "Deferred. Count decrements at the beginning of later queue passes. Other requests may finish first; responses must be matched by ID. Timeout/disconnect does not cancel queued work.",
+      "verificationIds": [
+        "Editor.IntegrationTests.PlaybackContractTests.PumpFrames_ClampsLowCountsAndDefersReplies"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "pumpFrames",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "setTime",
+      "summary": "Set or report current playback time.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "timeInBars",
+          "wireType": "number",
+          "required": false,
+          "description": "Takes precedence over timeInSecs whenever the property exists, including explicit null. Negative values accepted; no finite/range validation in the handler.",
+          "omissionBehavior": "Leave time unchanged unless timeInSecs is supplied."
+        },
+        {
+          "name": "timeInSecs",
+          "wireType": "number",
+          "required": false,
+          "description": "Converted through current BPM: bars = seconds * BPM / 240. Ignored when timeInBars exists.",
+          "omissionBehavior": "Leave time unchanged unless timeInBars is supplied."
+        }
+      ],
+      "result": "Object {timeInBars:number,timeInSecs:number}.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "Changes Playback.Current time; does not pause playback. Omission of both fields reads current time. Explicit null/nonconvertible values throw.",
+      "completion": "Immediate acknowledgement; subsequent frames can advance time when playing.",
+      "verificationIds": [
+        "Editor.IntegrationTests.PlaybackContractTests.Time_UsesBarsPrecedenceAndCurrentTempo",
+        "Editor.IntegrationTests.WireContractTests.Disconnect_DoesNotCancelQueuedMutations"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "setTime",
+          "timeInSecs": 0
+        }
+      }
+    },
+    {
+      "name": "setPlayback",
+      "summary": "Set or report current playback speed.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "speed",
+          "wireType": "number",
+          "required": false,
+          "description": "Takes precedence over playing whenever present. Negative speeds accepted. Handler does not validate finite values or impose bounds.",
+          "omissionBehavior": "Use playing if supplied; otherwise retain current speed."
+        },
+        {
+          "name": "playing",
+          "wireType": "boolean",
+          "required": false,
+          "description": "true sets speed 1; false sets speed 0. Ignored when speed exists.",
+          "omissionBehavior": "Leave speed unchanged unless speed supplied."
+        }
+      ],
+      "result": "Object {playbackSpeed:number}.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "Changes Playback.Current speed. getContext reports isPlaying as abs(speed) > 0.001. Explicit null for either selected field throws.",
+      "completion": "Immediate acknowledgement; timeline advancement is later frame work.",
+      "verificationIds": [
+        "Editor.IntegrationTests.PlaybackContractTests.Playback_UsesSpeedPrecedenceAndPlayingThreshold"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "setPlayback",
+          "playing": false
+        }
+      }
+    },
+    {
+      "name": "getAudioInputs",
+      "summary": "List available input devices and current capture analysis state.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [],
+      "result": "Object {devices:[{name:string,isLoopback:boolean}],active:string|null,level:number}. No recording-path or recording-status field is returned.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "Enumerates input devices lazily on first request. Does not start capture. Enumeration can be empty if the native engine is unavailable.",
+      "completion": "Immediate snapshot; level is the decaying input level and active is the current capture device, not proof of a recording.",
+      "verificationIds": [
+        "Editor.IntegrationTests.AudioContractTests.AudioState_ReportsDevicesAndIdleStopWithoutCapture",
+        "Editor.IntegrationTests.AudioContractTests.AudioSelection_AcknowledgesUnknownDeviceWithoutOpeningIt"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "getAudioInputs"
+        }
+      }
+    },
+    {
+      "name": "setAudioInput",
+      "summary": "Choose external input analysis or the project's soundtrack.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "device",
+          "wireType": "string",
+          "required": false,
+          "description": "Nonempty selects ExternalDevice and stores the name without checking that it exists. Empty selects ProjectSoundTrack. No trim or case-insensitive matching.",
+          "omissionBehavior": "Missing or null acts as empty string.",
+          "default": ""
+        }
+      ],
+      "result": "Object {audioSource:string}, with ExternalDevice or ProjectSoundTrack.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "Mutates composition playback settings. A selected real device can start capture in subsequent audio frames. An unknown name can be acknowledged but never become active; inspect state and logs.",
+      "completion": "Immediate settings acknowledgement; device opening/switching happens afterward. This response does not prove device availability.",
+      "verificationIds": [
+        "Editor.IntegrationTests.AudioContractTests.AudioSelection_AcknowledgesUnknownDeviceWithoutOpeningIt"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "setAudioInput",
+          "device": ""
+        }
+      }
+    },
+    {
+      "name": "startAudioRecording",
+      "summary": "Request capture into a temporary PCM WAV recording.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [],
+      "result": "Object {path:string|null}. A null path with ok:true means recording did not start, including an already-active session.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "May start real input capture, using the configured device or falling back to the first enumerated device when it cannot resolve one. Writes under getPaths.temp/Recordings using existing automatic session naming. Does not take a path or device argument. Device selection is not a sandbox.",
+      "completion": "Returns once a WAV writer is created, before samples or final header are guaranteed. Use stopAudioRecording and validate the finalized file. Failures are generally logged with a null path; no structured recording status endpoint exists.",
+      "verificationIds": [
+        "Editor.IntegrationTests.AudioContractTests.Recording_WithoutDevicesReturnsNullAndNoFile"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "startAudioRecording"
+        }
+      }
+    },
+    {
+      "name": "stopAudioRecording",
+      "summary": "Stop an active WAV recording and finalize its header.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [],
+      "result": "Object {path:string|null}; null when idle, otherwise the finalized recording path.",
+      "errors": [
+        "INTERNAL_ERROR"
+      ],
+      "effects": "Closes the active writer; warns if it captured no samples. Capture may remain active for ExternalDevice analysis; recording-only capture teardown is later frame work.",
+      "completion": "Synchronous file finalization when active. A readable header alone does not prove that samples were captured.",
+      "verificationIds": [
+        "Editor.IntegrationTests.AudioContractTests.AudioState_ReportsDevicesAndIdleStopWithoutCapture",
+        "Editor.IntegrationTests.AudioContractTests.Recording_WithoutDevicesReturnsNullAndNoFile"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "stopAudioRecording"
+        }
+      }
+    }
+  ]
+}
