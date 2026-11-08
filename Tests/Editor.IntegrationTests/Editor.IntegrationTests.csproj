@@ -11,15 +11,8 @@
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
         <PackageReference Include="xunit" Version="2.9.3" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />
-        <PackageReference Include="StbImageSharp" Version="2.30.16" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\TiXL.DebugClient\TiXL.DebugClient.csproj" />
-    </ItemGroup>
-    <ItemGroup>
-        <!-- Exercise the actual ring buffer without loading the editor or a graphics backend. -->
-        <Compile Include="../../Editor/App/DebugProtocol/DebugLogBuffer.cs" Link="Subject/DebugLogBuffer.cs" />
-        <Compile Include="../../Logging/ILogEntry.cs" Link="Subject/ILogEntry.cs" />
-        <Compile Include="../../Logging/ILogWriter.cs" Link="Subject/ILogWriter.cs" />
     </ItemGroup>
 </Project>

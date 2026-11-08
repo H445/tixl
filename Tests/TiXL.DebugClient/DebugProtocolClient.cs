@@ -1,7 +1,5 @@
 using System.Net.Sockets;
 using System.Text;
-using System.Diagnostics;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace TiXL.DebugClient;
@@ -9,39 +7,26 @@ namespace TiXL.DebugClient;
 /// <summary>
 /// Typed client for TiXL's JSON-lines debug protocol (editor started with
 /// <c>--debug-server &lt;port&gt;</c>). One request/response at a time per client;
-/// strict mode also validates the echoed ID and envelope. Thread-unsafe by design - use one
+/// responses are matched by order, not id. Thread-unsafe by design - use one
 /// client per driving thread.
 /// </summary>
 public sealed class DebugProtocolClient : IDisposable
 {
-    public static bool TryConnect(int port, TimeSpan timeout, out DebugProtocolClient? client,
-                                  bool strictResponses = false, TimeSpan? responseTimeout = null)
+    public static bool TryConnect(int port, TimeSpan timeout, out DebugProtocolClient? client)
     {
-        var replyTimeout = responseTimeout ?? TimeSpan.FromMinutes(5);
-        if (timeout <= TimeSpan.Zero || replyTimeout.TotalMilliseconds < 1 || replyTimeout.TotalMilliseconds > int.MaxValue)
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
         {
-            throw new ArgumentOutOfRangeException(nameof(timeout), "Connection and response timeouts must be positive and bounded.");
-        }
-        var timer = Stopwatch.StartNew();
-        while (timer.Elapsed < timeout)
-        {
-            var tcpClient = new TcpClient();
             try
             {
-                var remaining = timeout - timer.Elapsed;
-                using var cancellation = new CancellationTokenSource(remaining > TimeSpan.Zero ? remaining : TimeSpan.FromMilliseconds(1));
-                tcpClient.ConnectAsync("127.0.0.1", port, cancellation.Token).AsTask().GetAwaiter().GetResult();
-                client = new DebugProtocolClient(tcpClient, strictResponses, (int)replyTimeout.TotalMilliseconds);
+                var tcpClient = new TcpClient();
+                tcpClient.Connect("127.0.0.1", port);
+                client = new DebugProtocolClient(tcpClient);
                 return true;
             }
-            catch (Exception e) when (e is SocketException or OperationCanceledException)
+            catch (SocketException)
             {
-                tcpClient.Dispose();
-                var remaining = timeout - timer.Elapsed;
-                if (remaining > TimeSpan.Zero)
-                {
-                    Thread.Sleep(TimeSpan.FromMilliseconds(Math.Min(100, remaining.TotalMilliseconds)));
-                }
+                Thread.Sleep(1000);
             }
         }
 
@@ -49,96 +34,32 @@ public sealed class DebugProtocolClient : IDisposable
         return false;
     }
 
-    private DebugProtocolClient(TcpClient tcpClient, bool strictResponses, int responseTimeoutMs)
+    private DebugProtocolClient(TcpClient tcpClient)
     {
         _tcpClient = tcpClient;
-        _strictResponses = strictResponses;
         var stream = tcpClient.GetStream();
         _reader = new StreamReader(stream, Encoding.UTF8);
         _writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
-        _tcpClient.ReceiveTimeout = responseTimeoutMs;
-        _tcpClient.SendTimeout = responseTimeoutMs;
+        _tcpClient.ReceiveTimeout = (int)TimeSpan.FromMinutes(5).TotalMilliseconds;
     }
 
     /// <summary>Sends a request and blocks for the response envelope.</summary>
     public Response Call(string method, object? args = null)
     {
-        var envelope = CallRaw(method, args);
+        var request = args == null ? new JObject() : JObject.FromObject(args);
+        request["id"] = (++_requestCounter).ToString();
+        request["method"] = method;
+
+        _writer.WriteLine(request.ToString(Newtonsoft.Json.Formatting.None));
+        var line = _reader.ReadLine() ?? throw new IOException("Debug protocol connection closed");
+        var envelope = JObject.Parse(line);
+
         return new Response(envelope["ok"]?.Value<bool>() ?? false,
                             envelope["result"] as JObject,
                             envelope["error"]?["code"]?.Value<string>(),
                             envelope["error"]?["detail"]?.Value<string>(),
                             envelope["frame"]?.Value<long>() ?? -1,
-                            envelope["structureVersion"]?.Value<int>() ?? -1)
-               { Envelope = envelope };
-    }
-
-    /// <summary>Returns every wire field. A failed strict exchange closes the connection; it never retries the request.</summary>
-    public JObject CallRaw(string method, object? args = null)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        var request = args == null ? new JObject() : JObject.FromObject(args);
-        request["id"] = (++_requestCounter).ToString();
-        request["method"] = method;
-
-        try
-        {
-            _writer.WriteLine(request.ToString(Formatting.None));
-            var line = _reader.ReadLine() ?? throw new IOException("Debug protocol connection closed; request outcome may be unknown.");
-            var envelope = JObject.Parse(line);
-            if (_strictResponses)
-            {
-                ValidateEnvelope(envelope, request["id"]!);
-            }
-            return envelope;
-        }
-        catch (Exception e) when (e is IOException or JsonException or DebugProtocolException)
-        {
-            if (_strictResponses)
-            {
-                // Reusing a timed-out stream could attribute a late mutation reply to a later request.
-                Dispose();
-            }
-            throw;
-        }
-    }
-
-    private static void ValidateEnvelope(JObject envelope, JToken requestId)
-    {
-        if (!JToken.DeepEquals(envelope["id"], requestId))
-        {
-            throw new DebugProtocolException("Response ID does not match the request; outcome may be unknown.");
-        }
-        if (envelope["ok"]?.Type != JTokenType.Boolean
-            || envelope["frame"]?.Type != JTokenType.Integer
-            || envelope["playbackFrame"]?.Type != JTokenType.Integer
-            || envelope["structureVersion"]?.Type != JTokenType.Integer)
-        {
-            throw new DebugProtocolException("Response requires boolean ok and integer frame, playbackFrame and structureVersion.");
-        }
-        try
-        {
-            _ = envelope["frame"]!.Value<long>();
-            _ = envelope["playbackFrame"]!.Value<long>();
-            _ = envelope["structureVersion"]!.Value<int>();
-        }
-        catch (Exception e) when (e is OverflowException or InvalidCastException)
-        {
-            throw new DebugProtocolException("Response counters exceed the supported wire ranges.");
-        }
-        if (envelope["ok"]!.Value<bool>())
-        {
-            if (envelope["result"] is not JObject || envelope.ContainsKey("error"))
-            {
-                throw new DebugProtocolException("Success response requires an object result and no error.");
-            }
-        }
-        else if (envelope["error"] is not JObject error || error["code"]?.Type != JTokenType.String
-                                                        || error["detail"]?.Type != JTokenType.String
-                                                        || envelope.ContainsKey("result"))
-        {
-            throw new DebugProtocolException("Failure response requires string error.code/detail and no result.");
-        }
+                            envelope["structureVersion"]?.Value<int>() ?? -1);
     }
 
     // --- convenience wrappers ----------------------------------------------
@@ -209,10 +130,6 @@ public sealed class DebugProtocolClient : IDisposable
     /// <summary>Fire-and-forget: the editor tears down before it can reply.</summary>
     public void Shutdown()
     {
-        if (_disposed)
-        {
-            return;
-        }
         try
         {
             _writer.WriteLine("""{"id":"shutdown","method":"shutdown"}""");
@@ -222,32 +139,16 @@ public sealed class DebugProtocolClient : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-        _disposed = true;
-        _tcpClient.Dispose();
-        _reader.Dispose();
-        _writer.Dispose();
-    }
+    public void Dispose() => _tcpClient.Dispose();
 
     private readonly TcpClient _tcpClient;
     private readonly StreamReader _reader;
     private readonly StreamWriter _writer;
-    private readonly bool _strictResponses;
-    private bool _disposed;
     private int _requestCounter;
 }
 
 public sealed record Response(bool Ok, JObject? Result, string? ErrorCode, string? ErrorDetail, long Frame, int StructureVersion)
 {
-    public JObject? Envelope { get; init; }
-    public JToken? Id => Envelope?["id"];
-    public long? PlaybackFrame => Envelope?["playbackFrame"]?.Value<long>();
-
     /// <summary>Returns the result payload or throws with the protocol error.</summary>
     public JObject Require(string what)
     {

@@ -29,7 +29,11 @@ public sealed class EditorFixture : IDisposable
         }
 
         var exePath = FindEditorExe();
-        _editorProcess = Process.Start(CreateStartInfo(exePath, port))
+        _editorProcess = Process.Start(new ProcessStartInfo(exePath, $"--debug-server {port} --window 1280x720 --no-splash --no-reopen")
+                                           {
+                                               WorkingDirectory = Path.GetDirectoryName(exePath)!,
+                                               UseShellExecute = false,
+                                           })
                          ?? throw new InvalidOperationException("Failed to start TiXL.exe");
 
         if (!DebugProtocolClient.TryConnect(port, TimeSpan.FromMinutes(2), out client))
@@ -42,41 +46,9 @@ public sealed class EditorFixture : IDisposable
         Client.PumpFrames(30); // let startup settle
     }
 
-    private EditorFixture(OwnedEditorSession ownedSession)
-    {
-        _ownedSession = ownedSession;
-        Client = ownedSession.Client;
-    }
-
-    /// <summary>Starts a new editor and verifies isolated paths before any mutation.</summary>
-    public static EditorFixture CreateOwned(string executable, string backend, bool createProject = true)
-        => new(OwnedEditorSession.Start(executable, backend, createProject));
-
-    internal OwnedEditorSession? OwnedSession => _ownedSession;
-
-    internal static ProcessStartInfo CreateStartInfo(string executable, int port)
-    {
-        var start = new ProcessStartInfo(executable)
-        {
-            WorkingDirectory = Path.GetDirectoryName(executable)!,
-            UseShellExecute = false,
-        };
-        foreach (var argument in new[] { "--debug-server", port.ToString(), "--window", "1280x720", "--no-splash", "--no-reopen" })
-        {
-            start.ArgumentList.Add(argument);
-        }
-        return start;
-    }
-
     /// <summary>Opens the playground and returns its baseline child/connection counts.</summary>
     public (int Children, int Connections) OpenPlayground()
     {
-        if (_ownedSession != null)
-        {
-            _ownedSession.OpenProject();
-            var graph = Client.GetGraphState();
-            return (graph["children"]!.Count(), graph["connections"]!.Count());
-        }
         Client.OpenProject(PlaygroundProject).Require("openProject " + PlaygroundProject);
         Client.PumpFrames(10);
 
@@ -128,11 +100,6 @@ public sealed class EditorFixture : IDisposable
 
     public void Dispose()
     {
-        if (_ownedSession != null)
-        {
-            _ownedSession.Dispose();
-            return;
-        }
         if (_editorProcess == null)
         {
             Client.Dispose();
@@ -146,7 +113,6 @@ public sealed class EditorFixture : IDisposable
     }
 
     private readonly Process? _editorProcess;
-    private readonly OwnedEditorSession? _ownedSession;
 }
 
 [CollectionDefinition("Editor")]
