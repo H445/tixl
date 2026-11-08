@@ -140,7 +140,19 @@ public sealed class CatalogTests
             Arguments = [new("value", "any JSON", false, "Opaque codec", "Defaults to null", JsonSerializer.SerializeToElement<object?>(null))],
         };
         var json = JsonSerializer.Serialize(catalog, CatalogDocument.JsonOptions);
-        Assert.Empty(CatalogValidator.Validate(JsonSerializer.Deserialize<CatalogDocument>(json, CatalogDocument.JsonOptions)!, Source));
+        var roundTrip = JsonSerializer.Deserialize<CatalogDocument>(json, CatalogDocument.JsonOptions)!;
+        Assert.Empty(CatalogValidator.Validate(roundTrip, Source));
+        Assert.Equal(JsonValueKind.Null, roundTrip.Commands[0].Arguments[0].Default.ValueKind);
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CatalogDocument>(json.Replace("\"summary\"", "\"sumary\""), CatalogDocument.JsonOptions));
+    }
+
+    [Fact]
+    public void OmittedDefault_RemainsDistinctFromExplicitNull()
+    {
+        var argument = new ArgumentContract("value", "any JSON", false, "Input value", "Leave unchanged");
+        var json = JsonSerializer.Serialize(argument, CatalogDocument.JsonOptions);
+        using var document = JsonDocument.Parse(json);
+        Assert.False(document.RootElement.TryGetProperty("default", out _));
+        Assert.Equal(JsonValueKind.Undefined, JsonSerializer.Deserialize<ArgumentContract>(json, CatalogDocument.JsonOptions)!.Default.ValueKind);
     }
 }

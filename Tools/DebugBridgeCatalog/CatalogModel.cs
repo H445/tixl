@@ -39,4 +39,4 @@ internal sealed record ArgumentContract(
     bool Required,
     string Description,
     string OmissionBehavior,
-    JsonElement? Default = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] JsonElement Default = default);
