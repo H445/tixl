@@ -67,7 +67,8 @@
       "effects": "Reads symbol definitions/current stored inputs; values can differ from evaluated connected inputs. Explicit query allocates JSON.",
       "completion": "Immediate.",
       "verificationIds": [
-        "Editor.IntegrationTests.GraphContractTests.GraphState_ReportsDefaultsKnownSymbolAndInvalidComposition"
+        "Editor.IntegrationTests.GraphContractTests.GraphState_ReportsDefaultsKnownSymbolAndInvalidComposition",
+        "Editor.IntegrationTests.OutputContractTests.ListAndMatrixInputs_AreInspectableWhileTheirOutputsRemainOpaque"
       ],
       "extensions": {
         "source": "Editor/App/DebugProtocol/DebugServer.cs",
@@ -173,7 +174,7 @@
           "name": "value",
           "wireType": "slot-dependent JSON",
           "required": true,
-          "description": "Decoded by the existing input type converter. Explicit null is passed to that converter; omission is distinct.",
+          "description": "Decoded by the existing input type converter. Explicit null is passed to that converter; omission is distinct. Representative formats include scalar JSON, vectors with named X/Y/Z/W fields, List<int> as {Values:[...]}, and Matrix4x4 as 16 row-major numbers. A malformed matrix shape silently selects identity rather than rejecting the request. There is no universal input JSON shape or universal invalid-value rejection.",
           "omissionBehavior": "MISSING_PARAM."
         }
       ],
@@ -189,7 +190,10 @@
       "verificationIds": [
         "Editor.IntegrationTests.GraphContractTests.ScalarInputs_SelectorsErrorsAndUndo",
         "Editor.IntegrationTests.GraphContractTests.VectorOutput_DefaultUsesCacheAndExplicitUpdateEvaluates",
-        "Editor.IntegrationTests.GraphContractTests.StringCodec_RoundTrips"
+        "Editor.IntegrationTests.GraphContractTests.StringCodec_RoundTrips",
+        "Editor.IntegrationTests.OutputContractTests.PrimitiveOutputs_PreserveValuesAndTriggerFlanks",
+        "Editor.IntegrationTests.OutputContractTests.ListAndMatrixInputs_AreInspectableWhileTheirOutputsRemainOpaque",
+        "Editor.IntegrationTests.OutputContractTests.IntegerBuffer_ReadbackReinterpretsBytesAsFloats"
       ],
       "extensions": {
         "source": "Editor/App/DebugProtocol/DebugServer.cs",
@@ -265,7 +269,7 @@
           "default": 0
         }
       ],
-      "result": "Object with outputId,valueType,value. Scalars float/double/int/bool/string return scalar JSON; Vector2/3/4 return arrays. Texture, geometry, buffer and structured-list outputs return specialized summaries; unsupported or missing resources return null. Buffer/list reads add elements; 64-byte stride is decoded as Point fields, other strides as float arrays. See output-shape notes for summaries and export limitations.",
+      "result": "Object with outputId,valueType,value. Scalars float/double/int/bool/string return scalar JSON; Vector2/3/4 return arrays. Unsupported types (including Matrix4x4 and List<int>) and missing resources return null; valueType alone does not prove value availability. Texture summary: width,height,format,mipLevels,arraySize,bindFlags,optionFlags,disposed. Geometry summary: pointCount,faceCount,cornerCount,partCount,boundsMin,boundsMax,boundaryEdges,boundaryEdgesOnCuts,boundaryEdgeSamples,nonManifoldEdges,volume,attributes. Buffer summary: sizeInBytes,stride,elementCount,disposed. Structured-list summary: type,elementCount,elementSizeInBytes. Positive buffer/list readCount adds elements when storage is available; offsets clamp to zero and out-of-range offsets produce an empty array. A 64-byte stride is interpreted as Point fields (index,position,f1,orientation,color,scale,f2), other strides as float arrays regardless of actual element type. Integer buffer bytes are reinterpreted, not numerically converted. Geometry OBJ export preserves polygon corners and writes synchronously; file errors become INTERNAL_ERROR.",
       "errors": [
         "NOT_FOUND",
         "INTERNAL_ERROR"
@@ -276,7 +280,12 @@
         "Editor.IntegrationTests.GraphContractTests.ScalarInputs_SelectorsErrorsAndUndo",
         "Editor.IntegrationTests.GraphContractTests.VectorOutput_DefaultUsesCacheAndExplicitUpdateEvaluates",
         "Editor.IntegrationTests.GraphContractTests.StringCodec_RoundTrips",
-        "Editor.IntegrationTests.GraphContractTests.OutputSelectors_UnknownAndMalformedChildBehavior"
+        "Editor.IntegrationTests.GraphContractTests.OutputSelectors_UnknownAndMalformedChildBehavior",
+        "Editor.IntegrationTests.OutputContractTests.PrimitiveOutputs_PreserveValuesAndTriggerFlanks",
+        "Editor.IntegrationTests.OutputContractTests.ListAndMatrixInputs_AreInspectableWhileTheirOutputsRemainOpaque",
+        "Editor.IntegrationTests.OutputContractTests.StructuredPoints_CpuAndGpuReadbackAgreeAndRespectRanges",
+        "Editor.IntegrationTests.OutputContractTests.IntegerBuffer_ReadbackReinterpretsBytesAsFloats",
+        "Editor.IntegrationTests.OutputContractTests.GeometrySummaryAndObjDump_AgreeWithKnownCube"
       ],
       "extensions": {
         "source": "Editor/App/DebugProtocol/DebugServer.cs",
@@ -421,7 +430,8 @@
       "effects": "Undoable connection mutation. Cycle rejection is applied only when the addressed symbol is the focused composition; do not infer global cycle protection.",
       "completion": "Immediate.",
       "verificationIds": [
-        "Editor.IntegrationTests.GraphContractTests.Connections_ResolveSelectorsRejectMismatchAndCycle"
+        "Editor.IntegrationTests.GraphContractTests.Connections_ResolveSelectorsRejectMismatchAndCycle",
+        "Editor.IntegrationTests.OutputContractTests.MultiInputConnections_PreserveOrderThroughDeleteAndUndo"
       ],
       "extensions": {
         "source": "Editor/App/DebugProtocol/DebugServer.cs",
@@ -466,7 +476,8 @@
       "effects": "Undoable graph deletion; autosave may persist it.",
       "completion": "Immediate.",
       "verificationIds": [
-        "Editor.IntegrationTests.GraphContractTests.SelectionBypassDeleteAndHistory_RoundTrip"
+        "Editor.IntegrationTests.GraphContractTests.SelectionBypassDeleteAndHistory_RoundTrip",
+        "Editor.IntegrationTests.OutputContractTests.MultiInputConnections_PreserveOrderThroughDeleteAndUndo"
       ],
       "extensions": {
         "source": "Editor/App/DebugProtocol/DebugServer.cs",
@@ -585,7 +596,8 @@
       "completion": "Immediate.",
       "verificationIds": [
         "Editor.IntegrationTests.GraphContractTests.SelectionBypassDeleteAndHistory_RoundTrip",
-        "Editor.IntegrationTests.GraphContractTests.ScalarInputs_SelectorsErrorsAndUndo"
+        "Editor.IntegrationTests.GraphContractTests.ScalarInputs_SelectorsErrorsAndUndo",
+        "Editor.IntegrationTests.OutputContractTests.MultiInputConnections_PreserveOrderThroughDeleteAndUndo"
       ],
       "extensions": {
         "source": "Editor/App/DebugProtocol/DebugServer.cs",
