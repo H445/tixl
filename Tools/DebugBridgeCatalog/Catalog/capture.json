@@ -1,0 +1,269 @@
+{
+  "formatVersion": "1.0",
+  "protocolVersion": 1,
+  "targets": [
+    {
+      "name": "windows-d3d11",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    },
+    {
+      "name": "windows-vulkan",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    },
+    {
+      "name": "linux-vulkan",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    },
+    {
+      "name": "macos-vulkan",
+      "symbols": [
+        "TRACE",
+        "RELEASE"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "screenshot",
+      "summary": "Save the current output texture or a rendered editor UI frame.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "path",
+          "wireType": "string",
+          "required": true,
+          "description": "Output file path. Case-insensitive .jpg selects JPEG; all other suffixes, including .jpeg, select PNG. Relative paths are accepted but resolve against the editor working directory; use a fresh full path in an owned folder.",
+          "omissionBehavior": "Missing or whitespace gives MISSING_PARAM."
+        },
+        {
+          "name": "target",
+          "wireType": "string",
+          "required": false,
+          "description": "Exact case-sensitive output or ui. UI captures the next back buffer and forces opaque alpha. Output requires a current texture in a visible output window.",
+          "omissionBehavior": "output.",
+          "default": "output"
+        }
+      ],
+      "result": "Object {path:string} echoes the writer's requested path. Known limitation: save/encoding exceptions may be logged but still produce a successful path reply with no usable file. Independently verify the file and decoder result.",
+      "errors": [
+        "MISSING_PARAM",
+        "INVALID_PARAM",
+        "NO_OUTPUT",
+        "SCREENSHOT_BUSY",
+        "SCREENSHOT_FAILED"
+      ],
+      "effects": "GPU readback and image encoding; can overwrite the requested file. Parent folders are not created by ScreenshotWriter. The shared writer's format/alpha state and single pending UI callback make overlapping requests unsafe.",
+      "completion": "Deferred readback callback. A successful reply alone is not a file-saved guarantee; a timeout leaves an unknown outcome and must not trigger automatic replay.",
+      "verificationIds": [
+        "Editor.IntegrationTests.CaptureContractTests.Screenshot_ValidatesArgumentsAndRequiresOutput",
+        "Editor.IntegrationTests.CaptureContractTests.Screenshot_OutputFormatsAreReadableWhenReplyArrives",
+        "Editor.IntegrationTests.CaptureContractTests.Screenshot_FileWriteFailureCanStillReturnSuccess",
+        "Editor.IntegrationTests.CaptureContractTests.Screenshot_OverlappingUiRequestsCanLoseTheFirstCallback",
+        "Editor.IntegrationTests.CaptureContractTests.UiAndWindowCaptures_AreReadableAndWindowErrorsAreExplicit"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "screenshot",
+          "path": "C:\\owned-session\\output.png"
+        }
+      }
+    },
+    {
+      "name": "screenshotWindow",
+      "summary": "Capture the editor window client area using the Windows capture path.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "path",
+          "wireType": "string",
+          "required": true,
+          "description": "Output path; .jpg selects JPEG, other suffixes PNG. Creates missing parent directories. Relative paths are accepted, but automation should use a full owned path.",
+          "omissionBehavior": "MISSING_PARAM for missing or whitespace."
+        },
+        {
+          "name": "region",
+          "wireType": "string",
+          "required": false,
+          "description": "Exact graph crops to the current graph canvas bounds intersected with the client area. Any other nonempty string is INVALID_PARAM.",
+          "omissionBehavior": "Entire editor client area."
+        }
+      ],
+      "result": "Object {path:string} with normalized full path on success. The command exists on all targets, but non-Windows capture returns SCREENSHOT_FAILED with an unsupported-platform detail.",
+      "errors": [
+        "MISSING_PARAM",
+        "INVALID_PARAM",
+        "NO_COMPOSITION",
+        "SCREENSHOT_FAILED"
+      ],
+      "effects": "Captures the owned OS window, crops and encodes an image; creates parent folders and can overwrite a file. Depends on client-area/window availability.",
+      "completion": "Synchronous capture and save; errors are returned rather than the screenshot writer's deferred callback.",
+      "verificationIds": [
+        "Editor.IntegrationTests.CaptureContractTests.UiAndWindowCaptures_AreReadableAndWindowErrorsAreExplicit"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "screenshotWindow",
+          "path": "C:\\owned-session\\graph.png",
+          "region": "graph"
+        }
+      }
+    },
+    {
+      "name": "startRender",
+      "summary": "Start a video export from the current output texture.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [
+        {
+          "name": "path",
+          "wireType": "string",
+          "required": true,
+          "description": "Target path must satisfy platform Path.IsPathRooted. On Windows this is broader than fully qualified; supply a full owned path. Export setup can create the parent directory.",
+          "omissionBehavior": "BAD_PATH."
+        },
+        {
+          "name": "startSecs",
+          "wireType": "number",
+          "required": false,
+          "description": "Requested start time in seconds. Copied into cloned render settings with seconds as their reference.",
+          "omissionBehavior": "Zero.",
+          "default": 0
+        },
+        {
+          "name": "durationSecs",
+          "wireType": "number",
+          "required": true,
+          "description": "Duration in seconds; values <=0 are rejected. The handler has no separate finite-number validation.",
+          "omissionBehavior": "Zero gives BAD_DURATION."
+        },
+        {
+          "name": "fps",
+          "wireType": "number",
+          "required": false,
+          "description": "Frame rate; no explicit handler range/finite validation. Advertised frameCount rounds duration times fps.",
+          "omissionBehavior": "60.",
+          "default": 60
+        },
+        {
+          "name": "codec",
+          "wireType": "string",
+          "required": false,
+          "description": "Case-insensitive VideoExportCodec name: H264, ProRes, VP9, AV1, FFV1, Hap, HapAlpha, HapQ, Hevc. An unparseable string leaves the cloned codec unchanged; numeric strings are accepted by Enum.TryParse without defined-value checking.",
+          "omissionBehavior": "Keep cloned render-settings codec."
+        },
+        {
+          "name": "exportAudio",
+          "wireType": "boolean",
+          "required": false,
+          "description": "Whether to include composition audio. Requires corresponding exporter/audio prerequisites.",
+          "omissionBehavior": "True.",
+          "default": true
+        }
+      ],
+      "result": "Object {path:string,frameCount:integer} acknowledges accepted settings. It does not establish encoder availability, successful completion or file readability.",
+      "errors": [
+        "BAD_PATH",
+        "BAD_DURATION",
+        "RENDER_NOT_READY"
+      ],
+      "effects": "Clones render settings, requests video export and advances playback frame-by-frame. Requires a valid Texture2D, visible output and ReadyForExport state. Encoder setup can fail later. An existing target may be overwritten; cancellation may leave a partial file.",
+      "completion": "Accepted export completes over later frames. Poll getRenderStatus and inspect the actual artifact and logs; do not treat the acknowledgement as completion.",
+      "verificationIds": [
+        "Editor.IntegrationTests.CaptureContractTests.Render_ValidatesPathDurationAndReadiness",
+        "Editor.IntegrationTests.CaptureContractTests.Render_CompletionAndCancellationHaveSeparateEvidence",
+        "Editor.IntegrationTests.CaptureContractTests.Render_AcceptedRequestCanFailLaterWithoutAFile"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "startRender",
+          "path": "C:\\owned-session\\render.mp4",
+          "durationSecs": 1,
+          "fps": 30,
+          "exportAudio": false
+        }
+      }
+    },
+    {
+      "name": "getRenderStatus",
+      "summary": "Read current export state and progress.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [],
+      "result": "Object {state:string,isExporting:boolean,progress:number,frameIndex:integer,message:string}. Current state names: Undefined, NoOutputWindow, NoValidOutputType, NoValidOutputTexture, ReadyForExport, Exporting. frameIndex belongs to the active session and becomes zero after cleanup; progress can reset to zero. Existing continuous exports can report negative progress. message is human-readable status, not a structured success code.",
+      "errors": [],
+      "effects": "Read-only snapshot of the existing render process.",
+      "completion": "Immediate; isExporting:false alone does not distinguish success, cancellation, unavailable output or late failure.",
+      "verificationIds": [
+        "Editor.IntegrationTests.CaptureContractTests.Render_ValidatesPathDurationAndReadiness",
+        "Editor.IntegrationTests.CaptureContractTests.Render_CompletionAndCancellationHaveSeparateEvidence",
+        "Editor.IntegrationTests.CaptureContractTests.Render_AcceptedRequestCanFailLaterWithoutAFile"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "getRenderStatus"
+        }
+      }
+    },
+    {
+      "name": "cancelRender",
+      "summary": "Cancel an active export, or report the current status message when idle.",
+      "targets": [
+        "windows-d3d11",
+        "windows-vulkan",
+        "linux-vulkan",
+        "macos-vulkan"
+      ],
+      "arguments": [],
+      "result": "Object {message:string}. An idle request leaves the existing message; there is no cancelled flag.",
+      "errors": [],
+      "effects": "Stops an active export and cleans up its session; partial output may remain. Does not delete artifacts or restore arbitrary caller state.",
+      "completion": "Cancellation is requested synchronously; inspect status and artifact state after subsequent frames.",
+      "verificationIds": [
+        "Editor.IntegrationTests.CaptureContractTests.Render_ValidatesPathDurationAndReadiness",
+        "Editor.IntegrationTests.CaptureContractTests.Render_CompletionAndCancellationHaveSeparateEvidence"
+      ],
+      "extensions": {
+        "source": "Editor/App/DebugProtocol/DebugServer.cs",
+        "exampleRequest": {
+          "id": "example",
+          "method": "cancelRender"
+        }
+      }
+    }
+  ]
+}

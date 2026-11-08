@@ -19,6 +19,7 @@ internal sealed class OwnedEditorSession : IDisposable
     internal OwnedEditorPaths Paths { get; }
     internal string EvidenceDirectory { get; }
     internal Guid HomeSymbolId { get; private set; }
+    internal int Port { get; private set; }
     internal string ProjectDirectory { get; private set; } = "";
 
     internal static OwnedEditorSession Start(string executable, string backend, bool createProject = true)
@@ -54,6 +55,7 @@ internal sealed class OwnedEditorSession : IDisposable
             paths.Claim();
             // A released port can be raced; the unique getPaths handshake is the ownership check.
             var port = FindFreePort();
+            session.Port = port;
             var start = EditorFixture.CreateStartInfo(executable, port);
             start.CreateNoWindow = true;
             start.WindowStyle = ProcessWindowStyle.Hidden;
@@ -90,7 +92,7 @@ internal sealed class OwnedEditorSession : IDisposable
             var editorVersion = client.Call("getVersion").Require("getVersion");
             File.WriteAllText(Path.Combine(evidence, "session.json"), new JObject
             {
-                ["executable"] = executable, ["backend"] = backend, ["processId"] = session._process.Id,
+                ["executable"] = executable, ["backend"] = backend, ["processId"] = session._process.Id, ["port"] = port,
                 ["profileId"] = paths.ProfileId, ["reportedVersion"] = editorVersion,
                 ["paths"] = client.Call("getPaths").Require("getPaths"),
                 ["buildMatch"] = "Unverified: assembly version does not prove source identity",
