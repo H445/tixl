@@ -67,6 +67,13 @@ public sealed class CatalogTests
     }
 
     [Fact]
+    public void NewConditionalSymbol_CannotSilentlyHideACommandFromEveryTarget()
+    {
+        var source = Source.Replace("case null:", "#if NEW_TARGET\ncase \"hidden\": break;\n#endif\ncase null:");
+        Assert.Contains(CatalogValidator.Validate(Catalog(), source), e => e.Contains("conditional symbol 'NEW_TARGET'"));
+    }
+
+    [Fact]
     public void Metadata_RejectsDuplicatesMissingFieldsAndUnknownVersions()
     {
         var catalog = Catalog();

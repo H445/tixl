@@ -99,6 +99,9 @@ internal static class CatalogValidator
         {
             return errors;
         }
+        var declaredSymbols = catalog.Targets.SelectMany(target => target.Symbols).ToHashSet(StringComparer.Ordinal);
+        foreach (var symbol in CommandInventory.ConditionalSymbols(source).Except(declaredSymbols, StringComparer.Ordinal))
+            errors.Add($"Dispatcher conditional symbol '{symbol}' is absent from every target; review target definitions before accepting this source.");
         foreach (var target in catalog.Targets)
         {
             try

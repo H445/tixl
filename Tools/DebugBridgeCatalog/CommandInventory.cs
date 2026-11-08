@@ -6,6 +6,20 @@ namespace DebugBridgeCatalog;
 
 internal static class CommandInventory
 {
+    internal static string[] ConditionalSymbols(string source)
+        => CSharpSyntaxTree.ParseText(source).GetRoot().DescendantTrivia(descendIntoTrivia: true)
+                          .Select(trivia => trivia.GetStructure())
+                          .OfType<DirectiveTriviaSyntax>()
+                          .Select(directive => directive switch
+                          {
+                              IfDirectiveTriviaSyntax condition => condition.Condition,
+                              ElifDirectiveTriviaSyntax condition => condition.Condition,
+                              _ => null,
+                          })
+                          .Where(condition => condition != null)
+                          .SelectMany(condition => condition!.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+                          .Select(identifier => identifier.Identifier.ValueText).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+
     internal static string[] Read(string source, IEnumerable<string> symbols)
     {
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(preprocessorSymbols: symbols));

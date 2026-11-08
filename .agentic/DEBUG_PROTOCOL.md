@@ -30,54 +30,50 @@ errors in the log.
 
 ## Transport
 
-JSON lines over TCP on `127.0.0.1:<port>`. One request per line, one response per line:
+JSON lines over TCP on `127.0.0.1:<port>`. Each request and response occupies one line:
 
 ```json
-{"id":"1","method":"getVersion"}
-{"id":"1","ok":true,"frame":1234,"playbackFrame":56,"structureVersion":7,"result":{...}}
+{"id":"1","method":"ping"}
+{"id":"1","ok":true,"frame":1234,"playbackFrame":56,"structureVersion":7,"result":{}}
 ```
 
-- `id` is echoed back; process responses in order (the server answers sequentially).
-- Every response envelope carries `frame`, `playbackFrame` and `structureVersion`
-  (bumped on any graph-structure change) — use them to detect progress.
-- Failures come back as `"ok":false` with an `error` string. Malformed lines are logged
-  and answered with an error; the connection stays open.
+- Supply a unique string `id` per request and correlate every reply by ID. Deferred commands
+  such as `pumpFrames` and `screenshot` can reply after later requests. The server itself echoes
+  arbitrary JSON IDs and does not enforce uniqueness; do not rely on that as a client policy.
+- Every response carries integer `frame`, `playbackFrame` and `structureVersion` counters.
+  Success has `ok:true` and an object `result`; failure has `ok:false` and
+  `error:{code:string,detail:string}`. Validate the envelope before interpreting a result.
+- Blank lines are ignored. Invalid JSON/object lines receive `PARSE_ERROR` with `id:null`;
+  missing/null methods receive `MISSING_METHOD`, and unknown names receive `UNKNOWN_METHOD`.
+  Method names must be strings. Object/array method conversion occurs outside the handler's
+  exception guard and can terminate processing; it is not a supported validation probe.
+- A timeout or disconnect leaves a mutation's outcome unknown. Queued work can still execute.
+  Reconnect, re-establish identity, and inspect state before deciding what to do next; never
+  blindly replay a mutation. The strict test client closes a failed connection without retrying.
 
-## Methods
+## Command reference and discovery
 
-Read surface: `ping`, `getVersion`, `getPaths`, `getStructureVersion`, `getMetrics`, `getContext`,
-`getLogTail` (`minLevel`, `maxCount`), `getGraphState`, `getOutput`, `screenshot` (`path`,
-optional `target`: `output` = the output window's texture, the default; `ui` = the **whole editor
-window as rendered** — windows, panels, canvases — copied from the back buffer on the next frame).
-Use `target: "ui"` to verify UI work; it needs no OS screen grab and doesn't care which window is
-in front (a fullscreen presentation viewer, for instance). UI captures are written opaque — the back
-buffer's alpha is render residue and would make the PNG see-through.
+The complete [generated command reference](DEBUG_BRIDGE_REFERENCE.md) and
+[machine-readable catalog](debug-bridge/catalog.json) describe arguments, defaults, results,
+errors, effects, completion and verification references. Source dispatch remains authoritative.
+The [coverage ledger](../Tests/Editor.IntegrationTests/DebugBridgeCoverage.md) distinguishes
+passed cases, known limitations and outstanding target/device evidence; a test reference is
+not proof that it ran. Generated files contain no runtime index or live `describe` endpoint.
 
-Control surface: `openProject` (`name`), `newProject`, `select` (`childId`), `setInput`
-(`childId`, `inputName`, `value`), `addOp`, `connect`, `deleteOp`, `pin`, `pumpFrames`
-(`count`), `layoutSelection` (runs the G layout action on the current selection; returns `changed` and
-the grown `selectedIds`), `deleteSelection` (runs the Del action on the current selection, `disconnect: true`
-for Ctrl+Del; returns `deleted` and the `selectedIds` picked afterwards), `resetView`, `reload`, `undo`, `redo`, `setTime`, `setPlayback`, `shutdown`,
-`outputSetup` (`entity`: a setup entity's display name to select, e.g. `"Surface 1"`; `mode`: the
-strip's toolbar tab — `Board`, `Straight`, `Output`; either optional), `openWindow` (`name`: a window's
-type name such as `SettingsWindow`, `ParameterWindow`; optional `section` picks a settings category, e.g.
-`Midi`) — shows the window so a `screenshot` with `target: "ui"` can verify panel work without a mouse.
-It does what the outliner click and the tab click do, so Board ↔ space folds can be driven without a
-mouse. Every fold logs one `[fold] metrics …` line at Debug level (read it with `getLogTail`): the
-rectified surface's on-screen centre path as mean distance from the window centre, path length over
-the chord (1.00 = a straight line) and the largest deviation from the chord.
+Scripts and agents can load the JSON catalog locally, identify the running editor with
+`getVersion`, then use existing `getContext` and `getGraphState` discovery. Query a known
+composition with `compositionId` and use `includeDefaults:true` when stored input values are
+needed. This does not enumerate every loadable operator or provide complete slot schemas.
+Use returned child IDs and known symbol definitions rather than inventing names or selectors.
+A protocol version alone does not identify an exact source build; use matching documentation
+artifacts and recorded build provenance when comparing releases.
 
-Rendering: `startRender` (`path` absolute, `durationSecs`, optional `startSecs`, `fps`, `exportAudio`, `codec`) exports the
-pinned `Texture2D` output to a video file through the same path as the render window, without touching the
-composition's saved render settings or version number. It returns at once with the `frameCount`; the export advances
-one frame per editor frame, so poll `getRenderStatus` (`isExporting`, `progress`, `frameIndex`, `message`) until
-`isExporting` is false. `cancelRender` stops it. Check the result with `ffprobe` / `ffmpeg`. Audio ops only stay in
-the export if they were evaluated just before it, so wire an `[AudioBus]` into the rendered chain.
-
-Audio input: `getAudioInputs` lists the capture devices with the `active` one and its `level`; `setAudioInput` (`device`)
-makes the composition analyse that device, and an empty name goes back to its own audio. The change is in memory but
-gets saved with the project, so reset it when done. `startAudioRecording` / `stopAudioRecording` write the input to a WAV
-and return its path. To test without a microphone, play a known file into a PipeWire null sink and capture its monitor.
+For capture/export, distinguish acknowledgement from completion. An accepted `startRender`
+can fail later; poll status, inspect logs and validate the resulting file. `screenshot` can
+return a filename after a failed save, and overlapping UI captures can replace a callback.
+Serialize captures and validate fresh artifacts instead of treating `ok:true` as file proof.
+Audio recording can return a null path and can fall back to the first enumerated input.
+Use isolated synthetic devices for recording tests, not an invalid device name on a workstation.
 
 Parameter shapes are defined in `DebugServer.cs` — read the handler when unsure. Notes:
 
@@ -106,8 +102,8 @@ Parameter shapes are defined in `DebugServer.cs` — read the handler when unsur
   same key shows estimated progress. The overlay is presented by another thread, so neither
   `screenshot` nor `screenshotWindow` can capture it; they only run once the stall is over.
 - `shutdown` is fire-and-forget — the response may never arrive.
-- `getOutput` with a forced update only works for simple leaf evaluation and can
-  double-evaluate; prefer the select-then-read pattern below.
+- `getOutput update:true` forces invalidation and pull evaluation, including upstream inputs.
+  It can double-evaluate a viewed operator and does not await asynchronous operator jobs.
 - `getOutput` picks the output by `outputId` (guid), `outputName`, or defaults to the
   first output. Pass `update: true` to force a pull for outputs nothing displays.
 - `getOutput` on a `MeshGeometry` slot returns a numeric summary instead of the
@@ -188,7 +184,7 @@ responding. Restore it without stealing focus - P/Invoke `ShowWindow(hwnd, 4)` f
 - `setAgentState` (`state`: `busy` | `ready` | `""`, optional `note`) drives the bridge
   icon in the app bar: magenta while an agent works, **green when it reports `ready`**.
   Send `ready` with a one-line note at the end of every verification round, before
-  handing back to the user; any later request flips it to `busy` automatically.
+  handing back to the user; a later request other than `ping` or `setAgentState` flips it to `busy`.
 - A modal message box (e.g. "can't create Input Definition for <Type>" when an op uses
   a Core type that isn't registered in `SymbolPackage.TypeRegistration.cs`) blocks the
   main thread, and with it the whole bridge: requests queue until the user closes it.
@@ -259,7 +255,9 @@ check: its line numbers will match the old source.
 
 ## Running the visual reference test suite
 
-- Quick protocol/graph checks: `dotnet test Tests/Editor.IntegrationTests --filter "Category!=VisualSuite"`.
+- Offline client/isolation checks: `dotnet test Tests/Editor.IntegrationTests --filter "Category=Offline"`.
+- Live contracts require the owned-session setup below. Do not use an unfiltered run: the
+  existing non-contract fixture can attach to an editor and its visual suite mutates package state.
 - Full visual suite (~98 tests): `--filter "Category=VisualSuite"`. Requires a running or
   auto-launched editor (`TIXL_DEBUG_PORT` env var attaches to an existing one on that port).
 - Individual tests carry stable hash ids (`#id` suffix in result lines). Known-flaky tests
@@ -267,3 +265,43 @@ check: its line numbers will match the old source.
   existing list.
   `Tests/Editor.IntegrationTests/VisualSuiteTests.cs` shows the full
   select → flank-trigger → poll-results flow.
+
+## Maintaining the generated contract
+
+From the repository root, with TiXL closed:
+
+```powershell
+dotnet test Tests/DebugBridgeCatalog.Tests/DebugBridgeCatalog.Tests.csproj
+dotnet run --project Tools/DebugBridgeCatalog -- generate
+dotnet run --project Tools/DebugBridgeCatalog -- check
+```
+
+The standalone tool reads authored command groups, the dispatcher source, and xUnit test
+source. It neither loads nor references Editor/Core, scans operator packages, starts TiXL,
+nor adds an editor build hook. Generation costs occur only in the external tool.
+Use `--repo <root>` after `generate` or `check` to select a checkout explicitly.
+
+When changing a command, update its authored entry under `Tools/DebugBridgeCatalog/Catalog/`
+and independent contract assertions, regenerate, and commit metadata/tests/generated output
+together. The exact per-target name check catches new, removed or renamed commands without a
+hard-coded command count. A conditional symbol absent from every declared target also fails:
+review actual build definitions before adding its target availability. Changed dispatch syntax
+requires an extractor update and fixture.
+Verification IDs must resolve to xUnit Fact/Theory source methods; this does not run live tests.
+
+`check` compares UTF-8/LF output byte-for-byte and rejects missing, changed, or obsolete files
+in the generated `.agentic/debug-bridge/` directory. Keep hand-written material outside that
+directory. Generation does not delete unexpected files; review and remove obsolete artifacts
+explicitly. Tracked outputs have no timestamps or current-HEAD hash, so identical inputs stay
+identical across runs. Behavioral tests are still required: changing only a handler default
+can leave generated documentation unchanged.
+
+For live tests, set `TIXL_CONTRACT_EXE` to the intended executable and
+`TIXL_CONTRACT_BACKEND` to `d3d11` or `vulkan`, and select an explicit `ContractGroup`.
+The owned fixture uses a new profile/port/project, verifies `getPaths`, records evidence, and
+cleans up only its own roots/process. On Windows, the account's `T3_ASSEMBLY_PATH` must already
+match that executable's directory; the fixture refuses to silently change shared settings.
+Provision a dedicated account/runner and the declared graphics/audio prerequisites. Device-free
+recording belongs to `AudioDeviceAbsence`; ordinary `Audio` cases do not start recording.
+The coverage ledger records this workstation's temporary-setting authorization and Vulkan
+Slang PATH prerequisite; neither is an implicit permission for CI to alter shared account state.
