@@ -21,7 +21,7 @@ internal sealed class OwnedEditorSession : IDisposable
     internal Guid HomeSymbolId { get; private set; }
     internal string ProjectDirectory { get; private set; } = "";
 
-    internal static OwnedEditorSession Start(string executable, string backend)
+    internal static OwnedEditorSession Start(string executable, string backend, bool createProject = true)
     {
         executable = Path.GetFullPath(executable);
         if (!File.Exists(executable) || backend is not ("d3d11" or "vulkan")
@@ -96,6 +96,10 @@ internal sealed class OwnedEditorSession : IDisposable
                 ["buildMatch"] = "Unverified: assembly version does not prove source identity",
             }.ToString());
 
+            if (!createProject)
+            {
+                return session;
+            }
             var projectName = "BridgeContract" + paths.RunId;
             var created = client.Call("newProject", new { name = "contract." + projectName }).Require("newProject");
             session.HomeSymbolId = Guid.Parse(created["homeSymbolId"]!.Value<string>()!);
@@ -122,6 +126,8 @@ internal sealed class OwnedEditorSession : IDisposable
         Client.Call("openProject", new { symbolId = HomeSymbolId }).Require("openProject");
         Client.PumpFrames(3);
     }
+
+    internal bool WaitForExit(TimeSpan timeout) => _process?.WaitForExit((int)timeout.TotalMilliseconds) == true;
 
     private static int FindFreePort()
     {

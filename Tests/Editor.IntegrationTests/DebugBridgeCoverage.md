@@ -19,9 +19,9 @@ Do not auto-run the existing unfiltered integration suite: its fixture can attac
 
 ## Command assignments
 
-Verification IDs identify planned contract coverage, not existing tests. Existing assertions must be reused and strengthened where sufficient.
+The `bridge.*` IDs below identify work assignments from the initial audit. Authored catalog entries use fully qualified test method names as their verification IDs. Existing assertions must be reused and strengthened where sufficient.
 “Missing” means no direct contract assertion was found in the four reviewed test files.
-All runtime evidence is pending until an actual run is recorded.
+Runtime evidence is pending unless an actual run is recorded in the ledger below.
 
 | Command | Sprint item | Verification ID | Existing evidence from source review |
 | --- | --- | --- | --- |
@@ -111,14 +111,32 @@ Manual/device evidence must name target/backend, case, actual result and artifac
 | --- | --- | --- |
 | Source inventory and work assignment | Reviewed | 50 unique dispatcher names; every name mapped once above |
 | Existing test review | Reviewed | Four test classes listed above; source review only |
-| Offline catalog foundation | Passed | 18 tests, including omitted versus explicit-null defaults; real Roslyn extraction matches all 50 source commands |
-| Offline strict client and owned-path checks | Passed | 21 tests; no live fixture initialized |
+| Offline catalog foundation and authored groups | Passed | 19 tests, including omitted/null defaults and authored-group validation; full exact-set completeness remains a separate gate |
+| Offline strict client, owned paths and log rollover | Passed | 23 tests; production log buffer linked only into the test project; no live fixture initialized |
 | Owned harness, Windows / D3D11 | Passed on installed 4.4.0.4 | Run `218e545b3b96494ea1989e96fe571988`; logs confirm Direct3D 11; cleanup verified |
 | Owned harness, Windows / Vulkan | Passed on installed 4.4.0.4 | Run `2145bc19649244d0a2fabd668c1bb055`; logs confirm Vulkan 1.4.341; cleanup verified |
-| Full live command contracts and source-build match | Pending | Smoke results establish harness operation only; current checkout was not built or tested live |
+| Source Release build | Passed on Windows | `dotnet build t3.sln -c Release`; zero warnings/errors; production source at `bf4b95c3d` unchanged by this feature; build hashes recorded with live results |
+| Session/diagnostics source contracts | Passed on Windows D3D11 and configured Vulkan | Nine cases per backend in `tixl-reviewed-contracts-0ed2c3655c504d709db85e83b1e89b88`, plus resource release/rebuild in `tixl-contract-followup-f9fc4bf142d54a038dc9468ce64c604c`; 10 session cases total per backend |
+| Full live command contract matrix | Pending | Partial groups are not a full dispatcher or operator behavior-class pass |
 | Linux/macOS live matrix | Pending | Path/launch code reviewed; hardware runs remain required |
 | Runtime dependency/payload comparison | Pending | Required before first release |
 
 Smoke evidence is local under the system temp directory's `tixl-contract-evidence/<run-id>/`, including session provenance, editor log and cleanup confirmation. Both runs created and inspected a disposable project through existing commands, terminated their owned editor, and removed settings/cache/projects/temp roots. The installed editor is not claimed to match the source baseline. No production code, operator package or editor project references changed during the foundation work.
 
 Future changes update this record together with metadata/tests. Keep detailed logs and disposable projects outside tracked source.
+
+## Session/diagnostic contract checkpoint
+
+`Catalog/session.json` describes 16 commands. `SessionContractTests` independently checks no-project diagnostics, owned-project context, agent-state argument handling, live log filtering/cursors, metric/sample shapes, bounded stalls, setting clamps and persistence, shader failures/source access/clear, and shutdown. `DebugLogBufferTests` exercises the actual ring buffer's 4096-entry rollover and window-before-filter behavior without loading the editor. Expectations do not read authored metadata.
+
+Source-build results are under the system temp directory's `tixl-reviewed-contracts-0ed2c3655c504d709db85e83b1e89b88/`, with TRX files and a build manifest containing source commit, dispatcher hash and editor DLL hash. The source build reports 4.4.0.5-alpha; an initial installed 4.4.0.4 run was insufficient because it lacks `getFrameSamples`. Installed results are not substituted for current-source evidence.
+
+Behavior corrected through live evidence: omitted setting values report current state but explicit JSON null returns `INTERNAL_ERROR`; frame/CPU/presentation sample arrays are independent and can have different warmup lengths. Shader tests deliberately compile two invalid shaders inside the owned project, check newest-first errors, read captured source, remove only an owned captured file to verify `sourceError`, then clear the failures.
+
+The targeted resource case passed on both backends in `tixl-contract-followup-f9fc4bf142d54a038dc9468ce64c604c`. It evaluates an unpinned 64-by-32 render target, requests release, advances frames, verifies the cached texture becomes null and the release is logged, then forces evaluation and compares the rebuilt texture descriptor. This checks the effect rather than treating the acknowledgement or a fluctuating global memory counter as proof of release.
+
+The first source-build Vulkan startup failed before dispatch because in-process Slang 2026.18 could not load `spirv-opt`. Standalone shader compilation succeeded; adding the compiler's `bin` folder to only the runner process's PATH made the owned startup probe pass (`tixl-vulkan-path-probe-8a95a8a90ddd4b03a7d335329854114b`). Subsequent Vulkan results use that explicit prerequisite. Default source startup remains a separate production issue. The failed run is retained as failed/aborted in `tixl-contract-groups-82e4adec3e7d4b58a6b16750c432a246`, with owned startup evidence retained for diagnosis.
+
+The user authorized temporarily setting `T3_ASSEMBLY_PATH` to the source build for these runs. Launch wrappers check for other TiXL processes, preserve the original user/process values, and restore/verify them in `finally`; the fixture guard remains unchanged. No permanent PATH setting was changed. These local runs are not a general permission for CI to alter shared account state.
+
+Remaining session evidence includes UI-only ready-to-busy transitions, unavailable-device metric branches, extreme-duration stall behavior, and Linux/macOS runs. Tests establish observed contracts; they do not establish every device state or a latency guarantee. Full release gates remain open.

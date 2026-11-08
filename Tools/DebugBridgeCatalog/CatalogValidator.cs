@@ -2,7 +2,7 @@ namespace DebugBridgeCatalog;
 
 internal static class CatalogValidator
 {
-    internal static IReadOnlyList<string> Validate(CatalogDocument catalog, string source)
+    internal static IReadOnlyList<string> ValidateMetadata(CatalogDocument catalog)
     {
         var errors = new List<string>();
         if (catalog.FormatVersion != "1.0")
@@ -89,7 +89,17 @@ internal static class CatalogValidator
             }
         }
 
-        foreach (var target in catalog.Targets.Where(t => t != null && t.Symbols != null))
+        return errors;
+    }
+
+    internal static IReadOnlyList<string> Validate(CatalogDocument catalog, string source)
+    {
+        var errors = ValidateMetadata(catalog).ToList();
+        if (errors.Count != 0)
+        {
+            return errors;
+        }
+        foreach (var target in catalog.Targets)
         {
             try
             {

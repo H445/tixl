@@ -90,9 +90,17 @@ public sealed class OwnedPathTests
 [CollectionDefinition("OwnedEditor")]
 public sealed class OwnedEditorCollection : ICollectionFixture<OwnedEditorFixture>;
 
+[CollectionDefinition("OwnedContracts", DisableParallelization = true)]
+public sealed class OwnedContractCollection;
+
 public sealed class OwnedEditorFixture : IDisposable
 {
     public OwnedEditorFixture()
+    {
+        Editor = StartEditor();
+    }
+
+    internal static EditorFixture StartEditor(bool createProject = true)
     {
         var executable = Environment.GetEnvironmentVariable("TIXL_CONTRACT_EXE");
         var backend = Environment.GetEnvironmentVariable("TIXL_CONTRACT_BACKEND");
@@ -100,7 +108,7 @@ public sealed class OwnedEditorFixture : IDisposable
         {
             throw new InvalidOperationException("Owned contract tests require explicit TIXL_CONTRACT_EXE and TIXL_CONTRACT_BACKEND. Use --filter Category=Offline for offline tests.");
         }
-        Editor = EditorFixture.CreateOwned(executable, backend);
+        return EditorFixture.CreateOwned(executable, backend, createProject);
     }
 
     public EditorFixture Editor { get; }

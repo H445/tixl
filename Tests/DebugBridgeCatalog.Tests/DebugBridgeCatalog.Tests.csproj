@@ -12,4 +12,8 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />
     <ProjectReference Include="../../Tools/DebugBridgeCatalog/DebugBridgeCatalog.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../Tools/DebugBridgeCatalog/Catalog/*.json" Link="Catalog/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../Editor/App/DebugProtocol/DebugServer.cs" Link="Source/DebugServer.cs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -15,4 +15,10 @@
     <ItemGroup>
         <ProjectReference Include="..\TiXL.DebugClient\TiXL.DebugClient.csproj" />
     </ItemGroup>
+    <ItemGroup>
+        <!-- Exercise the actual ring buffer without loading the editor or a graphics backend. -->
+        <Compile Include="../../Editor/App/DebugProtocol/DebugLogBuffer.cs" Link="Subject/DebugLogBuffer.cs" />
+        <Compile Include="../../Logging/ILogEntry.cs" Link="Subject/ILogEntry.cs" />
+        <Compile Include="../../Logging/ILogWriter.cs" Link="Subject/ILogWriter.cs" />
+    </ItemGroup>
 </Project>

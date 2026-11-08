@@ -49,8 +49,8 @@ public sealed class EditorFixture : IDisposable
     }
 
     /// <summary>Starts a new editor and verifies isolated paths before any mutation.</summary>
-    public static EditorFixture CreateOwned(string executable, string backend)
-        => new(OwnedEditorSession.Start(executable, backend));
+    public static EditorFixture CreateOwned(string executable, string backend, bool createProject = true)
+        => new(OwnedEditorSession.Start(executable, backend, createProject));
 
     internal OwnedEditorSession? OwnedSession => _ownedSession;
 
