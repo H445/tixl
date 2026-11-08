@@ -4,10 +4,17 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - feature/debug-bridge-api
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    if: github.event.pull_request.draft == false
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -15,3 +22,62 @@ jobs:
 
       - name: Build
         uses: ./.github/actions/build
+
+  debug-bridge-offline:
+    name: Debug Bridge offline (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-15]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore offline projects
+        run: |
+          dotnet restore Tests/DebugBridgeCatalog.Tests/DebugBridgeCatalog.Tests.csproj
+          if ($LASTEXITCODE -ne 0) { throw 'Catalog restore failed.' }
+          dotnet restore Tests/Editor.IntegrationTests/Editor.IntegrationTests.csproj
+          if ($LASTEXITCODE -ne 0) { throw 'Client test restore failed.' }
+
+      - name: Test catalog and generation failure gates
+        run: dotnet test Tests/DebugBridgeCatalog.Tests/DebugBridgeCatalog.Tests.csproj -c Release --no-restore --logger "trx;LogFileName=catalog.trx" --results-directory "$env:RUNNER_TEMP/debug-bridge-offline"
+
+      - name: Check exact command metadata and generated docs
+        run: dotnet run --project Tools/DebugBridgeCatalog -c Release --no-build --no-restore -- check
+
+      - name: Test client and isolation without TiXL
+        run: dotnet test Tests/Editor.IntegrationTests/Editor.IntegrationTests.csproj -c Release --no-restore --filter "Category=Offline" --logger "trx;LogFileName=client.trx" --results-directory "$env:RUNNER_TEMP/debug-bridge-offline"
+
+      - name: Upload offline test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-bridge-offline-${{ matrix.os }}
+          path: ${{ runner.temp }}/debug-bridge-offline
+          if-no-files-found: warn
+          retention-days: 14
+
+  debug-bridge-required:
+    name: Debug Bridge docs and offline tests
+    if: always()
+    needs: debug-bridge-offline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every offline target to pass
+        env:
+          OFFLINE_RESULT: ${{ needs.debug-bridge-offline.result }}
+        run: |
+          if [ "$OFFLINE_RESULT" != "success" ]; then
+            echo "Offline matrix did not pass: $OFFLINE_RESULT"
+            exit 1
+          fi
