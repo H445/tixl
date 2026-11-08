@@ -111,8 +111,15 @@ Manual/device evidence must name target/backend, case, actual result and artifac
 | --- | --- | --- |
 | Source inventory and work assignment | Reviewed | 50 unique dispatcher names; every name mapped once above |
 | Existing test review | Reviewed | Four test classes listed above; source review only |
-| Live target matrix | Pending | No live runs for this feature yet |
+| Offline catalog foundation | Passed | 18 tests, including omitted versus explicit-null defaults; real Roslyn extraction matches all 50 source commands |
+| Offline strict client and owned-path checks | Passed | 21 tests; no live fixture initialized |
+| Owned harness, Windows / D3D11 | Passed on installed 4.4.0.4 | Run `218e545b3b96494ea1989e96fe571988`; logs confirm Direct3D 11; cleanup verified |
+| Owned harness, Windows / Vulkan | Passed on installed 4.4.0.4 | Run `2145bc19649244d0a2fabd668c1bb055`; logs confirm Vulkan 1.4.341; cleanup verified |
+| Full live command contracts and source-build match | Pending | Smoke results establish harness operation only; current checkout was not built or tested live |
+| Linux/macOS live matrix | Pending | Path/launch code reviewed; hardware runs remain required |
 | Runtime dependency/payload comparison | Pending | Required before first release |
+
+Smoke evidence is local under the system temp directory's `tixl-contract-evidence/<run-id>/`, including session provenance, editor log and cleanup confirmation. Both runs created and inspected a disposable project through existing commands, terminated their owned editor, and removed settings/cache/projects/temp roots. The installed editor is not claimed to match the source baseline. No production code, operator package or editor project references changed during the foundation work.
 
 Future changes update this record together with metadata/tests. Keep detailed logs and disposable projects outside tracked source.
 
