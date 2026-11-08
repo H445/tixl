@@ -122,4 +122,3 @@ Manual/device evidence must name target/backend, case, actual result and artifac
 Smoke evidence is local under the system temp directory's `tixl-contract-evidence/<run-id>/`, including session provenance, editor log and cleanup confirmation. Both runs created and inspected a disposable project through existing commands, terminated their owned editor, and removed settings/cache/projects/temp roots. The installed editor is not claimed to match the source baseline. No production code, operator package or editor project references changed during the foundation work.
 
 Future changes update this record together with metadata/tests. Keep detailed logs and disposable projects outside tracked source.
-
