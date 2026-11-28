@@ -260,6 +260,114 @@ public class MeshDrawTests(ITestOutputHelper output)
         AssertValidationStayedQuiet();
     }
 
+    [Fact]
+    public async Task IndexedGeometrySelectsLodAndCullsOnGpu()
+    {
+        using var backend = TryCreateBackend();
+        var shaders = RepositoryShaderFolder();
+        if (backend == null || shaders == null || SlangShaderCompiler.FindCompiler() == null)
+        {
+            output.WriteLine("Skipped: a Vulkan device, slangc and the repository shaders are required.");
+            return;
+        }
+        var device = new Device(backend);
+        var dc = device.ImmediateContext;
+        var compiler = new SlangShaderCompiler(device);
+        const string name = "DrawGeometryIndirect.hlsl";
+        var source = File.ReadAllText(Path.Combine(shaders, "3d", "mesh", name));
+        GpuShader Compile<T>(string entry, ShaderStage stage) where T : AbstractShader
+        {
+            Assert.True(TryCompile<T>(compiler, source, entry, shaders, name, out var blob, out var message), message);
+            Assert.True(SpirvBlob.TryUnpack(blob!, out var spirv, out var bindings, out _));
+            return backend.CreateShader(stage, spirv, entry, bindings, entry);
+        }
+        using var reduce = new T3.Graphics.Compat.ComputeShader(device, Compile<T3.Core.DataTypes.ComputeShader>("reduceDepth", ShaderStage.Compute));
+        using var classify = new T3.Graphics.Compat.ComputeShader(device, Compile<T3.Core.DataTypes.ComputeShader>("classify", ShaderStage.Compute));
+        using var vs = new T3.Graphics.Compat.VertexShader(device, Compile<VertexShader>("vsMain", ShaderStage.Vertex));
+        using var ps = new T3.Graphics.Compat.PixelShader(device, Compile<PixelShader>("psMain", ShaderStage.Pixel));
+        using var ms = Compile<T3.Core.DataTypes.ComputeShader>("reduceDepthMS", ShaderStage.Compute);
+
+        const int count = 5;
+        float U(int bits) => BitConverter.Int32BitsToSingle(bits);
+        Buffer Upload(float[] values, BindFlags bind, int stride = 0) =>
+            new(device, new BufferDescription
+            {
+                SizeInBytes = values.Length * 4, BindFlags = bind, Usage = ResourceUsage.Immutable,
+                StructureByteStride = stride, OptionFlags = stride > 0 ? ResourceOptionFlags.BufferStructured : 0
+            }, System.Runtime.InteropServices.MemoryMarshal.AsBytes<float>(values));
+
+        using var parameters = Upload([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1,
+                                       Size,Size,12,U(count), U(Size/8),U(1),U(1),0], BindFlags.ConstantBuffer);
+        // Large foreground, small foreground, outside right, fully occluded, and a near-plane crossing.
+        using var parts = Upload([
+            -.9f,-.8f,.2f,0, -.1f,.8f,.2f,0, 0,U(3),U(3),U(3),
+             .35f,-.1f,.2f,0, .55f,.1f,.2f,0, 0,U(3),U(3),U(3),
+             2,0,.2f,0, 3,1,.3f,0, 0,U(3),0,0,
+             .2f,.2f,.8f,0, .8f,.8f,.9f,0, 0,U(3),0,0,
+             0,0,-.1f,0, .01f,.01f,.1f,0, 0,U(3),U(3),U(3)
+        ], BindFlags.ShaderResource, 48);
+        using var partView = new ShaderResourceView(device, parts);
+        Buffer Storage(int elements, int stride, ResourceOptionFlags extra = 0) =>
+            new(device, elements * stride, ResourceUsage.Default, BindFlags.ShaderResource | BindFlags.UnorderedAccess,
+                CpuAccessFlags.None, ResourceOptionFlags.BufferStructured | extra, stride);
+        using var tiles = Storage(Size * Size / 64, 4);
+        using var tilesIn = new ShaderResourceView(device, tiles);
+        using var tilesOut = new UnorderedAccessView(device, tiles);
+        using var args = Storage(count, 20, ResourceOptionFlags.DrawIndirectArguments);
+        using var argsOut = new UnorderedAccessView(device, args);
+        var depthDesc = Describe2D(BindFlags.DepthStencil | BindFlags.ShaderResource);
+        depthDesc.Format = Format.R32_Typeless;
+        using var depth = new Texture2D(device, depthDesc);
+        using var dsv = new DepthStencilView(device, depth, new DepthStencilViewDescription
+        { Format = Format.D32_Float, Dimension = DepthStencilViewDimension.Texture2D });
+        using var depthIn = new ShaderResourceView(device, depth, new ShaderResourceViewDescription
+        { Format = Format.R32_Float, Dimension = ShaderResourceViewDimension.Texture2D,
+          Texture2D = new ShaderResourceViewDescription.Texture2DResource { MipLevels = 1 } });
+        using var target = new Texture2D(device, Describe2D(BindFlags.RenderTarget));
+        using var targetView = new RenderTargetView(device, target);
+        using var verts = Upload([
+            -.9f,-.8f,.2f,1, 1,0,0,1, -.5f,.8f,.2f,1, 1,0,0,1, -.1f,-.8f,.2f,1, 1,0,0,1,
+             .35f,-.1f,.2f,1, 0,1,0,1, .45f,.1f,.2f,1, 0,1,0,1, .55f,-.1f,.2f,1, 0,1,0,1
+        ], BindFlags.ShaderResource, 16);
+        using var vertsIn = new ShaderResourceView(device, verts);
+        using var indices = Upload([0,U(1),U(2),U(3),U(4),U(5)], BindFlags.IndexBuffer);
+
+        device.BeginFrame();
+        dc.OutputMerger.SetTargets(dsv, targetView);
+        dc.ClearDepthStencilView(dsv, DepthStencilClearFlags.Depth, .5f, 0);
+        dc.ClearRenderTargetView(targetView, Vector4.Zero);
+        dc.Rasterizer.SetViewport(0, 0, Size, Size);
+        dc.ComputeShader.SetConstantBuffer(0, parameters);
+        dc.ComputeShader.Set(reduce);
+        dc.ComputeShader.SetShaderResource(1, depthIn);
+        dc.ComputeShader.SetUnorderedAccessView(1, tilesOut);
+        dc.Dispatch(Size / 8, Size / 8, 1);
+        dc.ComputeShader.SetShaderResource(1, null);
+        dc.ComputeShader.SetUnorderedAccessView(1, null);
+        dc.ComputeShader.Set(classify);
+        dc.ComputeShader.SetShaderResource(0, partView);
+        dc.ComputeShader.SetShaderResource(3, tilesIn);
+        dc.ComputeShader.SetUnorderedAccessView(0, argsOut);
+        dc.Dispatch(1, 1, 1);
+        dc.ComputeShader.SetUnorderedAccessView(0, null);
+        dc.VertexShader.Set(vs);
+        dc.VertexShader.SetConstantBuffer(0, parameters);
+        dc.VertexShader.SetShaderResource(4, vertsIn);
+        dc.PixelShader.Set(ps);
+        dc.InputAssembler.SetIndexBuffer(indices, Format.R32_UInt, 0);
+        dc.DrawIndexedInstancedIndirect(args, 0, count, 20);
+        device.EndFrame();
+
+        var records = await backend.ReadbackAsync(args.GpuBuffer!);
+        var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(records.Data.Span).ToArray();
+        Assert.Equal(new[] { 3,1,0,0,0, 3,1,3,0,0, 3,0,0,0,0, 3,0,0,0,0, 3,1,0,0,0 }, words);
+        var image = await backend.ReadbackAsync(target.GpuTexture!, 0, 0);
+        Assert.Equal(255, image.Data.Span[32 * image.RowPitch + 16 * 4]);
+        Assert.Equal(255, image.Data.Span[32 * image.RowPitch + 46 * 4 + 1]);
+        output.WriteLine($"Verified five indexed records and both LOD colors on {backend.AdapterName}.");
+        AssertValidationStayedQuiet();
+    }
+
     private static Buffer StructuredBuffer(Device device, int stride, int count)
         => new(device,
                new BufferDescription

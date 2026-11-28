@@ -1,0 +1,50 @@
+{
+  "FormatVersion": 3,
+  "Id": "55dc5089-52d0-46bf-ba08-3967c51267a1",
+  "Description": "Connect polygon Geometry and feed Output into a camera's scene command. Each geometry part contributes an indexed draw. Render opaque occluders first in the same depth-enabled RenderTarget and camera. Parts render with their vertex colors.",
+  "InputUis": [
+    {
+      "InputId": "da67e263-1a84-40fc-ac4e-c6a53599921c",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Polygon geometry. A geometry without parts is drawn as one part.",
+      "Relevancy": "Required"
+    },
+    {
+      "InputId": "4fc9aa3a-91e1-43fb-a441-5aa5eaf28a9b",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Optional lower-detail geometry in the same coordinate system, with corresponding parts in the same order."
+    },
+    {
+      "InputId": "f1da9f26-da47-4019-8ac3-48ca073629fe",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Switch to LowDetail below this projected part size in pixels. Zero keeps full detail."
+    },
+    {
+      "InputId": "6789bf1b-79de-4718-9b76-c84ebcc5d715",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Cull against depth already drawn in the active full-viewport D32 target, including MSAA samples. Disable when earlier draws used a different camera."
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "e7858a2a-0fa6-48ef-9903-0eed4fe836ac",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    }
+  ]
+}

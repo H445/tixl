@@ -1,0 +1,24 @@
+{
+  "FormatVersion": 3,
+  "Id": "55dc5089-52d0-46bf-ba08-3967c51267a1",
+  "Inputs": [
+    {
+      "Id": "da67e263-1a84-40fc-ac4e-c6a53599921c",
+      "DefaultValue": null
+    },
+    {
+      "Id": "4fc9aa3a-91e1-43fb-a441-5aa5eaf28a9b",
+      "DefaultValue": null
+    },
+    {
+      "Id": "f1da9f26-da47-4019-8ac3-48ca073629fe",
+      "DefaultValue": 64
+    },
+    {
+      "Id": "6789bf1b-79de-4718-9b76-c84ebcc5d715",
+      "DefaultValue": true
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}
