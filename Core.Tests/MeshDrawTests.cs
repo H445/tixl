@@ -282,7 +282,7 @@ public class MeshDrawTests(ITestOutputHelper output)
             return backend.CreateShader(stage, spirv, entry, bindings, entry);
         }
         using var reduce = new T3.Graphics.Compat.ComputeShader(device, Compile<T3.Core.DataTypes.ComputeShader>("reduceDepth", ShaderStage.Compute));
-        using var classify = new T3.Graphics.Compat.ComputeShader(device, Compile<T3.Core.DataTypes.ComputeShader>("classify", ShaderStage.Compute));
+        using var classify = new T3.Graphics.Compat.ComputeShader(device, Compile<T3.Core.DataTypes.ComputeShader>("classifyDepth", ShaderStage.Compute));
         using var vs = new T3.Graphics.Compat.VertexShader(device, Compile<VertexShader>("vsMain", ShaderStage.Vertex));
         using var ps = new T3.Graphics.Compat.PixelShader(device, Compile<PixelShader>("psMain", ShaderStage.Pixel));
         using var ms = Compile<T3.Core.DataTypes.ComputeShader>("reduceDepthMS", ShaderStage.Compute);
@@ -341,14 +341,14 @@ public class MeshDrawTests(ITestOutputHelper output)
         dc.ComputeShader.Set(reduce);
         dc.ComputeShader.SetShaderResource(1, depthIn);
         dc.ComputeShader.SetUnorderedAccessView(1, tilesOut);
-        dc.Dispatch(Size / 8, Size / 8, 1);
+        dc.Dispatch(((Size + 7) / 8 + 7) / 8, (Size + 7) / 8, 1);
         dc.ComputeShader.SetShaderResource(1, null);
         dc.ComputeShader.SetUnorderedAccessView(1, null);
         dc.ComputeShader.Set(classify);
         dc.ComputeShader.SetShaderResource(0, partView);
         dc.ComputeShader.SetShaderResource(3, tilesIn);
         dc.ComputeShader.SetUnorderedAccessView(0, argsOut);
-        dc.Dispatch(1, 1, 1);
+        dc.Dispatch(count, 1, 1);
         dc.ComputeShader.SetUnorderedAccessView(0, null);
         dc.VertexShader.Set(vs);
         dc.VertexShader.SetConstantBuffer(0, parameters);
@@ -366,6 +366,118 @@ public class MeshDrawTests(ITestOutputHelper output)
         Assert.Equal(255, image.Data.Span[32 * image.RowPitch + 46 * 4 + 1]);
         output.WriteLine($"Verified five indexed records and both LOD colors on {backend.AdapterName}.");
         AssertValidationStayedQuiet();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DepthTilesPreserveTheFarthestTexelAtOddImageEdges(bool multisampled)
+    {
+        using var backend = TryCreateBackend();
+        var shaders = RepositoryShaderFolder();
+        if (backend == null || shaders == null || SlangShaderCompiler.FindCompiler() == null)
+            return;
+
+        const int width = 75, height = 19;
+        const int tilesX = (width + 7) / 8, tilesY = (height + 7) / 8;
+        var device = new Device(backend);
+        const string name = "DrawGeometryIndirect.hlsl";
+        var source = File.ReadAllText(Path.Combine(shaders, "3d", "mesh", name));
+        var compiler = new SlangShaderCompiler(device);
+        var entry = multisampled ? "reduceDepthMS" : "reduceDepth";
+        Assert.True(TryCompile<T3.Core.DataTypes.ComputeShader>(compiler, source,
+                    entry, shaders, name, out var blob, out var reason), reason);
+        Assert.True(SpirvBlob.TryUnpack(blob!, out var spirv, out var bindings, out _));
+        using var shader = new T3.Graphics.Compat.ComputeShader(device, backend.CreateShader(ShaderStage.Compute, spirv, entry, bindings));
+        var pixels = new float[width * height];
+        var expected = new float[tilesX * tilesY];
+        var rng = new Random(71);
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            float depth = x == 8 && y == 0 || x == width - 1 && y == height - 1 ? 1 : rng.NextSingle();
+            if (multisampled)
+                depth = (x == 8 && y == 0 || x == width - 1 && y == height - 1) ? 1 : .25f;
+            pixels[y * width + x] = depth;
+            int tile = y / 8 * tilesX + x / 8;
+            expected[tile] = Math.Max(expected[tile], depth);
+        }
+        var desc = Describe2D();
+        desc.Width = width;
+        desc.Height = height;
+        desc.Format = Format.R32_Float;
+        if (multisampled)
+        {
+            desc.BindFlags |= BindFlags.RenderTarget;
+            desc.SampleDescription = new SampleDescription(4, 0);
+        }
+        using var input = multisampled
+                              ? new Texture2D(device, desc)
+                              : new Texture2D(device, desc, System.Runtime.InteropServices.MemoryMarshal.AsBytes<float>(pixels));
+        using var view = new ShaderResourceView(device, input, new ShaderResourceViewDescription
+        {
+            Format = Format.R32_Float,
+            Dimension = multisampled ? ShaderResourceViewDimension.Texture2DMultisampled : ShaderResourceViewDimension.Texture2D,
+            Texture2D = new ShaderResourceViewDescription.Texture2DResource { MipLevels = 1 }
+        });
+        var constants = new float[24];
+        constants[16] = width;
+        constants[17] = height;
+        constants[20] = BitConverter.Int32BitsToSingle(tilesX);
+        using var parameters = new Buffer(device, new BufferDescription { SizeInBytes = 96, BindFlags = BindFlags.ConstantBuffer },
+                                          System.Runtime.InteropServices.MemoryMarshal.AsBytes<float>(constants));
+        using var tiles = new Buffer(device, expected.Length * 4, ResourceUsage.Default, BindFlags.UnorderedAccess,
+                                     CpuAccessFlags.None, ResourceOptionFlags.BufferStructured, 4);
+        using var outputView = new UnorderedAccessView(device, tiles);
+        var dc = device.ImmediateContext;
+        device.BeginFrame();
+        if (multisampled) FillSamples();
+        dc.ComputeShader.Set(shader);
+        dc.ComputeShader.SetConstantBuffer(0, parameters);
+        dc.ComputeShader.SetShaderResource(multisampled ? 2 : 1, view);
+        dc.ComputeShader.SetUnorderedAccessView(1, outputView);
+        dc.Dispatch((tilesX + 7) / 8, tilesY, 1);
+        device.EndFrame();
+        var result = await backend.ReadbackAsync(tiles.GpuBuffer!);
+        Assert.Equal(expected, System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(result.Data.Span).ToArray());
+        AssertValidationStayedQuiet();
+
+        void FillSamples()
+        {
+            // Leave one sample clear in two pixels. Reading just sample zero would lose both holes.
+            const string fill = """
+                float4 vs(uint i : SV_VertexID) : SV_Position
+                {
+                    float2 uv = float2((i << 1) & 2, i & 2);
+                    return float4(uv * 2 - 1, 0, 1);
+                }
+                float ps(float4 pos : SV_Position, out uint mask : SV_Coverage) : SV_Target
+                {
+                    uint2 p = (uint2)pos.xy;
+                    mask = all(p == uint2(8, 0)) || all(p == uint2(74, 18)) ? 7 : 15;
+                    return .25;
+                }
+                """;
+            GpuShader CompileFill<T>(string name, ShaderStage stage) where T : AbstractShader
+            {
+                Assert.True(TryCompile<T>(compiler, fill, name, shaders, "depthCoverage.hlsl", out var code, out var error), error);
+                Assert.True(SpirvBlob.TryUnpack(code!, out var spv, out var layout, out _));
+                return backend.CreateShader(stage, spv, name, layout);
+            }
+            using var vs = new T3.Graphics.Compat.VertexShader(device, CompileFill<VertexShader>("vs", ShaderStage.Vertex));
+            using var ps = new T3.Graphics.Compat.PixelShader(device, CompileFill<PixelShader>("ps", ShaderStage.Pixel));
+            using var rtv = new RenderTargetView(device, input);
+            using var raster = new RasterizerState(device, new RasterizerStateDescription
+            { CullMode = CullMode.None, FillMode = FillMode.Solid, IsMultisampleEnabled = true, IsDepthClipEnabled = true });
+            dc.OutputMerger.SetTargets(rtv);
+            dc.ClearRenderTargetView(rtv, Vector4.One);
+            dc.Rasterizer.SetViewport(0, 0, width, height);
+            dc.Rasterizer.State = raster;
+            dc.VertexShader.Set(vs);
+            dc.PixelShader.Set(ps);
+            dc.Draw(3, 0);
+            dc.OutputMerger.SetTargets((DepthStencilView?)null);
+        }
     }
 
     private static Buffer StructuredBuffer(Device device, int stride, int count)

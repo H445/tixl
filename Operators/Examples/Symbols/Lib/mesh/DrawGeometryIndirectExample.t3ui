@@ -1,7 +1,7 @@
 {
   "FormatVersion": 3,
   "Id": "d13d7e22-04f4-4d03-8af6-000000001000",
-  "Description": "Play the timeline to orbit a field of 225 rings and an opaque wall. Select a draw mode for a live comparison, or enable Benchmark for a repeatable five-mode GPU timing run at 1280 \u00d7 720.",
+  "Description": "Play the timeline to orbit a field of 225 rings and an opaque wall. Select a draw mode for a live comparison, or enable Benchmark for a repeatable five-mode GPU timing run at 1280 × 720.",
   "InputUis": [
     {
       "Position": {
@@ -18,6 +18,30 @@
       },
       "InputId": "d13d7e22-04f4-4d03-8af6-000000001003",
       "Description": "Turn on to replay five identical camera orbits per mode and save per-frame Vulkan GPU timestamps to a CSV in the system temp folder. The Log window shows the path. Turn off to reset."
+    },
+    {
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001004",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Size of the opaque wall. Increase width or height to hide more of the field."
+    },
+    {
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001005",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "World-space wall center. Moving the wall toward the camera hides more foreground geometry."
+    },
+    {
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001006",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "With Benchmark on, compare LOD alone and LOD plus depth on adjacent frames at every camera pose. Select before starting."
     }
   ],
   "SymbolChildUis": [

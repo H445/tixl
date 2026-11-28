@@ -22,7 +22,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
     public readonly InputSlot<bool> DepthCulling = new();
 
     private const string ShaderPath = "Lib:shaders/3d/mesh/DrawGeometryIndirect.hlsl";
-    private readonly Resource<ComputeShader> _classify, _reduce, _reduceMs;
+    private readonly Resource<ComputeShader> _classify, _classifyDepth, _reduce, _reduceMs;
     private readonly Resource<VertexShader> _vertexShader;
     private readonly Resource<PixelShader> _pixelShader;
     private readonly GeometryMeshCompiler _fine = new(), _coarse = new();
@@ -42,6 +42,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
     {
         Output.UpdateAction = Update;
         _classify = ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "classify");
+        _classifyDepth = ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "classifyDepth");
         _reduce = ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "reduceDepth");
         _reduceMs = ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "reduceDepthMS");
         _vertexShader = ResourceManager.CreateShaderResource<VertexShader>(ShaderPath, this, () => "vsMain");
@@ -92,10 +93,9 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         var dc = ResourceManager.Device.ImmediateContext;
         var view = dc.Rasterizer.GetViewport();
         var depth = dc.OutputMerger.DepthStencilTarget?.Resource as DeviceTexture;
-        var cs = _classify.GetValue(context);
         var vs = _vertexShader.GetValue(context);
         var ps = _pixelShader.GetValue(context);
-        if (cs == null || vs == null || ps == null)
+        if (vs == null || ps == null)
         {
             _warning = "The indirect draw shaders could not be loaded.";
             return;
@@ -109,13 +109,19 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
                         && view.Width == depth.Description.Width && view.Height == depth.Description.Height;
         var ms = canSample && depth!.Description.SampleDescription.Count > 1;
         var reducer = canSample ? (ms ? _reduceMs : _reduce).GetValue(context) : null;
+        var cs = (reducer == null ? _classify : _classifyDepth).GetValue(context);
+        if (cs == null)
+        {
+            _warning = "The indirect classification shader could not be loaded.";
+            return;
+        }
         if (useDepth && reducer == null)
             _warning ??= "Depth culling needs a sampleable full-viewport D32 render target. Frustum culling and LOD are active.";
-        if (_depthView != null && (reducer == null || _depthView.Resource != depth))
+        if (_depthView != null && _depthView.Resource != depth)
             GraphicsUtilities.Dispose(ref _depthView);
         var tilesX = ((int)width + 7) / 8;
         var tilesY = ((int)height + 7) / 8;
-        var groups = (_partCount + 63) / 64;
+        var groups = reducer == null ? (_partCount + 63) / 64 : _partCount;
         var groupsX = Math.Min(groups, 65535);
         var parameters = new Parameters
         {
@@ -150,7 +156,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
                 stage.Set(reducer);
                 stage.SetShaderResource(ms ? 2 : 1, _depthView);
                 stage.SetUnorderedAccessView(1, _tiles.Uav);
-                dc.Dispatch(tilesX, tilesY, 1);
+                dc.Dispatch((tilesX + 7) / 8, tilesY, 1);
                 stage.SetUnorderedAccessView(1, null);
                 stage.SetShaderResource(ms ? 2 : 1, null);
             }
