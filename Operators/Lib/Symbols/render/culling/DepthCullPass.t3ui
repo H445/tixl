@@ -1,0 +1,58 @@
+{
+  "FormatVersion": 3,
+  "Id": "64cd0588-51c2-5716-ab93-6fcaa0babde8",
+  "Description": "Draw opaque occluders, then test later static mesh groups against a shared current-camera depth pyramid. Each candidate uses its regular frustum path if depth is unavailable.",
+  "InputUis": [
+    {
+      "InputId": "1ffcb480-cac3-5e5f-be7b-ee0ef3d90dd0",
+      "Description": "Opaque, depth-writing geometry. Drawn once into the current render target.",
+      "Position": {
+        "X": -240,
+        "Y": 0
+      }
+    },
+    {
+      "InputId": "85dc5b6a-fe05-5606-9c2f-fd1f20c90b83",
+      "Description": "DrawCulledTriangles nodes with CacheStaticMesh enabled, or an Execute containing them.",
+      "Position": {
+        "X": -240,
+        "Y": 65
+      }
+    },
+    {
+      "InputId": "bde3a9df-83ec-5921-a67e-731d91e6848d",
+      "Description": "Enable depth testing of candidates against the opaque occluders.",
+      "Position": {
+        "X": -240,
+        "Y": 130
+      }
+    },
+    {
+      "InputId": "5c195918-a7fc-51c0-adc6-0b5d0f71b92b",
+      "Description": "Positive normalized depth separation required to hide a complete group.",
+      "Position": {
+        "X": -240,
+        "Y": 195
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "6a81fee5-fce2-5b5c-a882-e4a2bfbf8ac6",
+      "Description": "Connect inside the active camera and render target.",
+      "Position": {
+        "X": 350,
+        "Y": 0
+      }
+    },
+    {
+      "OutputId": "dec2e08c-eb5d-5805-accb-eacb7e5b4167",
+      "Description": "Depth availability on the last rendered pass.",
+      "Position": {
+        "X": 350,
+        "Y": 65
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "FormatVersion": 3,
+  "Id": "b9fbad68-bf5a-5782-a862-5f64a6a45920",
+  "InputUis": [],
+  "SymbolChildUis": [
+    {
+      "ChildId": "8c8c98aa-ce90-5ff0-bda1-b864b0d2d4d4",
+      "SymbolName": "Lib.mesh.generate.CubeMesh",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "240df1db-be11-52ab-8d63-68ceceeaadb9",
+      "SymbolName": "Lib.mesh.generate.CubeMesh",
+      "Position": {
+        "X": 0,
+        "Y": 160
+      }
+    },
+    {
+      "ChildId": "255b4b1f-f645-5b7d-9829-4dbb1a07ef7b",
+      "SymbolName": "Lib.mesh.draw.DrawMesh",
+      "Position": {
+        "X": 240,
+        "Y": 160
+      }
+    },
+    {
+      "ChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
+      "SymbolName": "Lib.render.culling.CullMesh",
+      "Position": {
+        "X": 490,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
+      "SymbolName": "Lib.render.camera.Camera",
+      "Position": {
+        "X": 730,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "3a2063bf-41af-5846-91de-6b4f0a42316e",
+      "SymbolName": "Lib.image.generate.basic.RenderTarget",
+      "Position": {
+        "X": 970,
+        "Y": 0
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "4c5bf29a-39f9-55d9-9f82-ca52f64a525e",
+      "Position": {
+        "X": 1220,
+        "Y": 0
+      }
+    }
+  ],
+  "Description": "Move the wall across the detailed cube to test depth occlusion. Move the candidate beyond the camera edge to test frustum culling."
+}

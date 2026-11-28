@@ -1,0 +1,378 @@
+{
+  "FormatVersion": 3,
+  "Id": "f435a3e2-9d1d-55c7-b3a8-006cbe4f0f16",
+  "Description": "Draw a TiXL PBR mesh with GPU triangle-frustum filtering in the active camera. No region table is required. The stock PBR shader reads the original vertices in source face order. BypassCulling compares against the full draw.",
+  "SymbolTags": "1",
+  "InputUis": [
+    {
+      "InputId": "eb6969c1-d8eb-5672-9e20-66f68e475e3b",
+      "Position": {
+        "X": 1526.489,
+        "Y": 3627.165
+      },
+      "Description": "Default: uses the mesh normals.\nFlat: computes facet normals per pixel, giving a faceted look."
+    },
+    {
+      "InputId": "d37aca8e-d24f-5767-8fc6-06b240c69e5f",
+      "Position": {
+        "X": 2089.872,
+        "Y": 3905.177
+      },
+      "GroupTitle": "Texture Options",
+      "Description": "Texture filtering mode."
+    },
+    {
+      "InputId": "c08454db-64fd-5e30-a6b2-6d8981dc3be4",
+      "Position": {
+        "X": 2404.7104,
+        "Y": 4099.43
+      },
+      "GroupTitle": "Draw Style",
+      "Description": "Solid or wireframe rendering."
+    },
+    {
+      "InputId": "e3b16858-ed02-5f46-a03a-9c4bddd212d7",
+      "Position": {
+        "X": 1778.2278,
+        "Y": 3092.3406
+      },
+      "GroupTitle": "Field Overrides...",
+      "Description": "Optional field whose color is multiplied with each fragment, evaluated at the world position.\n\nTry [SphereSDF] -> [SDFToColor] -> FragmentField."
+    },
+    {
+      "InputId": "fb00642d-7aeb-5a0f-85d2-58e3abf89205",
+      "Position": {
+        "X": 1824.954,
+        "Y": 3585.8855
+      },
+      "Description": "Fragments with an alpha below this value are discarded. 0 disables alpha testing."
+    },
+    {
+      "InputId": "5eb9f991-4b3e-5d9c-8081-af046eef0d26",
+      "Position": {
+        "X": 1544.9539,
+        "Y": 3445.8855
+      },
+      "GroupTitle": "Appearance",
+      "Description": "Tints the mesh. Multiplied with the material colors set by [SetMaterial]."
+    },
+    {
+      "InputId": "bdc908d0-c516-5a2e-91b5-1b05e7174447",
+      "Position": {
+        "X": 1778.2278,
+        "Y": 3127.3406
+      },
+      "Description": "Additional HLSL code inserted into the generated shader, e.g. #define statements or helper functions. Invalid code breaks rendering.",
+      "Usage": "Multiline"
+    },
+    {
+      "InputId": "5eaa034a-fe2f-5836-978b-8052078ece41",
+      "Relevancy": "Required",
+      "Position": {
+        "X": 1339.876,
+        "Y": 3887.7703
+      }
+    },
+    {
+      "InputId": "0b2ab808-5666-52d5-b80f-6cc5032e176b",
+      "Position": {
+        "X": 2404.7104,
+        "Y": 4175.523
+      }
+    },
+    {
+      "InputId": "a3b701c9-5107-535b-a397-c9c1be4e1401",
+      "Position": {
+        "X": 2404.7104,
+        "Y": 4064.43
+      },
+      "Description": "Which faces are hidden.\n\nNone: both sides are drawn.\nFront: front faces are hidden, only back faces are visible.\nBack: back faces are hidden (default)."
+    },
+    {
+      "InputId": "614e7f3b-2003-5705-ba0c-ae2cceea05f4",
+      "Position": {
+        "X": 2404.7104,
+        "Y": 4210.523
+      },
+      "Description": "If enabled, fragments hidden behind already drawn geometry (according to the depth buffer) are discarded.",
+      "AddPadding": "True"
+    },
+    {
+      "InputId": "ddd65751-ccd5-5ccb-ab0a-99cc0c57da0f",
+      "Position": {
+        "X": 1824.9539,
+        "Y": 3655.8855
+      },
+      "Description": "Reduces specular aliasing on silhouettes and in high-frequency normal map regions.",
+      "Min": 0.0,
+      "Max": 20.0,
+      "ClampMin": true
+    },
+    {
+      "InputId": "33b3bd12-e4fd-52d0-96ca-7371407624c7",
+      "Position": {
+        "X": 2039.8054,
+        "Y": 4026.683
+      },
+      "Description": "How the texture is sampled outside the 0..1 UV range.\n\nWrap: repeats.\nMirror: repeats mirrored.\nClamp: extends the edge pixels.\nBorder: uses the sampler border color.\nMirrorOnce: mirrors once, then clamps."
+    },
+    {
+      "InputId": "d2927e15-e9d6-5eb3-b5ac-095d95113c5e",
+      "Position": {
+        "X": 2404.7104,
+        "Y": 4245.523
+      },
+      "Description": "If enabled, the mesh writes into the depth buffer so it can occlude itself and geometry drawn later."
+    },
+    {
+      "InputId": "b9142068-e4a8-558b-a3cb-8b2583dfba5f",
+      "Description": "Draw the complete mesh for a same-camera comparison.",
+      "Position": {
+        "X": -900,
+        "Y": 670
+      }
+    },
+    {
+      "InputId": "a5be3978-7ef0-53f4-a20e-298c11ffadf3",
+      "Description": "Use for fixed local positions and topology. Reuse bounds for groups of 128 triangles as the camera or object moves. Matching views can reuse the previous submission. Leave off for meshes rewritten on the GPU.",
+      "Position": {
+        "X": -900,
+        "Y": 732
+      }
+    }
+  ],
+  "SymbolChildUis": [
+    {
+      "ChildId": "3b780b82-4e5b-5c8a-aa2a-90e28f929bb4",
+      "SymbolName": "Lib.numbers.int.basic.IntToFloat",
+      "Position": {
+        "X": 1824.9539,
+        "Y": 3620.8855
+      }
+    },
+    {
+      "ChildId": "61ecd910-d77b-5d19-9819-45c5952c3e77",
+      "SymbolName": "Types.Gfx.SamplerState",
+      "Position": {
+        "X": 2229.872,
+        "Y": 3962.612
+      }
+    },
+    {
+      "ChildId": "0a3c6eba-3cc8-5679-b801-a02ee54c6a5f",
+      "SymbolName": "Lib.numbers.vec4.Vector4Components",
+      "Style": "Resizable",
+      "Size": {
+        "X": 111.079544,
+        "Y": 59.905018
+      },
+      "Position": {
+        "X": 1824.9539,
+        "Y": 3445.8855
+      }
+    },
+    {
+      "ChildId": "adb22a76-81ed-522d-b581-7c1741676181",
+      "SymbolName": "Lib.field.render._.GenerateShaderGraphCode",
+      "Position": {
+        "X": 1918.2278,
+        "Y": 3092.3406
+      }
+    },
+    {
+      "ChildId": "f632f573-544e-5538-bd9d-a21f4e538288",
+      "SymbolName": "Lib.flow.Execute",
+      "Style": "Resizable",
+      "Size": {
+        "X": 55.07945,
+        "Y": 921.4707
+      },
+      "Position": {
+        "X": 3003.2698,
+        "Y": 3271.7793
+      }
+    },
+    {
+      "ChildId": "59d34b14-0d8e-59f4-966d-1adfa2bea1e6",
+      "SymbolName": "Lib.flow.context.GetForegroundColor",
+      "Position": {
+        "X": 1544.9539,
+        "Y": 3480.8855
+      }
+    },
+    {
+      "ChildId": "3cf9f22a-8f3b-509a-90a3-c829d929bf20",
+      "SymbolName": "Lib.render._dx11.api._TransformsCBuffer",
+      "Style": "Expanded",
+      "Size": {
+        "X": 140.0,
+        "Y": 35.0
+      },
+      "Position": {
+        "X": 2544.7104,
+        "Y": 3391.748
+      }
+    },
+    {
+      "ChildId": "6f918d9c-e874-511b-b552-a6a7de1eea2a",
+      "SymbolName": "Lib.render._dx11.api.InputAssemblerStage",
+      "Position": {
+        "X": 2863.2698,
+        "Y": 3271.7793
+      }
+    },
+    {
+      "ChildId": "573b36c3-950a-56c8-8889-7faae5a9373b",
+      "SymbolName": "Lib.render.shading._.ContextCBuffers",
+      "Position": {
+        "X": 2544.7104,
+        "Y": 3461.748
+      }
+    },
+    {
+      "ChildId": "36e0e9b9-b3e1-572b-a4af-acb7cafe4310",
+      "SymbolName": "Types.Gfx.PixelShaderFromSource",
+      "Position": {
+        "X": 2058.228,
+        "Y": 3092.3406
+      }
+    },
+    {
+      "ChildId": "34e08104-11cd-51ec-8e31-6785c3195241",
+      "SymbolName": "Types.Gfx.SamplerState",
+      "Position": {
+        "X": 2544.7104,
+        "Y": 3951.748
+      }
+    },
+    {
+      "ChildId": "8267a7e5-12a6-59c2-99c2-938321a26f7c",
+      "SymbolName": "Lib.render._dx11.fxsetup.SetPixelAndVertexShaderStage",
+      "Position": {
+        "X": 2684.7104,
+        "Y": 3321.748
+      }
+    },
+    {
+      "ChildId": "d45a7b0f-ad72-5be0-ab5b-43babb379922",
+      "SymbolName": "Lib.numbers.color.BlendColors",
+      "Position": {
+        "X": 1684.9539,
+        "Y": 3445.8855
+      }
+    },
+    {
+      "ChildId": "ef821ed5-25c2-53f9-9097-4ac649838585",
+      "SymbolName": "Lib.render._dx11.api.OutputMergerStage",
+      "Position": {
+        "X": 2684.7104,
+        "Y": 4175.523
+      }
+    },
+    {
+      "ChildId": "1e1f2fd7-4b3e-5dd7-8239-21e57b94a4ee",
+      "SymbolName": "Lib.mesh._._MeshBufferComponents",
+      "Position": {
+        "X": 1479.876,
+        "Y": 3887.7703
+      }
+    },
+    {
+      "ChildId": "081225b4-2359-5e6b-9549-cab66a0d06b0",
+      "SymbolName": "Types.Gfx.RasterizerState",
+      "Position": {
+        "X": 2544.7104,
+        "Y": 4064.43
+      }
+    },
+    {
+      "ChildId": "ca253727-4c7a-5f59-9ef9-0f786f7a9fa7",
+      "SymbolName": "Lib.render._dx11.buffer.GetBufferComponents",
+      "Position": {
+        "X": 1696.4711,
+        "Y": 3933.1995
+      }
+    },
+    {
+      "ChildId": "f4126ddf-6479-5035-946c-809d80d44592",
+      "SymbolName": "Lib.render._dx11.buffer.GetBufferComponents",
+      "Position": {
+        "X": 1729.4662,
+        "Y": 3844.2825
+      }
+    },
+    {
+      "ChildId": "f7fa9925-8233-58d2-8cc9-1ffacca2b1b7",
+      "SymbolName": "Types.Gfx.VertexShader",
+      "Position": {
+        "X": 2544.7104,
+        "Y": 3321.748
+      }
+    },
+    {
+      "ChildId": "07217704-b085-5ec3-8c3e-08fe09b3caf1",
+      "SymbolName": "Lib.render.culling._DrawFrustumTriangles",
+      "Position": {
+        "X": 2091.1904,
+        "Y": 4461.1104
+      }
+    },
+    {
+      "ChildId": "fc2439ae-0ee6-5db3-a652-0ad696805e37",
+      "SymbolName": "Lib.render._dx11.api.FloatsToBuffer",
+      "Position": {
+        "X": 1964.9539,
+        "Y": 3410.8855
+      }
+    },
+    {
+      "ChildId": "d1bad862-af46-57e3-8e79-a3e2c2f47d80",
+      "SymbolName": "Types.Gfx.DepthStencilState",
+      "Position": {
+        "X": 2544.7104,
+        "Y": 4210.523
+      }
+    },
+    {
+      "ChildId": "e7aa6e8d-2190-5e62-a905-0357d0c7bb50",
+      "SymbolName": "Lib.render._dx11.api.Rasterizer",
+      "Position": {
+        "X": 2684.7104,
+        "Y": 4064.43
+      }
+    },
+    {
+      "ChildId": "514487a9-2270-567e-8f02-cce8ceb17228",
+      "SymbolName": "Lib.render._dx11.api.SrvFromTexture2d",
+      "Position": {
+        "X": 2382.018,
+        "Y": 3853.5764
+      }
+    },
+    {
+      "ChildId": "7aaf44d4-4135-57cd-8daa-9517e76fbac2",
+      "SymbolName": "Lib.render._dx11.fxsetup.PickBlendMode",
+      "Position": {
+        "X": 2544.7104,
+        "Y": 4175.523
+      }
+    },
+    {
+      "ChildId": "491d86d5-392c-54e9-9193-25808cbd2915",
+      "SymbolName": "Lib.render.shading._.GetPbrParameters",
+      "Position": {
+        "X": 2242.018,
+        "Y": 3643.5764
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "9203bed2-a397-5217-81cc-976285a26834",
+      "Position": {
+        "X": 3003.2698,
+        "Y": 3446.7793
+      }
+    }
+  ]
+}
