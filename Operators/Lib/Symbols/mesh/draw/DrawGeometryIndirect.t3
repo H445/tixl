@@ -21,6 +21,10 @@
     {
       "Id": "ef95c50b-ee30-47fc-9231-f6e4584cd642",
       "DefaultValue": false
+    },
+    {
+      "Id": "0cc0cff8-30a5-4147-b4a6-1e18d6214475",
+      "DefaultValue": true
     }
   ],
   "Children": [],

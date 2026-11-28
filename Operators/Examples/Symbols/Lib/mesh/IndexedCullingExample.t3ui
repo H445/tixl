@@ -1,0 +1,25 @@
+{
+  "FormatVersion": 3,
+  "Id": "c9f757ad-fa43-4ce4-abbf-258f754a7efc",
+  "Description": "Full-detail meshes with frustum and current-frame depth culling. Pin Image and play the timeline to orbit the field.",
+  "InputUis": [],
+  "SymbolChildUis": [
+    {
+      "ChildId": "0637c13e-84fa-49c5-86d2-db587ed721e7",
+      "SymbolName": "Examples.Lib.mesh.DrawGeometryIndirectExample",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "5d468644-f0b7-4f94-89a3-4ebb42695492",
+      "Position": {
+        "X": 260,
+        "Y": 0
+      }
+    }
+  ]
+}

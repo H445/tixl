@@ -1,0 +1,28 @@
+{
+  "FormatVersion": 3,
+  "Id": "c9f757ad-fa43-4ce4-abbf-258f754a7efc",
+  "Inputs": [],
+  "Children": [
+    {
+      "Id": "0637c13e-84fa-49c5-86d2-db587ed721e7",
+      "SymbolId": "d13d7e22-04f4-4d03-8af6-000000001000",
+      "SymbolName": "Examples.Lib.mesh.DrawGeometryIndirectExample",
+      "InputValues": [
+        {
+          "Id": "d13d7e22-04f4-4d03-8af6-000000001002",
+          "Type": "System.Int32",
+          "Value": 3
+        }
+      ],
+      "Outputs": []
+    }
+  ],
+  "Connections": [
+    {
+      "SourceParentOrChildId": "0637c13e-84fa-49c5-86d2-db587ed721e7",
+      "SourceSlotId": "d13d7e22-04f4-4d03-8af6-000000001001",
+      "TargetParentOrChildId": "00000000-0000-0000-0000-000000000000",
+      "TargetSlotId": "5d468644-f0b7-4f94-89a3-4ebb42695492"
+    }
+  ]
+}

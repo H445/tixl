@@ -1,0 +1,25 @@
+{
+  "FormatVersion": 3,
+  "Id": "ebf1836d-ab96-4a6f-95f5-be30bbe2aa2e",
+  "Description": "Projected-size LOD with part culling disabled. Pin Image and play the timeline to orbit the field.",
+  "InputUis": [],
+  "SymbolChildUis": [
+    {
+      "ChildId": "e94045e3-6af7-4c3e-b653-97c11b97097c",
+      "SymbolName": "Examples.Lib.mesh.DrawGeometryIndirectExample",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "7472a438-44e6-40ec-9af1-488434a7dfaa",
+      "Position": {
+        "X": 260,
+        "Y": 0
+      }
+    }
+  ]
+}

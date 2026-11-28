@@ -43,6 +43,14 @@
         "Y": 0
       },
       "Description": "While DepthCulling is enabled, periodically time both paths and use the faster one as the camera moves."
+    },
+    {
+      "InputId": "0cc0cff8-30a5-4147-b4a6-1e18d6214475",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Reject parts outside the active camera frustum. Disable to measure LOD by itself."
     }
   ],
   "SymbolChildUis": [],

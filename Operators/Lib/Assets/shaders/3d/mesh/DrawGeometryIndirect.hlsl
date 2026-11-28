@@ -7,7 +7,7 @@ cbuffer Parameters : register(b0)
     uint TilesX;
     uint UseDepth;
     uint GroupsX;
-    uint Padding;
+    uint Flags; // bit 0 disables frustum rejection, bit 1 preserves CPU-generated draw ranges
 };
 
 float4 project(float3 p)
@@ -98,8 +98,8 @@ IndexedCommand selectLod(uint id, out float2 lo, out float2 hi, out float neares
         hi = max(hi, pixel);
         nearest = min(nearest, ndc.z);
     }
-    bool visible = common == 0;
-    canTestDepth = visible && !crossesNear;
+    bool visible = common == 0 || (Flags & 1) != 0;
+    canTestDepth = common == 0 && !crossesNear;
     bool coarse = !crossesNear && max(hi.x - lo.x, hi.y - lo.y) < LodPixels && part.ranges.w > 0;
     IndexedCommand cmd;
     cmd.firstIndex = coarse ? part.ranges.z : part.ranges.x;
@@ -137,6 +137,11 @@ void classifyDepth(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
         float nearest;
         bool canTest;
         selected = selectLod(id, lo, hi, nearest, canTest);
+        if ((Flags & 2) != 0)
+        {
+            selected = Commands[id];
+            canTest = canTest && selected.instanceCount != 0;
+        }
         nearestDepth = nearest;
         testRect = 0;
         foundVisible = 0;

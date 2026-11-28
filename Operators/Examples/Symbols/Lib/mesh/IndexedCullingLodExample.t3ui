@@ -1,0 +1,25 @@
+{
+  "FormatVersion": 3,
+  "Id": "f996b4dc-cd7c-4868-b8c5-413600a4036d",
+  "Description": "Projected-size LOD with frustum and current-frame depth culling. Pin Image and play the timeline to orbit the field.",
+  "InputUis": [],
+  "SymbolChildUis": [
+    {
+      "ChildId": "bb84b960-7b31-41ac-91e7-d03b3bdc973e",
+      "SymbolName": "Examples.Lib.mesh.DrawGeometryIndirectExample",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "f4c53da0-05c0-40c0-9ed4-af143573e1b7",
+      "Position": {
+        "X": 260,
+        "Y": 0
+      }
+    }
+  ]
+}

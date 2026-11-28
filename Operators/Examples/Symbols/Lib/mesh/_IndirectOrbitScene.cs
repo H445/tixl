@@ -28,6 +28,9 @@ internal sealed class _IndirectOrbitScene : Instance<_IndirectOrbitScene>
     [Output(Guid = "665bba8c-cf0d-47c8-8f5c-89ac9034679b", DirtyFlagTrigger = DirtyFlagTrigger.Always)]
     public readonly Slot<bool> AutoDepth = new();
 
+    [Output(Guid = "2e919777-937d-4f03-83df-b855ab39c88a", DirtyFlagTrigger = DirtyFlagTrigger.Always)]
+    public readonly Slot<bool> UseFrustum = new();
+
     internal const string SampleVariable = "DrawGeometryIndirectExample.Sample";
     internal const int Steps = 120;
 
@@ -35,7 +38,7 @@ internal sealed class _IndirectOrbitScene : Instance<_IndirectOrbitScene>
     {
         Fine.UpdateAction = _ => Fine.Value ??= MakeField(24, 12);
         Coarse.UpdateAction = _ => Coarse.Value ??= MakeField(8, 4);
-        Eye.UpdateAction = PathIndex.UpdateAction = LodPixels.UpdateAction = UseDepth.UpdateAction = AutoDepth.UpdateAction = UpdateView;
+        Eye.UpdateAction = PathIndex.UpdateAction = LodPixels.UpdateAction = UseDepth.UpdateAction = AutoDepth.UpdateAction = UseFrustum.UpdateAction = UpdateView;
     }
 
     private void UpdateView(EvaluationContext context)
@@ -50,9 +53,11 @@ internal sealed class _IndirectOrbitScene : Instance<_IndirectOrbitScene>
         var angle = (float)(turns * Math.Tau);
         Eye.Value = new Vector3(22 * MathF.Sin(angle), 6 - 3 * MathF.Cos(angle), 22 * MathF.Cos(angle));
         PathIndex.Value = mode == 0 ? 0 : 1;
-        LodPixels.Value = mode is 2 or 4 or 5 ? 100 : 0;
+        LodPixels.Value = mode is 2 or 4 or 5 or 7 ? 100 : 0;
         UseDepth.Value = mode is 3 or 4 or 5;
         AutoDepth.Value = mode == 5;
+        UseFrustum.Value = mode < 6;
+        UseFrustum.DirtyFlag.Clear();
         AutoDepth.DirtyFlag.Clear();
         Eye.DirtyFlag.Clear();
         PathIndex.DirtyFlag.Clear();

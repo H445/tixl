@@ -24,6 +24,22 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
     [Input(Guid = "ef95c50b-ee30-47fc-9231-f6e4584cd642")]
     public readonly InputSlot<bool> AutoDepth = new();
 
+    [Input(Guid = "0cc0cff8-30a5-4147-b4a6-1e18d6214475")]
+    public readonly InputSlot<bool> FrustumCulling = new();
+
+    // Also allows exercising the macOS command producer on a Vulkan test machine.
+    private static readonly bool CpuCommands = OperatingSystem.IsMacOS()
+        || Environment.GetEnvironmentVariable("TIXL_CPU_INDEXED_INDIRECT") == "1";
+    private IndexedCommand[] _cpuCommands = [];
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IndexedCommand
+    {
+        public uint IndexCount, InstanceCount, FirstIndex;
+        public int VertexOffset;
+        public uint FirstInstance;
+    }
+
     private readonly AdaptiveDepth _adaptive = new();
     private const string ShaderPath = "Lib:shaders/3d/mesh/DrawGeometryIndirect.hlsl";
     private readonly Resource<ComputeShader> _classify, _classifyDepth, _reduce, _reduceMs;
@@ -66,7 +82,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         public Matrix4x4 ObjectToClip;
         public Vector2 ViewSize;
         public float LodPixels;
-        public int PartCount, TilesX, UseDepth, GroupsX, Padding;
+        public int PartCount, TilesX, UseDepth, GroupsX, Flags;
     }
 
     private void Update(EvaluationContext context)
@@ -119,7 +135,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         var ms = canSample && depth!.Description.SampleDescription.Count > 1;
         var reducer = canSample ? (ms ? _reduceMs : _reduce).GetValue(context) : null;
         var cs = (reducer == null ? _classify : _classifyDepth).GetValue(context);
-        if (cs == null)
+        if (cs == null && (!CpuCommands || reducer != null))
         {
             _warning = "The indirect classification shader could not be loaded.";
             return;
@@ -136,7 +152,8 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         {
             ObjectToClip = context.ObjectToWorld * context.WorldToCamera * context.CameraToClipSpace,
             ViewSize = new Vector2(width, height), LodPixels = threshold, PartCount = _partCount,
-            TilesX = tilesX, UseDepth = reducer != null ? 1 : 0, GroupsX = groupsX
+            TilesX = tilesX, UseDepth = reducer != null ? 1 : 0, GroupsX = groupsX,
+            Flags = (FrustumCulling.GetValue(context) ? 0 : 1) | (CpuCommands ? 2 : 0)
         };
         if (_parameters == null)
             ResourceManager.SetupConstBuffer(parameters, ref _parameters);
@@ -148,6 +165,8 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         {
             if (automatic)
                 _adaptive.BeginProbe(dc);
+            if (CpuCommands)
+                UploadCpuCommands(dc, parameters);
             var stage = dc.ComputeShader;
             stage.SetConstantBuffer(0, _parameters);
             if (reducer != null)
@@ -172,12 +191,15 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
                 stage.SetShaderResource(ms ? 2 : 1, null);
             }
 
-            stage.Set(cs);
-            stage.SetShaderResource(0, _parts!.Srv);
-            stage.SetShaderResource(3, reducer == null ? null : _tiles.Srv);
-            stage.SetUnorderedAccessView(0, _commands.Uav);
-            dc.Dispatch(groupsX, (groups + groupsX - 1) / groupsX, 1);
-            stage.SetUnorderedAccessView(0, null);
+            if (!CpuCommands || reducer != null)
+            {
+                stage.Set(cs);
+                stage.SetShaderResource(0, _parts!.Srv);
+                stage.SetShaderResource(3, reducer == null ? null : _tiles.Srv);
+                stage.SetUnorderedAccessView(0, _commands.Uav);
+                dc.Dispatch(groupsX, (groups + groupsX - 1) / groupsX, 1);
+                stage.SetUnorderedAccessView(0, null);
+            }
 
             dc.InputAssembler.InputLayout = null;
             dc.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
@@ -202,6 +224,43 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
                 _adaptive.EndProbe(dc);
             dc.PopState();
         }
+    }
+
+    private void UploadCpuCommands(DeviceContext dc, in Parameters p)
+    {
+        if (_cpuCommands.Length != _partCount)
+            _cpuCommands = new IndexedCommand[_partCount];
+
+        for (var i = 0; i < _partCount; i++)
+        {
+            ref var part = ref _partData[i];
+            var common = 63;
+            var lo = new Vector2(float.PositiveInfinity);
+            var hi = new Vector2(float.NegativeInfinity);
+            var near = false;
+            for (var corner = 0; corner < 8; corner++)
+            {
+                var pos = new Vector4((corner & 1) == 0 ? part.Lower.X : part.Upper.X,
+                                      (corner & 2) == 0 ? part.Lower.Y : part.Upper.Y,
+                                      (corner & 4) == 0 ? part.Lower.Z : part.Upper.Z, 1);
+                var h = Vector4.Transform(pos, p.ObjectToClip);
+                common &= (h.X < -h.W ? 1 : 0) | (h.X > h.W ? 2 : 0)
+                        | (h.Y < -h.W ? 4 : 0) | (h.Y > h.W ? 8 : 0)
+                        | (h.Z < 0 ? 16 : 0) | (h.Z > h.W ? 32 : 0);
+                near |= h.Z <= 0 || h.W <= 1e-6f;
+                var pixel = (new Vector2(h.X, -h.Y) / MathF.Max(h.W, 1e-6f) * .5f + new Vector2(.5f)) * p.ViewSize;
+                lo = Vector2.Min(lo, pixel);
+                hi = Vector2.Max(hi, pixel);
+            }
+            var coarse = !near && part.LowCount > 0 && MathF.Max(hi.X - lo.X, hi.Y - lo.Y) < p.LodPixels;
+            _cpuCommands[i] = new IndexedCommand
+            {
+                IndexCount = (uint)(coarse ? part.LowCount : part.Count),
+                FirstIndex = (uint)(coarse ? part.LowFirst : part.First),
+                InstanceCount = common == 0 || (p.Flags & 1) != 0 ? 1u : 0u
+            };
+        }
+        dc.UpdateSubresource(_commands.Buffer!, 0, MemoryMarshal.AsBytes(_cpuCommands.AsSpan()), 0, 0);
     }
 
     // Two adjacent GPU measurements compare the same moving workload. Alternate their
