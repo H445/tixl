@@ -51,8 +51,9 @@ Open the same example on Direct3D 11 and repeat the wall and camera movement.
 ## Step: Render statistics
 
 **Action:**
-Move the wall out of view, center the sphere, and inspect Triangles in the render statistics. Compare 8 × 4 and 32 × 16 sphere segments. Pan the sphere out of view on Vulkan and wait several frames at each setting.
+Pin Preview in the stock example. Set Wall mesh Center to (100, 0, 2) and Sphere mesh Segments to 32 by 16. Read Triangles, Material triangles and Draw calls. Move the wall to (0, 0, 2), then pan both meshes out of view. Repeat with 8 by 4 sphere segments. Allow several frames for GPU results to arrive.
 
 **Expected:**
-- The sphere adds 72 or 1,056 submitted triangles, respectively, to the other draws. On Vulkan its contribution drops to zero outside the view. Indirect counts follow completed GPU frames.
-- On Direct3D 11 the fallback reports the full sphere submission even when the camera clips it.
+- On Vulkan, Triangles includes the depth-only submission and the material submission. Their difference (Triangles minus Material triangles) is the full input: 1,068 at 32 by 16 or 84 at 8 by 4. There are two draw calls.
+- Outside the view, Material triangles falls to zero while Triangles still includes the depth prepass. The counts follow completed indirect packets without forcing a GPU wait.
+- On Direct3D 11, both counts equal the full mesh submission regardless of visibility. The two source meshes each use one direct material draw.

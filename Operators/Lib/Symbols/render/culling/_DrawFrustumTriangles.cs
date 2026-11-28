@@ -89,6 +89,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         MeshDepthPyramid? depth = null;
         if (OpaquePrepass.GetValue(context) && DepthTestEnabled.GetValue(context) && _meshDepth.Build(context, this, faceCount))
             depth = _meshDepth;
+        int depthFaces = depth != null ? faceCount : 0;
         int version = Mesh.DirtyFlag.SourceVersion;
         bool sameSource = _lastVersion == version && _lastFaceCount == faceCount && _lastVertexCount == vertices
                           && _lastVertices == vertexView && _lastFaces == indexView;
@@ -100,7 +101,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
             int columns = 1 + (groups - 1) / rows;
             if (!PrepareBuffers(faceCount, groups))
             {
-                FullDraw(dc, faceCount);
+                FullDraw(dc, faceCount, depthFaces);
                 return;
             }
             // The small path consumes the same visible index buffer and indirect count.
@@ -114,7 +115,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
                 prefix=(_prefix ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"Prefix")).Value;
                 scatter=(_scatter ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"Scatter")).Value;
             }
-            if(mark==null || (!small && (prefix==null || scatter==null))) { FullDraw(dc,faceCount);return; }
+            if(mark==null || (!small && (prefix==null || scatter==null))) { FullDraw(dc, faceCount, depthFaces);return; }
             // Rebuild bounds for mutable geometry before classifying it against the private depth.
             bool useBounds = depth != null || (cache && groups >= 8);
             ComputeShader? builder = null;
@@ -184,7 +185,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
             _lastFaces = indexView;
             _cached = cache && depth == null;
         }
-        _stats.CountIndirect(dc, _args.Buffer!);
+        _stats.CountIndirect(dc, _args.Buffer!, depthFaces);
         dc.PushState(StateGroups.VertexShader);
         try
         {
@@ -194,12 +195,12 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         finally { dc.PopState(); }
     }
 
-    private void FullDraw(DeviceContext dc, int faces)
+    private void FullDraw(DeviceContext dc, int faces, int depthFaces = 0)
     {
         _cached = false;
         _hasBounds = false;
         dc.Draw(checked(faces * 3), 0);
-        _stats.CountDirect(faces);
+        _stats.CountDirect(faces, depthFaces);
     }
 
     private bool PrepareBuffers(int faces, int groups)
