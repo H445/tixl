@@ -2,6 +2,7 @@
   "FormatVersion": 3,
   "Id": "f435a3e2-9d1d-55c7-b3a8-006cbe4f0f16",
   "Inputs": [
+    {"Id": "fc2f9242-4c2c-4df3-bda2-f3b8d9638806", "DefaultValue": false},
     {
       "Id": "eb6969c1-d8eb-5672-9e20-66f68e475e3b",
       "DefaultValue": 0
@@ -374,6 +375,7 @@
     }
   ],
   "Connections": [
+    {"SourceParentOrChildId": "00000000-0000-0000-0000-000000000000", "SourceSlotId": "fc2f9242-4c2c-4df3-bda2-f3b8d9638806", "TargetParentOrChildId": "07217704-b085-5ec3-8c3e-08fe09b3caf1", "TargetSlotId": "1f78cd12-35ee-46f7-a9c5-177b33c1d860"},
     {
       "SourceParentOrChildId": "f632f573-544e-5538-bd9d-a21f4e538288",
       "SourceSlotId": "e81c99ce-fcee-4e7c-a1c7-0aa3b352b7e1",

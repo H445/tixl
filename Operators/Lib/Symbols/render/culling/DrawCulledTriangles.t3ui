@@ -4,6 +4,7 @@
   "Description": "Draw a TiXL PBR mesh with GPU triangle-frustum filtering in the active camera. No region table is required. The stock PBR shader reads the original vertices in source face order. BypassCulling compares against the full draw.",
   "SymbolTags": "1",
   "InputUis": [
+    {"InputId": "fc2f9242-4c2c-4df3-bda2-f3b8d9638806", "Position": {"X": -320, "Y": 890}, "Description": "Build a private depth prepass for opaque geometry."},
     {
       "InputId": "eb6969c1-d8eb-5672-9e20-66f68e475e3b",
       "Position": {

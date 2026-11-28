@@ -23,6 +23,13 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
     private int _lastFaceCount, _lastVertexCount, _lastVersion;
     private bool _cached, _hasBounds;
 
+    // Only the opaque CullMesh graph enables this path. Other graph users may supply
+    // blending, fragment fields or alpha clipping that a position-only prepass cannot reproduce.
+    [Input(Guid = "1f78cd12-35ee-46f7-a9c5-177b33c1d860")]
+    public readonly InputSlot<bool> OpaquePrepass = new();
+
+    private readonly MeshDepthPyramid _meshDepth = new();
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Parameters
     {
@@ -40,8 +47,25 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
 
     private void Render(EvaluationContext context)
     {
-        var mesh = Mesh.GetValue(context);
         var dc = ResourceManager.Device.ImmediateContext;
+        if (context.ObjectVariables.TryGetValue(CullMesh.DirectMeshesKey, out var value) && value is List<MeshBuffers> sources)
+        {
+            dc.PushState(StateGroups.VertexShader);
+            try
+            {
+                foreach (var source in sources)
+                {
+                    if (source.VertexBuffer?.Srv == null || source.IndicesBuffer?.Srv == null) continue;
+                    dc.VertexShader.SetShaderResource(0, source.VertexBuffer.Srv);
+                    dc.VertexShader.SetShaderResource(1, source.IndicesBuffer.Srv);
+                    FullDraw(dc, source.FaceCount);
+                }
+            }
+            finally { dc.PopState(); }
+            return;
+        }
+
+        var mesh = Mesh.GetValue(context);
         int faceCount = mesh?.FaceCount ?? 0;
         if (mesh == null || faceCount <= 0 || dc.VertexShader.Shader == null || dc.PixelShader.Shader == null) return;
 
@@ -51,7 +75,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         bool valid = vertexView is { IsDisposed: false } && indexView is { IsDisposed: false }
                      && mesh.VertexBuffer!.ElementStride == T3.Core.Rendering.PbrVertex.Stride
                      && mesh.IndicesBuffer!.ElementStride == 12 && vertices > 0;
-        if (BypassCulling.GetValue(context) || !valid || !DepthCullPass.IsVulkanDevice(ResourceManager.Device))
+        if (BypassCulling.GetValue(context) || !valid || !MeshDepthPyramid.IsVulkanDevice(ResourceManager.Device))
         {
             FullDraw(dc, faceCount);
             return;
@@ -59,10 +83,9 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
 
         var matrix = context.ObjectToWorld * context.WorldToCamera * context.CameraToClipSpace;
         bool cache = CacheStaticMesh.GetValue(context);
-        DepthCullPass.DepthSnapshot? depth = null;
-        if (cache && faceCount > 7 * 128 && context.ObjectVariables.TryGetValue(DepthCullPass.ContextKey, out var value)
-            && DepthTestEnabled.GetValue(context) && value is DepthCullPass.DepthSnapshot current && current.Applies(context, dc))
-            depth = current;
+        MeshDepthPyramid? depth = null;
+        if (OpaquePrepass.GetValue(context) && DepthTestEnabled.GetValue(context) && _meshDepth.Build(context, this, faceCount))
+            depth = _meshDepth;
         int version = Mesh.DirtyFlag.SourceVersion;
         bool sameSource = _lastVersion == version && _lastFaceCount == faceCount && _lastVertexCount == vertices
                           && _lastVertices == vertexView && _lastFaces == indexView;
@@ -78,7 +101,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
                 return;
             }
             // The small path consumes the same visible index buffer and indirect count.
-            bool small=faceCount<=7*128;
+            bool small = depth == null && faceCount <= 7 * 128;
             ComputeShader? mark, prefix=null, scatter=null;
             if(small)
                 mark=(_small ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"FilterSmall")).Value;
@@ -89,8 +112,8 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
                 scatter=(_scatter ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"Scatter")).Value;
             }
             if(mark==null || (!small && (prefix==null || scatter==null))) { FullDraw(dc,faceCount);return; }
-            // Small meshes have too few coherent groups to justify building a second index.
-            bool useBounds = cache && groups >= 8;
+            // Rebuild bounds for mutable geometry before classifying it against the private depth.
+            bool useBounds = depth != null || (cache && groups >= 8);
             ComputeShader? builder = null;
             if (useBounds)
             {
@@ -109,7 +132,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
             {
                 ObjectToClip = Matrix4x4.Transpose(matrix), FaceCount = (uint)faceCount, VertexCount = (uint)vertices,
                 GroupCount = (uint)groups, GroupsX = (uint)columns,
-                DepthWidth = (uint)(depth?.Width ?? 0), DepthHeight = (uint)(depth?.Height ?? 0), DepthBias = depth?.Bias ?? 0
+                DepthWidth = (uint)(depth?.Width ?? 0), DepthHeight = (uint)(depth?.Height ?? 0), DepthBias = MeshDepthPyramid.DepthBias
             }, ref _constants);
 
             dc.PushState(StateGroups.ComputeShader);
@@ -217,6 +240,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         {
             _masks.Dispose(); _offsets.Dispose(); _visible.Dispose(); _args.Dispose(); _bounds.Dispose();
             _indirect?.Dispose(); _constants?.Dispose();
+            _meshDepth.Dispose();
             _mark?.Dispose(); _small?.Dispose(); _prefix?.Dispose(); _scatter?.Dispose(); _markStatic?.Dispose(); _markDepth?.Dispose(); _buildBounds?.Dispose();
         }
         base.Dispose(disposing);

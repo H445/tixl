@@ -14,6 +14,8 @@ internal sealed class DrawCulledTriangles : Instance<DrawCulledTriangles>
         Flat = 1,
     }
 
+    [Input(Guid = "fc2f9242-4c2c-4df3-bda2-f3b8d9638806")] public readonly InputSlot<bool> OpaquePrepass = new();
+
     [Input(Guid = "5eaa034a-fe2f-5836-978b-8052078ece41")]
     public readonly InputSlot<T3.Core.DataTypes.MeshBuffers> Mesh = new();
 
