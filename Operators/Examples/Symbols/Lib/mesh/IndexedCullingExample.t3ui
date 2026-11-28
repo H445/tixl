@@ -2,7 +2,16 @@
   "FormatVersion": 3,
   "Id": "c9f757ad-fa43-4ce4-abbf-258f754a7efc",
   "Description": "Full-detail meshes with frustum and current-frame depth culling. Pin Image and play the timeline to orbit the field.",
-  "InputUis": [],
+  "InputUis": [
+    {
+      "InputId": "d92c5fb4-f411-5109-9f86-65cf76d6340f",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Benchmark all three examples and the unculled control at matched camera poses. The Log shows the resulting CSV."
+    }
+  ],
   "SymbolChildUis": [
     {
       "ChildId": "0637c13e-84fa-49c5-86d2-db587ed721e7",

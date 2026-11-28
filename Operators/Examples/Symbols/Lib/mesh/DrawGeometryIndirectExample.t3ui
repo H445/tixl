@@ -42,6 +42,14 @@
         "Y": 0
       },
       "Description": "With Benchmark on, compare LOD alone and LOD plus depth on adjacent frames at every camera pose. Select before starting."
+    },
+    {
+      "InputId": "d1fa8ee2-5bfa-4b88-b573-81200dda5589",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "With Benchmark enabled, compare full detail, LOD only, frustum plus depth culling, and both at each pose."
     }
   ],
   "SymbolChildUis": [

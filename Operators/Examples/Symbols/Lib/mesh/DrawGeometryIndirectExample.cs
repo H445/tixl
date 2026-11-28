@@ -21,5 +21,8 @@ internal sealed class DrawGeometryIndirectExample : Instance<DrawGeometryIndirec
     [Input(Guid = "d13d7e22-04f4-4d03-8af6-000000001006")]
     public readonly InputSlot<bool> PairDepthModes = new();
 
+    [Input(Guid = "d1fa8ee2-5bfa-4b88-b573-81200dda5589")]
+    public readonly InputSlot<bool> CompareExamples = new();
+
     internal enum DrawMode { Standard, Indirect, IndirectLod, IndirectDepth, IndirectLodAndDepth, IndirectLodAuto, IndirectUnculled, IndirectLodOnly }
 }

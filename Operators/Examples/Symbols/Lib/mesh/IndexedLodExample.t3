@@ -1,7 +1,12 @@
 {
   "FormatVersion": 3,
   "Id": "ebf1836d-ab96-4a6f-95f5-be30bbe2aa2e",
-  "Inputs": [],
+  "Inputs": [
+    {
+      "Id": "28957b0f-fcf6-5ec8-8e76-e61065ebfa04",
+      "DefaultValue": false
+    }
+  ],
   "Children": [
     {
       "Id": "e94045e3-6af7-4c3e-b653-97c11b97097c",
@@ -12,6 +17,11 @@
           "Id": "d13d7e22-04f4-4d03-8af6-000000001002",
           "Type": "System.Int32",
           "Value": 7
+        },
+        {
+          "Id": "d1fa8ee2-5bfa-4b88-b573-81200dda5589",
+          "Type": "System.Boolean",
+          "Value": true
         }
       ],
       "Outputs": []
@@ -23,6 +33,12 @@
       "SourceSlotId": "d13d7e22-04f4-4d03-8af6-000000001001",
       "TargetParentOrChildId": "00000000-0000-0000-0000-000000000000",
       "TargetSlotId": "7472a438-44e6-40ec-9af1-488434a7dfaa"
+    },
+    {
+      "SourceParentOrChildId": "00000000-0000-0000-0000-000000000000",
+      "SourceSlotId": "28957b0f-fcf6-5ec8-8e76-e61065ebfa04",
+      "TargetParentOrChildId": "e94045e3-6af7-4c3e-b653-97c11b97097c",
+      "TargetSlotId": "d13d7e22-04f4-4d03-8af6-000000001003"
     }
   ]
 }

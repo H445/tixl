@@ -2,7 +2,16 @@
   "FormatVersion": 3,
   "Id": "ebf1836d-ab96-4a6f-95f5-be30bbe2aa2e",
   "Description": "Projected-size LOD with part culling disabled. Pin Image and play the timeline to orbit the field.",
-  "InputUis": [],
+  "InputUis": [
+    {
+      "InputId": "28957b0f-fcf6-5ec8-8e76-e61065ebfa04",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "Benchmark all three examples and the unculled control at matched camera poses. The Log shows the resulting CSV."
+    }
+  ],
   "SymbolChildUis": [
     {
       "ChildId": "e94045e3-6af7-4c3e-b653-97c11b97097c",

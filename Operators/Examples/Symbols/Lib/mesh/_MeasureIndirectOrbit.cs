@@ -17,12 +17,16 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
     [Input(Guid = "d13d7e22-04f4-4d03-8af6-000000001204")]
     public readonly InputSlot<bool> PairDepthModes = new();
 
+    [Input(Guid = "0497d31c-df80-4074-b323-1214b16c80bf")]
+    public readonly InputSlot<bool> CompareExamples = new();
+
+    private static readonly int[] ExampleModes = [6, 7, 3, 4];
     private const int Warmup = 24, Modes = 8, Passes = 5, Steps = _IndirectOrbitScene.Steps;
     private const int FramesPerMode = Warmup + Steps;
     private readonly double[] _times = new double[Passes * Modes * Steps];
     private readonly Timers[] _ring = new Timers[8];
     private int _frame;
-    private bool _complete, _paired;
+    private bool _complete, _paired, _examples;
 
     public _MeasureIndirectOrbit() => Output.UpdateAction = Update;
 
@@ -44,14 +48,25 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
         }
         if (_frame == 0)
         {
-            _paired = PairDepthModes.GetValue(context);
+            _examples = CompareExamples.GetValue(context);
+            _paired = !_examples && PairDepthModes.GetValue(context);
             Array.Fill(_times, double.NaN);
             Log.Info("Starting GPU benchmark. Keep the example pinned until the CSV path appears in the log.", this);
         }
 
         int block = _frame / FramesPerMode, pass = block / Modes;
         int mode = (block + 2 * pass) % Modes, step = _frame % FramesPerMode - Warmup;
-        if (_paired)
+        if (_examples)
+        {
+            var count = ExampleModes.Length;
+            int framesPerPass = Warmup + count * Steps;
+            pass = _frame / framesPerPass;
+            int within = _frame % framesPerPass - Warmup;
+            step = within < 0 ? within : within / count;
+            int index = (within + Warmup + pass + Math.Max(step, 0)) % count;
+            mode = ExampleModes[index];
+        }
+        else if (_paired)
         {
             // Two adjacent frames use the same pose. Reverse their order across poses and passes.
             int framesPerPass = Warmup + 2 * Steps;
@@ -79,7 +94,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
             else
                 variables.Remove(_IndirectOrbitScene.SampleVariable);
         }
-        int frames = _paired ? (Warmup + 2 * Steps) * Passes : FramesPerMode * Modes * Passes;
+        int frames = _examples ? (Warmup + Steps * ExampleModes.Length) * Passes : _paired ? (Warmup + 2 * Steps) * Passes : FramesPerMode * Modes * Passes;
         if (++_frame != frames)
             return;
 
@@ -149,6 +164,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
             for (var i = 0; i < _times.Length; i++)
             {
                 int pass = i / (Steps * Modes), mode = i / Steps % Modes, step = i % Steps;
+                if (_examples && Array.IndexOf(ExampleModes, mode) < 0) continue;
                 if (_paired && mode is not (2 or 4)) continue;
                 csv.WriteLine(FormattableString.Invariant($"{pass + 1},{(DrawGeometryIndirectExample.DrawMode)mode},{step},{360 * step / Steps},{_times[i]:F6}"));
             }
