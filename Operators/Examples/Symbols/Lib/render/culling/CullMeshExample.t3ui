@@ -1,15 +1,31 @@
 {
   "FormatVersion": 3,
   "Id": "b9fbad68-bf5a-5782-a862-5f64a6a45920",
-  "Description": "Toggle Mesh Occlusion Culling on Camera and move the wall with TransformMesh. Compare Triangles and Triangles drawn in Performance.",
+  "Description": "Four spheres and an animated wall each have a DrawMesh command. Move Draw wall to the first or last input of Draw order. Compare Triangles and Triangles drawn in Performance with Mesh Occlusion Culling enabled on Camera.",
   "InputUis": [],
   "SymbolChildUis": [
+    {
+      "ChildId": "07dc413d-ae36-46cf-9986-db380703dccc",
+      "SymbolName": "Types.Values.Vector3",
+      "Position": {
+        "X": 145.6395,
+        "Y": 157.53842
+      }
+    },
     {
       "ChildId": "240df1db-be11-52ab-8d63-68ceceeaadb9",
       "SymbolName": "Lib.mesh.generate.CubeMesh",
       "Position": {
         "X": 0.0,
-        "Y": 160.0
+        "Y": 107.44696
+      }
+    },
+    {
+      "ChildId": "278b8f4e-1e22-42cd-8707-6474d2c82c67",
+      "SymbolName": "Lib.mesh.modify.TransformMesh",
+      "Position": {
+        "X": 140.0,
+        "Y": -44.83069
       }
     },
     {
@@ -24,16 +40,48 @@
       "ChildId": "3f4d35ce-9882-4905-8230-0b153c83920e",
       "SymbolName": "Lib.mesh.modify.TransformMesh",
       "Position": {
-        "X": 320.9543,
-        "Y": 382.72852
+        "X": 285.6395,
+        "Y": 122.53842
+      }
+    },
+    {
+      "ChildId": "45466cb2-96fe-4391-9bbc-678ff8e28092",
+      "SymbolName": "Lib.numbers.anim.animators.AnimValue",
+      "Position": {
+        "X": 5.639496,
+        "Y": 157.53842
       }
     },
     {
       "ChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
-      "SymbolName": "Lib.mesh.modify.CombineMeshes",
+      "SymbolName": "Lib.flow.Execute",
       "Position": {
-        "X": 490.0,
+        "X": 700.0,
         "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "642b302d-832e-4d88-b631-65480e9abf88",
+      "SymbolName": "Lib.mesh.modify.TransformMesh",
+      "Position": {
+        "X": 140.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "8175a151-1957-4fa9-b8d3-09dd0f49a2a7",
+      "SymbolName": "Lib.mesh.generate.SphereMesh",
+      "Position": {
+        "X": 0.0,
+        "Y": -86.670044
+      }
+    },
+    {
+      "ChildId": "8bad32bb-d736-4059-b1aa-a98ac6735bef",
+      "SymbolName": "Lib.mesh.generate.SphereMesh",
+      "Position": {
+        "X": 0.0,
+        "Y": -44.83069
       }
     },
     {
@@ -45,6 +93,22 @@
       }
     },
     {
+      "ChildId": "8e1dbb89-a357-435e-affc-1d7df7c98792",
+      "SymbolName": "Lib.mesh.generate.SphereMesh",
+      "Position": {
+        "X": 0.0,
+        "Y": 50.857086
+      }
+    },
+    {
+      "ChildId": "b04b2261-2668-4226-a800-0d72a5631ebf",
+      "SymbolName": "Lib.mesh.draw.DrawMesh",
+      "Position": {
+        "X": 490.0,
+        "Y": 122.53842
+      }
+    },
+    {
       "ChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
       "SymbolName": "Lib.render.camera.Camera",
       "Position": {
@@ -53,11 +117,43 @@
       }
     },
     {
-      "ChildId": "b04b2261-2668-4226-a800-0d72a5631ebf",
+      "ChildId": "e6ebe86a-ddaf-4ffe-aa64-a909bcccd952",
+      "SymbolName": "Lib.mesh.modify.TransformMesh",
+      "Position": {
+        "X": 140.0,
+        "Y": -86.670044
+      }
+    },
+    {
+      "ChildId": "4e4933d6-427f-46d7-b1d2-8a0f86f698c6",
       "SymbolName": "Lib.mesh.draw.DrawMesh",
       "Position": {
-        "X": 690.0,
+        "X": 490.0,
+        "Y": 50.857086
+      }
+    },
+    {
+      "ChildId": "f8865e63-272c-4e22-925e-4451a219e9ff",
+      "SymbolName": "Lib.mesh.draw.DrawMesh",
+      "Position": {
+        "X": 490.0,
         "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "c7c6b850-f5d0-41f1-af2c-74d915935719",
+      "SymbolName": "Lib.mesh.draw.DrawMesh",
+      "Position": {
+        "X": 490.0,
+        "Y": -44.83069
+      }
+    },
+    {
+      "ChildId": "d61d8827-ba9e-4588-b898-7ccb481a11ca",
+      "SymbolName": "Lib.mesh.draw.DrawMesh",
+      "Position": {
+        "X": 490.0,
+        "Y": -86.670044
       }
     }
   ],

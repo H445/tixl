@@ -23,6 +23,7 @@ public static class RenderStatsCollector
         
     public static bool IsCollecting { get; private set; }
     private static bool _meshOcclusionEnabled;
+    public const string PendingTriangleCount = "Mesh triangle readback pending";
     public const string CulledTriangleCount = "Mesh triangles skipped";
     public static void MarkMeshOcclusionEnabled() => _meshOcclusionEnabled = true;
 
@@ -38,7 +39,8 @@ public static class RenderStatsCollector
         }
             
         ResultsForLastFrame.Remove(CulledTriangleCount, out var skipped);
-        if (_meshOcclusionEnabled)
+        bool pending = ResultsForLastFrame.Remove(PendingTriangleCount);
+        if (_meshOcclusionEnabled && !pending)
             ResultsForLastFrame["Triangles drawn"] = ResultsForLastFrame.GetValueOrDefault("Triangles") - skipped;
         _meshOcclusionEnabled = false;
 

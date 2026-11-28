@@ -4,81 +4,100 @@ namespace Lib.render.culling;
 
 internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
 {
-    // Keep independent results for each mesh submitted by the camera in one frame.
-    private sealed class Sample
+    // Keep all indirect arguments from a camera frame together. Mixing independent
+    // per-draw samples can produce a total that was never submitted by any frame.
+    private sealed class Frame
     {
-        public readonly Queue<(Buffer Staging, int InputFaces)> Pending = new();
-        public int MaterialFaces;
-        public int? InputFaces;
+        public readonly List<Buffer> Packets = new();
+        public int InputFaces, Draws, ReadIndex, DrawnFaces;
     }
 
-    private readonly List<Sample> _samples = new();
-    private readonly Stack<Buffer> _available = new();
-    private int _materialDraws, _depthDraws, _materialTriangles, _inputTriangles;
+    private readonly Queue<Frame> _pending = new();
+    private readonly Stack<Frame> _available = new();
+    private Frame _current;
+    private int _inputFaces, _drawCalls, _indirectFaces, _indirectDraws;
+    private int _completedInput, _completedDraws, _completedSkipped;
 
     public void CountDirect(int faces, int depthFaces)
     {
         if (!RenderStatsCollector.IsCollecting) return;
-        _materialDraws++;
-        _materialTriangles += faces;
-        _inputTriangles += faces;
-        if (depthFaces > 0) _depthDraws++;
+        _inputFaces += faces;
+        _drawCalls += depthFaces > 0 ? 2 : 1;
     }
 
     public void CountIndirect(DeviceContext context, Buffer arguments, int faces, int depthFaces)
     {
-        // The editor advances the stats collector. Player renders never request readbacks.
         if (!RenderStatsCollector.IsCollecting) return;
-        while (_samples.Count <= _materialDraws)
-            _samples.Add(new Sample());
-        var sample = _samples[_materialDraws++];
-        Span<byte> vertexCount = stackalloc byte[sizeof(uint)];
-        while (sample.Pending.TryPeek(out var oldest)
-               && ResourceManager.Device.Backend.TryReadCompletedBuffer(oldest.Staging.GpuBuffer, vertexCount))
-        {
-            sample.InputFaces = oldest.InputFaces;
-            sample.MaterialFaces = (int)(BitConverter.ToUInt32(vertexCount) / 3);
-            _available.Push(sample.Pending.Dequeue().Staging);
-        }
-        // Keep the scene count current even when the GPU readback is delayed.
-        _inputTriangles += faces;
-        // After a topology change, use the full input until its first matching GPU result arrives.
-        _materialTriangles += sample.InputFaces == faces ? sample.MaterialFaces : faces;
-        if (depthFaces > 0) _depthDraws++;
+        CountDirect(faces, depthFaces);
+        _indirectDraws++;
+        _indirectFaces += faces;
 
-        // Use the latest completed packet while the GPU is busy. Bound memory even if collection stalls.
-        if (sample.Pending.Count >= 3) return;
-        if (!_available.TryPop(out var staging))
+        // Under GPU backpressure skip a whole sample, never part of a frame.
+        if (_pending.Count >= 3) return;
+        _current ??= _available.TryPop(out var frame) ? frame : new Frame();
+        if (_current.Draws == _current.Packets.Count)
         {
-            staging = new Buffer(ResourceManager.Device, new BufferDescription
+            _current.Packets.Add(new Buffer(ResourceManager.Device, new BufferDescription
             {
-                SizeInBytes = sizeof(uint), Usage = ResourceUsage.Staging, CpuAccessFlags = CpuAccessFlags.Read
-            });
+                SizeInBytes = DeviceContext.DrawInstancedIndirectArgsStride,
+                Usage = ResourceUsage.Staging,
+                CpuAccessFlags = CpuAccessFlags.Read
+            }));
         }
-        // Copy just vertexCount from the indirect packet (one instance, triangle list).
-        context.CopyResource(arguments, staging);
-        sample.Pending.Enqueue((staging, faces));
+        context.CopyResource(arguments, _current.Packets[_current.Draws++]);
+        _current.InputFaces += faces;
+    }
+
+    private void ReadCompletedFrames()
+    {
+        if (_current != null)
+        {
+            _pending.Enqueue(_current);
+            _current = null;
+        }
+        Span<byte> packet = stackalloc byte[DeviceContext.DrawInstancedIndirectArgsStride];
+        while (_pending.TryPeek(out var frame))
+        {
+            while (frame.ReadIndex < frame.Draws)
+            {
+                var buffer = frame.Packets[frame.ReadIndex];
+                if (!ResourceManager.Device.Backend.TryReadCompletedBuffer(buffer.GpuBuffer, packet))
+                    return;
+
+                // Each packet describes a triangle list: vertices per instance, then instance count.
+                frame.DrawnFaces += (int)((BitConverter.ToUInt32(packet) / 3) * BitConverter.ToUInt32(packet[4..]));
+                frame.ReadIndex++;
+            }
+            _completedInput = frame.InputFaces;
+            _completedDraws = frame.Draws;
+            _completedSkipped = frame.InputFaces - frame.DrawnFaces;
+            frame.InputFaces = frame.Draws = frame.ReadIndex = frame.DrawnFaces = 0;
+            _available.Push(_pending.Dequeue());
+        }
     }
 
     public IEnumerable<(string, int)> GetStats()
     {
-        yield return ("Triangles", _inputTriangles);
-        yield return (RenderStatsCollector.CulledTriangleCount, _inputTriangles - _materialTriangles);
-        yield return ("Draw calls", _depthDraws + _materialDraws);
+        ReadCompletedFrames();
+        yield return ("Triangles", _inputFaces);
+        yield return ("Draw calls", _drawCalls);
+        if (_indirectDraws == 0) yield break;
+        if (_completedInput == _indirectFaces && _completedDraws == _indirectDraws)
+            yield return (RenderStatsCollector.CulledTriangleCount, _completedSkipped);
+        else
+            yield return (RenderStatsCollector.PendingTriangleCount, 1);
     }
 
     public void StartNewFrame()
     {
-        _materialDraws = _depthDraws = 0;
-        _materialTriangles = _inputTriangles = 0;
+        _inputFaces = _drawCalls = _indirectFaces = _indirectDraws = 0;
     }
 
     public void Dispose()
     {
-        foreach (var sample in _samples)
-            foreach (var pending in sample.Pending)
-                pending.Staging.Dispose();
-        foreach (var buffer in _available)
-            buffer.Dispose();
+        if (_current != null) _available.Push(_current);
+        foreach (var frame in _available.Concat(_pending))
+            foreach (var packet in frame.Packets)
+                packet.Dispose();
     }
 }

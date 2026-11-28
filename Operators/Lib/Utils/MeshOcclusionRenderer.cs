@@ -96,12 +96,12 @@ internal sealed class MeshOcclusionRenderer : IDisposable
         finally { dc.PopState(); }
         // Keep transfer reads of the generated packet separate from indirect and uniform reads.
         dc.CopyResource(_args.Buffer!, _indirect!);
-        _stats.CountIndirect(dc, _args.Buffer!, faceCount, opaque ? faceCount : 0);
         dc.PushState(StateGroups.VertexShader);
         try
         {
             dc.VertexShader.SetShaderResource(1, _visible.Srv);
             dc.DrawInstancedIndirect(_indirect!, 0);
+            _stats.CountIndirect(dc, _indirect!, faceCount, opaque ? faceCount : 0);
         }
         finally { dc.PopState(); }
     }

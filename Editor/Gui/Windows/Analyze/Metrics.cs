@@ -153,7 +153,7 @@ internal static class T3Metrics
             var (label, tooltip) = key switch
             {
                 "Triangles" => ("Triangles", "Triangle count from the scene's reported draws before mesh occlusion culling. Repeated draws of a mesh count separately."),
-                "Triangles drawn" => ("Triangles drawn", "Triangles submitted for shading after mesh occlusion culling. Includes ordinary draws. Vulkan uses the latest completed visibility count."),
+                "Triangles drawn" => ("Triangles drawn (material pass)", "Triangles submitted for shading, including ordinary draws. The private depth prepass is excluded. Vulkan reports completed indirect draw arguments, so the count can lag during animation."),
                 _ => (key, null)
             };
             if (tooltip != null)
