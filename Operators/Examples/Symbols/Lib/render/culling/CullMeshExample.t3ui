@@ -1,46 +1,63 @@
 {
   "FormatVersion": 3,
   "Id": "b9fbad68-bf5a-5782-a862-5f64a6a45920",
+  "Description": "Toggle Mesh Occlusion Culling on Camera and move the wall with TransformMesh. Compare Triangles and Triangles drawn in Performance.",
   "InputUis": [],
   "SymbolChildUis": [
-    {
-      "ChildId": "8c8c98aa-ce90-5ff0-bda1-b864b0d2d4d4",
-      "SymbolName": "Lib.mesh.generate.SphereMesh",
-      "Position": {
-        "X": 0,
-        "Y": 0
-      }
-    },
     {
       "ChildId": "240df1db-be11-52ab-8d63-68ceceeaadb9",
       "SymbolName": "Lib.mesh.generate.CubeMesh",
       "Position": {
-        "X": 0,
-        "Y": 160
-      }
-    },
-    {
-      "ChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
-      "SymbolName": "Lib.render.culling.CullMesh",
-      "Position": {
-        "X": 490,
-        "Y": 0
-      }
-    },
-    {
-      "ChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
-      "SymbolName": "Lib.render.camera.Camera",
-      "Position": {
-        "X": 730,
-        "Y": 0
+        "X": 0.0,
+        "Y": 160.0
       }
     },
     {
       "ChildId": "3a2063bf-41af-5846-91de-6b4f0a42316e",
       "SymbolName": "Lib.image.generate.basic.RenderTarget",
       "Position": {
-        "X": 970,
-        "Y": 0
+        "X": 1170.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "3f4d35ce-9882-4905-8230-0b153c83920e",
+      "SymbolName": "Lib.mesh.modify.TransformMesh",
+      "Position": {
+        "X": 320.9543,
+        "Y": 382.72852
+      }
+    },
+    {
+      "ChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
+      "SymbolName": "Lib.mesh.modify.CombineMeshes",
+      "Position": {
+        "X": 490.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "8c8c98aa-ce90-5ff0-bda1-b864b0d2d4d4",
+      "SymbolName": "Lib.mesh.generate.SphereMesh",
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
+      "SymbolName": "Lib.render.camera.Camera",
+      "Position": {
+        "X": 930.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "ChildId": "b04b2261-2668-4226-a800-0d72a5631ebf",
+      "SymbolName": "Lib.mesh.draw.DrawMesh",
+      "Position": {
+        "X": 690.0,
+        "Y": 0.0
       }
     }
   ],
@@ -48,10 +65,9 @@
     {
       "OutputId": "4c5bf29a-39f9-55d9-9f82-ca52f64a525e",
       "Position": {
-        "X": 1220,
-        "Y": 0
+        "X": 1420.0,
+        "Y": 0.0
       }
     }
-  ],
-  "Description": "The sphere and wall feed the same Mesh input. Slide the cube along X or swap the two connections to inspect visibility."
+  ]
 }

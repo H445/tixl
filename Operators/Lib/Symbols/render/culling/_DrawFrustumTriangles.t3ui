@@ -22,7 +22,7 @@
     },
     {
       "InputId": "8a59453b-31c6-5829-9ac5-e2b913ba23dc",
-      "Description": "Reuse the previous result for an unchanged mesh and camera. Enable only for stable positions and topology.",
+      "Description": "Legacy input for saved graphs. The camera now rebuilds mesh bounds from current geometry.",
       "Position": {
         "X": -240,
         "Y": 130

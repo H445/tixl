@@ -1,7 +1,7 @@
 {
   "FormatVersion": 3,
   "Id": "a9801dd7-f7f7-57d8-a573-bea3d12eeb7b",
-  "Description": "Draw opaque meshes under the active camera. The GPU builds depth from the connected meshes before shading visible geometry.",
+  "Description": "Draw opaque meshes under the active camera. Enable Mesh Occlusion Culling on Camera to filter their triangles. New graphs can connect DrawMesh directly to Camera.",
   "InputUis": [
     {
       "InputId": "e5ef4ff9-92a7-57aa-97be-33379b9520b2",
@@ -17,7 +17,7 @@
         "X": -250,
         "Y": 80
       },
-      "Description": "Cache bounds for unchanged vertex and index data. Disable this when geometry is rewritten in place."
+      "Description": "Legacy input for saved graphs. The camera now rebuilds mesh bounds from current geometry."
     }
   ],
   "SymbolChildUis": [

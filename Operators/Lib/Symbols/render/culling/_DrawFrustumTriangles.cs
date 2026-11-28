@@ -16,31 +16,8 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
 
     private readonly CullDrawStats _stats = new();
 
-    private const string ShaderPath = "Lib:shaders/3d/mesh/culling/Frustum triangles.hlsl";
-    private Resource<ComputeShader>? _mark, _prefix, _scatter, _small, _buildBounds, _markStatic, _markDepth;
-    private readonly BufferWithViews _masks = new(), _offsets = new(), _visible = new(), _args = new(), _bounds = new();
-    private Buffer? _constants, _indirect;
-    private ShaderResourceView? _lastVertices, _lastFaces;
-    private Matrix4x4 _lastMatrix;
-    private int _lastFaceCount, _lastVertexCount, _lastVersion;
-    private bool _cached, _hasBounds;
-
-    // Only the opaque CullMesh graph enables this path. Other graph users may supply
-    // blending, fragment fields or alpha clipping that a position-only prepass cannot reproduce.
     [Input(Guid = "1f78cd12-35ee-46f7-a9c5-177b33c1d860")]
     public readonly InputSlot<bool> OpaquePrepass = new();
-
-    private readonly MeshDepthPyramid _meshDepth = new();
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Parameters
-    {
-        public Matrix4x4 ObjectToClip;
-        public uint FaceCount, GroupCount, GroupsX, VertexCount;
-        public uint DepthWidth, DepthHeight;
-        public float DepthBias;
-        public uint Padding;
-    }
 
     public _DrawFrustumTriangles()
     {
@@ -72,172 +49,16 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         int faceCount = mesh?.FaceCount ?? 0;
         if (mesh == null || faceCount <= 0 || dc.VertexShader.Shader == null || dc.PixelShader.Shader == null) return;
 
-        int vertices = mesh.VertexBuffer?.ElementCount ?? 0;
-        var vertexView = mesh.VertexBuffer?.Srv;
-        var indexView = mesh.IndicesBuffer?.Srv;
-        bool valid = vertexView is { IsDisposed: false } && indexView is { IsDisposed: false }
-                     && mesh.VertexBuffer!.ElementStride == T3.Core.Rendering.PbrVertex.Stride
-                     && mesh.IndicesBuffer!.ElementStride == 12 && vertices > 0;
-        if (BypassCulling.GetValue(context) || !valid || !MeshDepthPyramid.IsVulkanDevice(ResourceManager.Device))
-        {
+        if (context.DrawMeshWithOcclusion != null && !BypassCulling.GetValue(context) && DepthTestEnabled.GetValue(context))
+            context.DrawMeshWithOcclusion(context, mesh, OpaquePrepass.GetValue(context));
+        else
             FullDraw(dc, faceCount);
-            return;
-        }
-
-        var matrix = context.ObjectToWorld * context.WorldToCamera * context.CameraToClipSpace;
-        bool cache = CacheStaticMesh.GetValue(context);
-        MeshDepthPyramid? depth = null;
-        if (OpaquePrepass.GetValue(context) && DepthTestEnabled.GetValue(context) && _meshDepth.Build(context, this, faceCount))
-            depth = _meshDepth;
-        int depthFaces = depth != null ? faceCount : 0;
-        int version = Mesh.DirtyFlag.SourceVersion;
-        bool sameSource = _lastVersion == version && _lastFaceCount == faceCount && _lastVertexCount == vertices
-                          && _lastVertices == vertexView && _lastFaces == indexView;
-        if (!cache || !sameSource) _hasBounds = false;
-        if (!cache || !_cached || _lastMatrix != matrix || !sameSource || depth != null)
-        {
-            int groups = 1 + (faceCount - 1) / 128;
-            int rows = 1 + (groups - 1) / 65535;
-            int columns = 1 + (groups - 1) / rows;
-            if (!PrepareBuffers(faceCount, groups))
-            {
-                FullDraw(dc, faceCount, depthFaces);
-                return;
-            }
-            // The small path consumes the same visible index buffer and indirect count.
-            bool small = depth == null && faceCount <= 7 * 128;
-            ComputeShader? mark, prefix=null, scatter=null;
-            if(small)
-                mark=(_small ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"FilterSmall")).Value;
-            else
-            {
-                mark=(_mark ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"Mark")).Value;
-                prefix=(_prefix ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"Prefix")).Value;
-                scatter=(_scatter ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath,this,()=>"Scatter")).Value;
-            }
-            if(mark==null || (!small && (prefix==null || scatter==null))) { FullDraw(dc, faceCount, depthFaces);return; }
-            // Rebuild bounds for mutable geometry before classifying it against the private depth.
-            bool useBounds = depth != null || (cache && groups >= 8);
-            ComputeShader? builder = null;
-            if (useBounds)
-            {
-                builder = (_buildBounds ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "BuildBounds")).Value;
-                var grouped = (_markStatic ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "MarkStatic")).Value;
-                useBounds = builder != null && grouped != null && Workspace(_bounds, groups, 32, false);
-                if (useBounds) mark = grouped;
-                if (useBounds && depth != null)
-                {
-                    var depthShader = (_markDepth ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "MarkDepth")).Value;
-                    if (depthShader != null) mark = depthShader;
-                    else depth = null;
-                }
-            }
-            ResourceManager.SetupConstBuffer(new Parameters
-            {
-                ObjectToClip = Matrix4x4.Transpose(matrix), FaceCount = (uint)faceCount, VertexCount = (uint)vertices,
-                GroupCount = (uint)groups, GroupsX = (uint)columns,
-                DepthWidth = (uint)(depth?.Width ?? 0), DepthHeight = (uint)(depth?.Height ?? 0), DepthBias = MeshDepthPyramid.DepthBias
-            }, ref _constants);
-
-            dc.PushState(StateGroups.ComputeShader);
-            try
-            {
-                var cs = dc.ComputeShader;
-                cs.SetConstantBuffer(0, _constants);
-                cs.SetShaderResource(0, vertexView);
-                cs.SetShaderResource(1, indexView);
-                if (depth != null) cs.SetShaderResource(2, depth.Levels);
-                if(!small)
-                {
-                    cs.SetUnorderedAccessView(0, _masks.Uav, -1);
-                    cs.SetUnorderedAccessView(1, _offsets.Uav, -1);
-                }
-                cs.SetUnorderedAccessView(2, _visible.Uav, -1);
-                cs.SetUnorderedAccessView(3, _args.Uav, -1);
-                if (useBounds)
-                {
-                    cs.SetUnorderedAccessView(4, _bounds.Uav, -1);
-                    if (!_hasBounds)
-                    {
-                        cs.Set(builder);
-                        dc.Dispatch(columns, rows, 1);
-                        _hasBounds = true;
-                    }
-                }
-                cs.Set(mark);
-                dc.Dispatch(small?1:columns, small?1:rows, 1);
-                if(!small)
-                {
-                    cs.Set(prefix);
-                    dc.Dispatch(1, 1, 1);
-                    cs.Set(scatter);
-                    dc.Dispatch(columns, rows, 1);
-                }
-            }
-            finally { dc.PopState(); }
-            // Keep transfer reads of the generated packet separate from indirect and uniform reads.
-            dc.CopyResource(_args.Buffer!, _indirect!);
-            _lastMatrix = matrix;
-            _lastVersion = version;
-            _lastFaceCount = faceCount;
-            _lastVertexCount = vertices;
-            _lastVertices = vertexView;
-            _lastFaces = indexView;
-            _cached = cache && depth == null;
-        }
-        _stats.CountIndirect(dc, _args.Buffer!, depthFaces);
-        dc.PushState(StateGroups.VertexShader);
-        try
-        {
-            dc.VertexShader.SetShaderResource(1, _visible.Srv);
-            dc.DrawInstancedIndirect(_indirect!, 0);
-        }
-        finally { dc.PopState(); }
     }
 
-    private void FullDraw(DeviceContext dc, int faces, int depthFaces = 0)
+    private void FullDraw(DeviceContext dc, int faces)
     {
-        _cached = false;
-        _hasBounds = false;
         dc.Draw(checked(faces * 3), 0);
-        _stats.CountDirect(faces, depthFaces);
-    }
-
-    private bool PrepareBuffers(int faces, int groups)
-    {
-        // The compute result stays on the GPU. Cached draws reuse the last command snapshot.
-        if (_args.Uav == null)
-        {
-            _args.Buffer ??= new Buffer(ResourceManager.Device, new BufferDescription
-            {
-                SizeInBytes = 16,
-                StructureByteStride = sizeof(uint),
-                Usage = ResourceUsage.Default,
-                BindFlags = BindFlags.UnorderedAccess,
-                OptionFlags = ResourceOptionFlags.BufferStructured
-            });
-            _indirect ??= new Buffer(ResourceManager.Device, new BufferDescription
-            {
-                SizeInBytes = 16, Usage = ResourceUsage.Default, OptionFlags = ResourceOptionFlags.DrawIndirectArguments
-            });
-            ResourceManager.CreateStructuredBufferUav(_args.Buffer, UnorderedAccessViewBufferFlags.None, ref _args.Uav);
-        }
-        return _args.Uav != null && Workspace(_masks, groups, 16, false)
-               && Workspace(_offsets, groups, 4, false) && Workspace(_visible, faces, 12, true);
-    }
-
-    private static bool Workspace(BufferWithViews buffer, int count, int stride, bool read)
-    {
-        if (buffer.ElementCount < count || buffer.Uav == null || read && buffer.Srv == null)
-        {
-            int oldCapacity = buffer.ElementCount;
-            int capacity = (int)Math.Min(int.MaxValue / stride, Math.Max((long)count, oldCapacity + oldCapacity / 4L));
-            if (capacity < count) return false;
-            ResourceManager.SetupStructuredBuffer(capacity * stride, stride, ref buffer.Buffer);
-            ResourceManager.CreateStructuredBufferUav(buffer.Buffer, UnorderedAccessViewBufferFlags.None, ref buffer.Uav);
-            if (read) ResourceManager.CreateStructuredBufferSrv(buffer.Buffer, ref buffer.Srv);
-        }
-        return buffer.Buffer != null && buffer.ElementCount >= count && buffer.Uav != null && (!read || buffer.Srv != null);
+        _stats.CountDirect(faces, 0);
     }
 
     protected override void Dispose(bool disposing)
@@ -246,12 +67,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         {
             RenderStatsCollector.UnregisterProvider(_stats);
             _stats.Dispose();
-            _masks.Dispose(); _offsets.Dispose(); _visible.Dispose(); _args.Dispose(); _bounds.Dispose();
-            _indirect?.Dispose(); _constants?.Dispose();
-            _meshDepth.Dispose();
-            _mark?.Dispose(); _small?.Dispose(); _prefix?.Dispose(); _scatter?.Dispose(); _markStatic?.Dispose(); _markDepth?.Dispose(); _buildBounds?.Dispose();
         }
         base.Dispose(disposing);
     }
-
 }

@@ -2,6 +2,7 @@
   "FormatVersion": 3,
   "Id": "746d886c-5ab6-44b1-bb15-f3ce2fadf7e6"/*Camera*/,
   "Inputs": [
+    { "Id": "b9c174ee-57bb-4ef3-a69b-b21a203234fd", "DefaultValue": false },
     {
       "Id": "047b8fae-468c-48a7-8f3a-5fac8dd5b3c6"/*Command*/,
       "DefaultValue": null

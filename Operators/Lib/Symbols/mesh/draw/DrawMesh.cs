@@ -44,6 +44,23 @@ internal sealed class DrawMesh : Instance<DrawMesh>, ICustomDropdownHolder, ICom
         context.PbrMaterial = previousMaterial;
     }
 
+    internal bool TryDrawWithOcclusion(EvaluationContext context, int vertexCount)
+    {
+        if (!EnableZTest.GetValue(context) || FragmentField.HasInputConnections || !string.IsNullOrEmpty(ShaderDefines.GetValue(context)))
+            return false;
+
+        var mesh = Mesh.GetValue(context);
+        if (mesh == null || mesh.FaceCount <= 0 || mesh.FaceCount * 3L != vertexCount)
+            return false;
+
+        // Only solid, depth-writing geometry may act as its own occluder.
+        // Other draws test against depth already present in the camera target.
+        bool opaque = BlendMode.GetValue(context) == (int)SharedEnums.BlendModes.None
+                      && AlphaCutOff.GetValue(context) <= 0 && EnableZWrite.GetValue(context);
+        context.DrawMeshWithOcclusion(context, mesh, opaque);
+        return true;
+    }
+
     #region custom material dropdown
     string ICustomDropdownHolder.GetValueForInput(Guid inputId)
     {

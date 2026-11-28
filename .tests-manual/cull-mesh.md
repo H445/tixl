@@ -11,49 +11,33 @@ prerequisites:
   - Use a GPU frame capture with indirect draw arguments visible for the submission checks.
 ---
 
-## Step: Mesh-only occlusion
+## Step: Camera toggle and render statistics
 
-**Action:**
-In [CullMeshExample], trace Sphere mesh and Wall mesh to the Mesh input on [CullMesh]. Move the wall center from (100, 0, 2) to (0, 0, 2), then slide it sideways until the sphere is partly visible. Repeat after reversing the two mesh connections.
-
-**Expected:**
-- Both orders show the sphere uncovered, covered, and partly visible at the same positions.
-- A Vulkan capture shows a depth-only draw into a private attachment, depth reduction and visibility dispatches, then an indirect material draw into the original target. The covered material draw submits fewer vertices. Surviving 128-face groups can include some hidden faces.
-- Returning the wall to X = 100 restores the sphere. There is no occluder command or draw-order input to configure.
-
-## Step: One connected mesh
-
-**Action:**
-Connect both primitives to [CombineMeshes] and connect only its result to [CullMesh]. Repeat the wall movement. Then connect only Sphere mesh directly and pan the camera off it and back.
+**Action:** Pin Preview and open Performance. With Sphere mesh set to 32 by 16 segments, disable Mesh Occlusion Culling on Camera. Move the wall using TransformMesh. Enable the toggle, set Translation X to -1.55 to cover the sphere, then to 100 to move the wall outside the camera. Allow several frames for GPU readback.
 
 **Expected:**
-- The precombined mesh gives the same image and supports occlusion between its parts.
-- An isolated sphere clips correctly at the camera edge, disappears outside the view, and returns without stale geometry.
+- With the toggle off, Triangles reads 1,068 and the example issues one draw. The Triangles drawn row is hidden.
+- On Vulkan, Triangles stays at 1,068. Triangles drawn reads 40 when covered and 1,056 with the wall outside the camera. A frame capture shows a private depth draw and an indirect material draw. Groups touching visible geometry can include hidden triangles.
+- Toggle back and forth. The rendered silhouette matches between modes and the drawn row disappears when disabled.
 
 ## Step: Camera, topology and multisampling
 
-**Action:**
-Run with 1 and 4 samples on a device that supports 4x MSAA. Change the sphere from 32 by 16 segments to 8 by 4. Disable StaticMesh for geometry that changes in place. Move the wall and camera again.
+**Action:** With the wall outside the view, change Sphere mesh to 8 by 4 segments. Pan both objects outside the view. Repeat at 1 and 4 samples on hardware supporting 4x MSAA.
 
 **Expected:**
-- Uncovered pixels at the wall edge remain visible at both sample counts. The color pass renders into the original scene target.
-- The edited sphere follows the new silhouette. A frame capture shows depth and material draws with matching sample counts.
+- The input count changes to 84. On Vulkan the drawn count settles at 72 with the sphere visible and zero when both objects are outside the view.
+- Moving the wall or camera reveals newly visible geometry. Check the silhouette near the wall edge against culling disabled.
 
-## Step: Direct3D 11 fallback on Windows
+## Step: Separate material draws
 
-**Action:**
-Open the same example on Direct3D 11 and repeat the wall and camera movement.
+**Action:** Connect the transformed wall and sphere to separate opaque DrawMesh nodes. Feed their commands into Execute, wall first, and connect Execute to Camera. Compare the preview with the camera toggle off and on. Move the wall from centered to outside the view.
 
-**Expected:**
-- The wall covers the sphere and reveals it again. Clipping at the camera edge matches ordinary mesh drawing.
-- A frame capture shows a direct candidate draw. The GPU culling kernels and indirect draw are bypassed. The console reports no shader errors for the example.
+**Expected:** Both draws contribute to the same 1,068 input triangles. Their images match between modes. The sphere contributes no material triangles behind the centered wall and 1,056 with the wall outside the view.
 
-## Step: Render statistics
+## Step: Direct3D 11 fallback
 
-**Action:**
-Pin Preview in the stock example. Set Wall mesh Center to (100, 0, 2) and Sphere mesh Segments to 32 by 16. Read Triangles submitted (all passes), CullMesh depth prepass triangles, CullMesh material pass triangles and Draw calls. Move the wall to (0, 0, 2), then pan both meshes out of view. Repeat with 8 by 4 sphere segments. Allow several frames for GPU results to arrive.
+**Action:** Repeat the toggle, occlusion and topology steps with the Direct3D 11 backend.
 
 **Expected:**
-- On Vulkan, the depth prepass submits 1,068 triangles at 32 by 16 or 84 at 8 by 4. Moving the wall leaves this count unchanged. With only the example rendering, the all-passes total equals depth plus material. There are two draw calls.
-- Moving the wall over the sphere reduces material submissions. Fully occluded faces can still belong to a surviving group. Panning both meshes out of view reduces material submissions to zero and leaves the total equal to the depth prepass. Counts follow completed indirect packets without forcing a GPU wait.
-- On Direct3D 11, depth prepass triangles stays at zero. The material count and total both equal the full mesh submission regardless of visibility. The two source meshes each use one direct material draw.
+- One direct draw renders the example. With the toggle enabled both triangle counts equal the input, including when both meshes are outside the camera. Disabling the toggle hides Triangles drawn.
+- The console reports no shader errors.

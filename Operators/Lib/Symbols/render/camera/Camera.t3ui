@@ -105,6 +105,11 @@
       "Description": "Enforces a fixed aspect ratio for the camera view.\nFor values of 0 or below, the aspect ratio of the current render resolution is used. With a positive value, the content gets stretched if the output has a different aspect ratio."
     },
     {
+      "InputId": "b9c174ee-57bb-4ef3-a69b-b21a203234fd",
+      "Position": { "X": 0.0, "Y": 585.0 },
+      "Description": "Use scene depth to skip hidden DrawMesh triangles on Vulkan. Opaque draws can also build depth from their own geometry. Performance shows the surviving material submissions."
+    },
+    {
       "InputId": "fee19916-846f-491a-a2ee-1e7b1ac8e533"/*PositionOffset*/,
       "Position": {
         "X": 0.0,

@@ -1,3 +1,4 @@
+using Lib.render.culling;
 using T3.Core.Rendering;
 using T3.Core.Utils;
 
@@ -44,12 +45,24 @@ internal sealed class Camera : Instance<Camera>, ICamera, ICameraPropertiesProvi
 
         // The innermost camera claims the rendered image for the render op's bundle.
         var renderedCameraSerial = context.RenderPass.RenderedCameraSerial;
-        Command.GetValue(context);
-        context.RenderPass.RecordCamera(renderedCameraSerial, this);
-        context.RenderPass.ProjectionJitter = prevProjectionJitter;
-
-        context.CameraToClipSpace = prevCameraToClipSpace;
-        context.WorldToCamera = prevWorldToCamera;
+        var previousOcclusion = context.DrawMeshWithOcclusion;
+        try
+        {
+            bool enabled = MeshOcclusionCulling.GetValue(context);
+            if (enabled) RenderStatsCollector.MarkMeshOcclusionEnabled();
+            context.DrawMeshWithOcclusion = enabled && MeshDepthPyramid.IsVulkanDevice(ResourceManager.Device)
+                                                ? (_occlusion ??= new MeshOcclusionRenderer(this)).Draw
+                                                : null;
+            Command.GetValue(context);
+            context.RenderPass.RecordCamera(renderedCameraSerial, this);
+        }
+        finally
+        {
+            context.DrawMeshWithOcclusion = previousOcclusion;
+            context.RenderPass.ProjectionJitter = prevProjectionJitter;
+            context.CameraToClipSpace = prevCameraToClipSpace;
+            context.WorldToCamera = prevWorldToCamera;
+        }
     }
         
     private void UpdateCameraDefinition(EvaluationContext context)
@@ -86,6 +99,17 @@ internal sealed class Camera : Instance<Camera>, ICamera, ICameraPropertiesProvi
         WorldToCamera = worldToCamera;
     }
     
+    [Input(Guid = "b9c174ee-57bb-4ef3-a69b-b21a203234fd")]
+    public readonly InputSlot<bool> MeshOcclusionCulling = new();
+
+    private MeshOcclusionRenderer _occlusion;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _occlusion?.Dispose();
+        base.Dispose(disposing);
+    }
+
     private Vector2 _projectionJitter;
 
     public  CameraDefinition CameraDefinition => _cameraDefinition;

@@ -152,9 +152,8 @@ internal static class T3Metrics
         {
             var (label, tooltip) = key switch
             {
-                "Triangles" => ("Triangles submitted (all passes)", "Counts each reported triangle submission across the scene. A triangle drawn for depth and again for shading counts twice."),
-                "Depth prepass triangles" => ("CullMesh depth prepass triangles", "Input triangles submitted to build the occlusion depth buffer before culling. Included in the all-passes total."),
-                "Material triangles" => ("CullMesh material pass triangles", "Triangles submitted for shading after culling. Surviving groups can include hidden triangles. Included in the all-passes total."),
+                "Triangles" => ("Triangles", "Triangle count from the scene's reported draws before mesh occlusion culling. Repeated draws of a mesh count separately."),
+                "Triangles drawn" => ("Triangles drawn", "Triangles submitted for shading after mesh occlusion culling. Includes ordinary draws. Vulkan uses the latest completed visibility count."),
                 _ => (key, null)
             };
             if (tooltip != null)

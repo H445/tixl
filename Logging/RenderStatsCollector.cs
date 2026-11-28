@@ -21,8 +21,14 @@ public static class RenderStatsCollector
         _providers.Remove(obsoleteProvider);
     }
         
+    public static bool IsCollecting { get; private set; }
+    private static bool _meshOcclusionEnabled;
+    public const string CulledTriangleCount = "Mesh triangles skipped";
+    public static void MarkMeshOcclusionEnabled() => _meshOcclusionEnabled = true;
+
     public static void StartNewFrame()
     {
+        IsCollecting = true;
         ResultsForLastFrame.Clear();
 
         foreach (var (topic, count) in GetFrameResults())
@@ -31,6 +37,11 @@ public static class RenderStatsCollector
             ResultsForLastFrame[topic] = sum + count;
         }
             
+        ResultsForLastFrame.Remove(CulledTriangleCount, out var skipped);
+        if (_meshOcclusionEnabled)
+            ResultsForLastFrame["Triangles drawn"] = ResultsForLastFrame.GetValueOrDefault("Triangles") - skipped;
+        _meshOcclusionEnabled = false;
+
         foreach (var p in _providers)
         {
             p.StartNewFrame();

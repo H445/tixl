@@ -4,32 +4,31 @@ namespace Lib.render.culling;
 
 internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
 {
-    // Keep independent results if this operator draws under multiple cameras in one frame.
+    // Keep independent results for each mesh submitted by the camera in one frame.
     private sealed class Sample
     {
-        public readonly Queue<(Buffer Staging, int DepthFaces)> Pending = new();
+        public readonly Queue<(Buffer Staging, int InputFaces)> Pending = new();
         public int MaterialFaces;
-        public int? DepthFaces;
+        public int? InputFaces;
     }
 
     private readonly List<Sample> _samples = new();
     private readonly Stack<Buffer> _available = new();
-    private int _materialDraws, _depthDraws, _materialTriangles, _depthTriangles;
-    private bool _collecting;
+    private int _materialDraws, _depthDraws, _materialTriangles, _inputTriangles;
 
     public void CountDirect(int faces, int depthFaces)
     {
-        if (!_collecting) return;
+        if (!RenderStatsCollector.IsCollecting) return;
         _materialDraws++;
         _materialTriangles += faces;
-        _depthTriangles += depthFaces;
+        _inputTriangles += faces;
         if (depthFaces > 0) _depthDraws++;
     }
 
-    public void CountIndirect(DeviceContext context, Buffer arguments, int depthFaces)
+    public void CountIndirect(DeviceContext context, Buffer arguments, int faces, int depthFaces)
     {
         // The editor advances the stats collector. Player renders never request readbacks.
-        if (!_collecting) return;
+        if (!RenderStatsCollector.IsCollecting) return;
         while (_samples.Count <= _materialDraws)
             _samples.Add(new Sample());
         var sample = _samples[_materialDraws++];
@@ -37,13 +36,14 @@ internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
         while (sample.Pending.TryPeek(out var oldest)
                && ResourceManager.Device.Backend.TryReadCompletedBuffer(oldest.Staging.GpuBuffer, vertexCount))
         {
-            sample.DepthFaces = oldest.DepthFaces;
+            sample.InputFaces = oldest.InputFaces;
             sample.MaterialFaces = (int)(BitConverter.ToUInt32(vertexCount) / 3);
             _available.Push(sample.Pending.Dequeue().Staging);
         }
-        // Pair both counts from the same submission when topology or visibility changes.
-        _depthTriangles += sample.DepthFaces ?? depthFaces;
-        _materialTriangles += sample.MaterialFaces;
+        // Keep the scene count current even when the GPU readback is delayed.
+        _inputTriangles += faces;
+        // After a topology change, use the full input until its first matching GPU result arrives.
+        _materialTriangles += sample.InputFaces == faces ? sample.MaterialFaces : faces;
         if (depthFaces > 0) _depthDraws++;
 
         // Use the latest completed packet while the GPU is busy. Bound memory even if collection stalls.
@@ -57,22 +57,20 @@ internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
         }
         // Copy just vertexCount from the indirect packet (one instance, triangle list).
         context.CopyResource(arguments, staging);
-        sample.Pending.Enqueue((staging, depthFaces));
+        sample.Pending.Enqueue((staging, faces));
     }
 
     public IEnumerable<(string, int)> GetStats()
     {
-        yield return ("Triangles", _depthTriangles + _materialTriangles);
-        yield return ("Depth prepass triangles", _depthTriangles);
-        yield return ("Material triangles", _materialTriangles);
+        yield return ("Triangles", _inputTriangles);
+        yield return (RenderStatsCollector.CulledTriangleCount, _inputTriangles - _materialTriangles);
         yield return ("Draw calls", _depthDraws + _materialDraws);
     }
 
     public void StartNewFrame()
     {
-        _collecting = true;
         _materialDraws = _depthDraws = 0;
-        _materialTriangles = _depthTriangles = 0;
+        _materialTriangles = _inputTriangles = 0;
     }
 
     public void Dispose()

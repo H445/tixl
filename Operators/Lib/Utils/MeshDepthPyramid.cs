@@ -46,7 +46,7 @@ internal sealed class MeshDepthPyramid : IDisposable
 
     private static int Half(int x) => (x + 1) / 2;
 
-    public bool Build(EvaluationContext context, _DrawFrustumTriangles owner, int faceCount)
+    public bool Build(EvaluationContext context, Instance owner, int faceCount, bool opaque)
     {
         var dc = ResourceManager.Device.ImmediateContext;
         var attachment = dc.OutputMerger.DepthStencilTarget;
@@ -96,21 +96,23 @@ internal sealed class MeshDepthPyramid : IDisposable
             return false;
         }
 
-        // Only the private attachment receives prepass writes. Seed it with existing scene depth,
-        // then rasterize all supplied faces before deciding which groups need material shading.
-        // CullMesh uses opaque blending and zero alpha cutoff. The bound vertex shader is the
-        // material draw's vertex shader. Omitting the fragment shader preserves its raster coverage.
+        // Start from depth already written to the target. Opaque geometry may also
+        // occlude faces within this draw. Use its bound vertex shader to rasterize
+        // that geometry into the private copy, preserving the scene attachment.
         dc.CopyResource(source, _meshDepthTexture!);
-        dc.PushState(StateGroups.OutputMerger | StateGroups.PixelShader);
-        try
+        if (opaque)
         {
-            dc.OutputMerger.SetTargets(_depthTarget);
-            dc.PixelShader.Set(null);
-            dc.Draw(checked(faceCount * 3), 0);
-        }
-        finally
-        {
-            dc.PopState();
+            dc.PushState(StateGroups.OutputMerger | StateGroups.PixelShader);
+            try
+            {
+                dc.OutputMerger.SetTargets(_depthTarget);
+                dc.PixelShader.Set(null);
+                dc.Draw(checked(faceCount * 3), 0);
+            }
+            finally
+            {
+                dc.PopState();
+            }
         }
         dc.PushState(StateGroups.ComputeShader);
         try
