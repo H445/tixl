@@ -3,6 +3,7 @@
   "Id": "2f28ae59-4990-5a87-9763-17e68320e4b6",
   "Description": "Internal draw command for the PBR pass.",
   "InputUis": [
+    {"InputId": "1f78cd12-35ee-46f7-a9c5-177b33c1d860", "Position": {"X": -320, "Y": 890}, "Description": "Build a private depth prepass for opaque geometry."},
     {
       "InputId": "54c1c010-d527-5fd8-a15f-8fed02232b62",
       "Description": "Final vertex positions and triangle indices for the current pass.",

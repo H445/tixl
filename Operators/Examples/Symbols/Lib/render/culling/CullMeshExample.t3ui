@@ -20,14 +20,6 @@
       }
     },
     {
-      "ChildId": "255b4b1f-f645-5b7d-9829-4dbb1a07ef7b",
-      "SymbolName": "Lib.mesh.draw.DrawMesh",
-      "Position": {
-        "X": 240,
-        "Y": 160
-      }
-    },
-    {
       "ChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
       "SymbolName": "Lib.render.culling.CullMesh",
       "Position": {
@@ -61,5 +53,5 @@
       }
     }
   ],
-  "Description": "Slide the cube wall across the sphere to test depth occlusion. Pan the camera across the sphere to test frustum culling."
+  "Description": "The sphere and wall feed the same Mesh input. Slide the cube along X or swap the two connections to inspect visibility."
 }

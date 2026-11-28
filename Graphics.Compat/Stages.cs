@@ -546,6 +546,10 @@ public sealed class OutputMergerStage
                     return texture.Description.SampleDescription.Count == 0 ? new SampleDescription(1, 0) : texture.Description.SampleDescription;
             }
 
+            // A depth-only pass still has to match its multisampled attachment.
+            if (DepthStencilTarget?.Resource is Texture2D depth && depth.Description.SampleDescription.Count > 0)
+                return depth.Description.SampleDescription;
+
             return new SampleDescription(1, 0);
         }
     }

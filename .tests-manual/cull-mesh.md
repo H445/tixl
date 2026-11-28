@@ -11,37 +11,38 @@ prerequisites:
   - Use a GPU frame capture with indirect draw arguments visible for the submission checks.
 ---
 
-## Step: Frustum and static bounds on Vulkan
+## Step: Mesh-only occlusion
 
 **Action:**
-Move the Occluder cube to X = 100. Leave the Candidate at the origin with 32 × 16 sphere segments. Capture a frame. Pan the Camera by adding 100 to X on both Position and Target, capture again, then restore both values.
+In [CullMeshExample], trace Sphere mesh and Wall mesh to the Mesh input on [CullMesh]. Move the wall center from (100, 0, 2) to (0, 0, 2), then slide it sideways until the sphere is partly visible. Repeat after reversing the two mesh connections.
 
 **Expected:**
-- The detailed sphere disappears and returns. The candidate indirect draw has a positive vertex count at the origin and zero vertices outside the view.
-- Pan slowly until the sphere crosses the camera edge. The visible portion reaches the edge without holes or early disappearance.
+- Both orders show the sphere uncovered, covered, and partly visible at the same positions.
+- A Vulkan capture shows a depth-only draw into a private attachment, depth reduction and visibility dispatches, then an indirect material draw into the original target. The covered material draw submits fewer vertices. Surviving 128-face groups can include some hidden faces.
+- Returning the wall to X = 100 restores the sphere. There is no occluder command or draw-order input to configure.
 
-## Step: Opaque depth and multisampling
+## Step: One connected mesh
 
 **Action:**
-Keep the Candidate at the origin. Set the Occluder center to (0, 0, 2) and capture a frame. Move the wall sideways until part of the sphere appears, then move it back to X = 100. Repeat with the render target set to 4 samples on a device that supports 4x MSAA.
+Connect both primitives to [CombineMeshes] and connect only its result to [CullMesh]. Repeat the wall movement. Then connect only Sphere mesh directly and pan the camera off it and back.
 
 **Expected:**
-- The wall stays visible. Full coverage reduces the candidate indirect vertex count below the uncovered count. Moving the wall away restores the sphere and its original count.
-- Where the wall partially covers the sphere, uncovered pixels remain visible at its edge at both sample settings.
+- The precombined mesh gives the same image and supports occlusion between its parts.
+- An isolated sphere clips correctly at the camera edge, disappears outside the view, and returns without stale geometry.
 
-## Step: Changing geometry and small meshes
+## Step: Camera, topology and multisampling
 
 **Action:**
-With the wall out of view, turn off StaticMesh. Set Candidate Segments to 8 × 4, change Radius, and pan the camera off the sphere and back. Repeat at 32 × 16.
+Run with 1 and 4 samples on a device that supports 4x MSAA. Change the sphere from 32 by 16 segments to 8 by 4. Disable StaticMesh for geometry that changes in place. Move the wall and camera again.
 
 **Expected:**
-- Both meshes follow the edits on the next rendered frame. Neither leaves stale geometry behind.
-- The 8 × 4 sphere uses the small compute path. Its indirect vertex count is 216 when the whole sphere is inside the view. Both meshes submit zero vertices outside.
+- Uncovered pixels at the wall edge remain visible at both sample counts. The color pass renders into the original scene target.
+- The edited sphere follows the new silhouette. A frame capture shows depth and material draws with matching sample counts.
 
 ## Step: Direct3D 11 fallback on Windows
 
 **Action:**
-Open the same example on Direct3D 11. Move the wall from X = 100 to X = 0 and back. Pan the camera across the sphere. Compare the preview to Vulkan at the same positions.
+Open the same example on Direct3D 11 and repeat the wall and camera movement.
 
 **Expected:**
 - The wall covers the sphere and reveals it again. Clipping at the camera edge matches ordinary mesh drawing.

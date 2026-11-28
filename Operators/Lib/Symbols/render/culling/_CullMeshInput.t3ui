@@ -1,0 +1,33 @@
+{
+  "FormatVersion": 3,
+  "Id": "a7c4a43f-240b-5474-865c-e72fac3302ef",
+  "Description": "Pass one mesh through directly or combine several mesh buffers before culling.",
+  "InputUis": [
+    {
+      "InputId": "01beb8c9-c537-54c1-bd64-b18a5df81697",
+      "Position": {
+        "X": -240,
+        "Y": 0
+      }
+    }
+  ],
+  "SymbolChildUis": [
+    {
+      "ChildId": "ab90f2c0-0048-5a1b-ab31-2ed9c8a30eda",
+      "SymbolName": "Lib.mesh.modify.CombineMeshes",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "a259c8e4-a88d-5e58-8961-35effe17a21f",
+      "Position": {
+        "X": 240,
+        "Y": 0
+      }
+    }
+  ]
+}
