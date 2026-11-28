@@ -48,4 +48,10 @@ prerequisites:
 
 **Action:** Replace the four sphere draws with one [DrawMeshAtPoints] connected to the 32 by 16 sphere and a [GridPoints] with counts (129, 1, 1), zero Size and center at the origin. Set the draw size to 0.2 and blending to None. Connect the cube directly to its [DrawMesh], set Stretch to (1.2, 1.2, 0.25) and Center to (0, 0, 2). Compare the preview with camera culling off and on. Move the wall to (100, 0, 2) and repeat, then move the wall draw to the end of the command list and check both positions again.
 
-**Expected:** Both orders report 136,236 input triangles (129 × 1,056 plus 12). On Vulkan the centered wall hides every instance and submits 12 material triangles. Moving the wall outside the frustum exposes all 129 instances and submits 136,224 triangles. In each case the enabled and disabled images match. Direct3D 11 reports 136,236 material triangles at both positions.
+**Expected:** Both orders report 136,236 input triangles (129 Ã— 1,056 plus 12). On Vulkan the centered wall hides every instance and submits 12 material triangles. Moving the wall outside the frustum exposes all 129 instances and submits 136,224 triangles. In each case the enabled and disabled images match. Direct3D 11 reports 136,236 material triangles at both positions.
+
+## Step: Dense instanced depth occluder
+
+**Action:** In the 129-point test above, replace the sphere with a unit [CubeMesh] with 32 segments on each axis, retaining draw size 0.2. Compare both command orders and the culling-off preview for each wall position. For the final position set the wall Stretch to (0.02, 0.02, 0.02) and Center to (0, 0, -1), so the instanced cubes hide it.
+
+**Expected:** Input stays at 1,585,164 triangles. The centered foreground wall submits 12 material triangles. With the wall outside the view or fully behind the cubes, the 129 visible cubes submit 1,585,152 triangles. Both orders produce the same counts and each enabled preview matches its disabled reference. In a Vulkan capture, the dense solid cubes use a shortened index stream only for the private depth draw. Switching the cube draw to wireframe uses its original edges for depth.

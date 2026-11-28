@@ -41,7 +41,7 @@ struct Bounds
 };
 RWStructuredBuffer<Bounds> GroupBounds : register(u4);
 
-// Signed distances use homogeneous clip coordinates: left/right and bottom/top are Ã‚Â±w, near/far are 0 and w.
+// Signed distances use homogeneous clip coordinates: left/right and bottom/top are Ãƒâ€šÃ‚Â±w, near/far are 0 and w.
 float distanceToPlane(float4 v, uint p)
 {
     if (p == 0)
@@ -461,5 +461,98 @@ void CullPoints(uint lane : SV_GroupIndex)
         Arguments[2] = 0;
         Arguments[3] = 0; // base vertex
         Arguments[4] = 0; // first instance
+    }
+}
+
+// The private depth pass needs position and winding only. A row of coplanar
+// tessellated quads can therefore use its two end edges for all instances.
+// Material rendering still uses every original vertex and interpolant.
+[numthreads(1, 1, 1)]
+void InitDepthStripArgs()
+{
+    Arguments[0] = 0;           // groups reserve index ranges below
+    Arguments[1] = CopyCount;
+    Arguments[2] = 0;
+    Arguments[3] = 0;
+    Arguments[4] = 0;
+}
+
+// Recognize an extrusion along one object-space axis using exact comparisons.
+// a,b are the start edge and c,d the end edge. No tolerance is allowed: beveled,
+// deformed or folded strips must keep their original triangles.
+int stripDirection(float3 a, float3 b, float3 c, float3 d)
+{
+    if (!all(isfinite(a)) || !all(isfinite(b)) || !all(isfinite(c)) || !all(isfinite(d)))
+        return 0;
+    [unroll] for (int axis = 0; axis < 3; ++axis)
+    {
+        int j = (axis + 1) % 3, k = (axis + 2) % 3;
+        if (a[j] == c[j] && a[k] == c[k] && b[j] == d[j] && b[k] == d[k]
+            && a[axis] == b[axis] && c[axis] == d[axis] && a[axis] != c[axis])
+            return a[axis] < c[axis] ? axis + 1 : -(axis + 1);
+    }
+    return 0;
+}
+
+groupshared uint3 firstFace[128], secondFace[128];
+groupshared int directions[128];
+groupshared uint joinsPrevious[128];
+groupshared uint groupStart;
+
+[numthreads(128, 1, 1)]
+void PackDepthStrips(uint3 block : SV_GroupID, uint lane : SV_GroupIndex)
+{
+    uint face = ((block.y * GroupsX + block.x) * 128 + lane) * 2;
+    uint count = face < FaceCount ? min(2u, FaceCount - face) : 0;
+    uint3 f = 0, g = 0;
+    int direction = 0;
+    if (count > 0)
+        f = Faces[face];
+    if (count == 2)
+    {
+        g = Faces[face + 1];
+        if (f.y == g.x && f.z == g.z && all(f < VertexCount) && g.y < VertexCount)
+            direction = stripDirection(Vertices[f.x].Position, Vertices[f.y].Position,
+                                       Vertices[f.z].Position, Vertices[g.y].Position);
+    }
+    firstFace[lane] = f;
+    secondFace[lane] = g;
+    directions[lane] = direction;
+    GroupMemoryBarrierWithGroupSync();
+
+    // Only join cells sharing the exact two vertex indices in the same order.
+    uint prev = max(1u, lane) - 1;
+    bool join = lane > 0 && direction != 0 && direction == directions[prev]
+                && firstFace[prev].z == f.x && secondFace[prev].y == f.y;
+    joinsPrevious[lane] = join ? 1 : 0;
+    uint emitted = join ? 0 : count;
+    uint offset = exclusiveSum(lane, emitted);
+    if (lane == 127)
+    {
+        // Depth writes use the nearest sample, so independent groups can reserve
+        // index ranges in any order. The material index stream stays untouched.
+        uint firstIndex;
+        InterlockedAdd(Arguments[0], 3 * (offset + emitted), firstIndex);
+        groupStart = firstIndex / 3;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (emitted == 0)
+        return;
+    uint last = lane;
+    [loop] while (last < 127 && joinsPrevious[min(last + 1, 127u)] != 0)
+        ++last;
+    uint target = groupStart + offset;
+    if (last == lane)
+    {
+        Visible[target] = f;
+        if (count == 2)
+            Visible[target + 1] = g;
+    }
+    else
+    {
+        // Sweep the unchanged start edge to the last cell's end edge. Matching
+        // signed axes and shared indices prove there are no gaps or reversals.
+        Visible[target] = uint3(f.x, f.y, firstFace[last].z);
+        Visible[target + 1] = uint3(f.y, secondFace[last].y, firstFace[last].z);
     }
 }

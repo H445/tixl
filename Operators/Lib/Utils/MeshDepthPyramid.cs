@@ -113,7 +113,7 @@ internal sealed class MeshDepthPyramid : IDisposable
         dc.InputAssembler.SetIndexBuffer(indices.Buffer, Format.R32_UInt, offset);
     }
 
-    public bool AddOpaqueDraw(EvaluationContext context, MeshBuffers mesh, int copies, VertexShader? pointDepthShader)
+    public bool AddOpaqueDraw(EvaluationContext context, MeshBuffers mesh, int copies, VertexShader? pointDepthShader, Buffer? packedIndices, Buffer? packedArguments)
     {
         var dc = ResourceManager.Device.ImmediateContext;
         if (!MatchesDraw(context) || dc.OutputMerger.DepthStencilState?.Description.DepthWriteMask == DepthWriteMask.Zero)
@@ -128,8 +128,16 @@ internal sealed class MeshDepthPyramid : IDisposable
             if (pointDepthShader != null)
             {
                 dc.VertexShader.Set(pointDepthShader);
-                BindMeshIndices(dc, mesh);
-                dc.DrawIndexedInstanced(checked(mesh.FaceCount * 3), copies, 0, 0, 0);
+                if (packedIndices != null && packedArguments != null)
+                {
+                    dc.InputAssembler.SetIndexBuffer(packedIndices, Format.R32_UInt, 0);
+                    dc.DrawIndexedInstancedIndirect(packedArguments, 0, 1, DeviceContext.DrawIndexedInstancedIndirectArgsStride);
+                }
+                else
+                {
+                    BindMeshIndices(dc, mesh);
+                    dc.DrawIndexedInstanced(checked(mesh.FaceCount * 3), copies, 0, 0, 0);
+                }
             }
             else
                 dc.Draw(checked(mesh.FaceCount * 3 * copies), 0);

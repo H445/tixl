@@ -75,11 +75,61 @@ internal sealed class MeshOcclusionRenderer : IDisposable
 
     public void FinishDepth() => _meshDepth.Reduce();
 
+    private Resource<ComputeShader>? _initDepthStrips, _packDepthStrips;
+
+    // Rebuild from current GPU data: an upstream deformation can edit a buffer in place.
+    // Amortize the scan across copies. At 100x, the dense detail batches dominate
+    // depth time; small meshes go straight to the existing indexed draw.
+    private bool PrepareDepthStrips(MeshBuffers mesh, int copies)
+    {
+        var dc = ResourceManager.Device.ImmediateContext;
+        int faces = mesh.FaceCount;
+        if (copies < 4 || faces < 4096 || mesh.VertexBuffer?.Srv is not { IsDisposed: false }
+            || mesh.IndicesBuffer?.Srv is not { IsDisposed: false } || mesh.IndicesBuffer.ElementStride != 12
+            || mesh.VertexBuffer.ElementStride != T3.Core.Rendering.PbrVertex.Stride
+            || dc.InputAssembler.PrimitiveTopology != PrimitiveTopology.TriangleList
+            || dc.Rasterizer.State?.Description.FillMode == FillMode.Wireframe)
+            return false;
+        var init = (_initDepthStrips ??= ResourceManager.CreateShaderResource<ComputeShader>(
+            ShaderPath, _owner, () => "InitDepthStripArgs")).Value;
+        var pack = (_packDepthStrips ??= ResourceManager.CreateShaderResource<ComputeShader>(
+            ShaderPath, _owner, () => "PackDepthStrips")).Value;
+        if (init == null || pack == null || !PrepareArguments() || !Workspace(_visible, faces, 12, true))
+            return false;
+        int groups = 1 + (faces - 1) / 256;
+        int rows = 1 + (groups - 1) / 65535;
+        int columns = 1 + (groups - 1) / rows;
+        ResourceManager.SetupConstBuffer(new Parameters
+        {
+            FaceCount = (uint)faces, VertexCount = (uint)mesh.VertexBuffer.Srv.Description.Buffer.ElementCount,
+            PointCount = (uint)copies, GroupsX = (uint)columns
+        }, ref _constants);
+        dc.PushState(StateGroups.ComputeShader);
+        try
+        {
+            var cs = dc.ComputeShader;
+            cs.SetConstantBuffer(0, _constants);
+            cs.SetShaderResource(0, mesh.VertexBuffer.Srv);
+            cs.SetShaderResource(1, mesh.IndicesBuffer.Srv);
+            cs.SetUnorderedAccessView(2, _visible.Uav, -1);
+            cs.SetUnorderedAccessView(3, _args.Uav, -1);
+            cs.Set(init);
+            dc.Dispatch(1, 1, 1);
+            cs.Set(pack);
+            dc.Dispatch(columns, rows, 1);
+        }
+        finally { dc.PopState(); }
+        dc.CopyResource(_args.Buffer!, _indirect!);
+        return true;
+    }
+
     public void DrawDepth(EvaluationContext context, MeshBuffers mesh, BufferWithViews? points, float size, int scaleMode, bool usePointScale)
     {
         var depthShader = points == null ? null : (_pointDepthShader ??= ResourceManager.CreateShaderResource<VertexShader>(
             PointShaderPath, _owner, () => "vsPointDepth")).Value;
-        if (_meshDepth.AddOpaqueDraw(context, mesh, points?.ElementCount ?? 1, depthShader))
+        int copies = points?.ElementCount ?? 1;
+        bool packed = depthShader != null && PrepareDepthStrips(mesh, copies);
+        if (_meshDepth.AddOpaqueDraw(context, mesh, copies, depthShader, packed ? _visible.Buffer : null, packed ? _indirect : null))
             _stats.CountDepthDraw();
     }
 
@@ -278,6 +328,7 @@ internal sealed class MeshOcclusionRenderer : IDisposable
         _masks.Dispose(); _offsets.Dispose(); _visible.Dispose(); _args.Dispose(); _bounds.Dispose();
         _indirect?.Dispose(); _constants?.Dispose();
         _meshDepth.Dispose();
+        _initDepthStrips?.Dispose(); _packDepthStrips?.Dispose();
         _pointDepthShader?.Dispose(); _pointIds.Dispose(); _pointVertexShader?.Dispose(); _pointVisibility?.Dispose();
         _prefix?.Dispose(); _scatter?.Dispose(); _markDepth?.Dispose(); _buildBounds?.Dispose();
     }
