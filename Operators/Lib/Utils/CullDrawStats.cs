@@ -63,6 +63,7 @@ internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
     public IEnumerable<(string, int)> GetStats()
     {
         yield return ("Triangles", _depthTriangles + _materialTriangles);
+        yield return ("Depth prepass triangles", _depthTriangles);
         yield return ("Material triangles", _materialTriangles);
         yield return ("Draw calls", _depthDraws + _materialDraws);
     }

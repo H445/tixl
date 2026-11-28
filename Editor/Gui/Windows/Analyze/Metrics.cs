@@ -150,6 +150,20 @@ internal static class T3Metrics
         ImGui.PushFont(Fonts.FontSmall);
         foreach (var (key, number) in RenderStatsCollector.ResultsForLastFrame)
         {
+            var (label, tooltip) = key switch
+            {
+                "Triangles" => ("Triangles submitted (all passes)", "Counts each reported triangle submission across the scene. A triangle drawn for depth and again for shading counts twice."),
+                "Depth prepass triangles" => ("CullMesh depth prepass triangles", "Input triangles submitted to build the occlusion depth buffer before culling. Included in the all-passes total."),
+                "Material triangles" => ("CullMesh material pass triangles", "Triangles submitted for shading after culling. Surviving groups can include hidden triangles. Included in the all-passes total."),
+                _ => (key, null)
+            };
+            if (tooltip != null)
+            {
+                ImGui.Text($"{number:N0} {label}");
+                CustomComponents.TooltipForLastItem(tooltip);
+                continue;
+            }
+
             var formattedNumber = number switch
                                       {
                                           > 1000000 => $"{number / 1000000.0:0.0}M",

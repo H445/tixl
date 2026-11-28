@@ -51,9 +51,9 @@ Open the same example on Direct3D 11 and repeat the wall and camera movement.
 ## Step: Render statistics
 
 **Action:**
-Pin Preview in the stock example. Set Wall mesh Center to (100, 0, 2) and Sphere mesh Segments to 32 by 16. Read Triangles, Material triangles and Draw calls. Move the wall to (0, 0, 2), then pan both meshes out of view. Repeat with 8 by 4 sphere segments. Allow several frames for GPU results to arrive.
+Pin Preview in the stock example. Set Wall mesh Center to (100, 0, 2) and Sphere mesh Segments to 32 by 16. Read Triangles submitted (all passes), CullMesh depth prepass triangles, CullMesh material pass triangles and Draw calls. Move the wall to (0, 0, 2), then pan both meshes out of view. Repeat with 8 by 4 sphere segments. Allow several frames for GPU results to arrive.
 
 **Expected:**
-- On Vulkan, Triangles includes the depth-only submission and the material submission. Their difference (Triangles minus Material triangles) is the full input: 1,068 at 32 by 16 or 84 at 8 by 4. There are two draw calls.
-- Outside the view, Material triangles falls to zero while Triangles still includes the depth prepass. The counts follow completed indirect packets without forcing a GPU wait.
-- On Direct3D 11, both counts equal the full mesh submission regardless of visibility. The two source meshes each use one direct material draw.
+- On Vulkan, the depth prepass submits 1,068 triangles at 32 by 16 or 84 at 8 by 4. Moving the wall leaves this count unchanged. With only the example rendering, the all-passes total equals depth plus material. There are two draw calls.
+- Moving the wall over the sphere reduces material submissions. Fully occluded faces can still belong to a surviving group. Panning both meshes out of view reduces material submissions to zero and leaves the total equal to the depth prepass. Counts follow completed indirect packets without forcing a GPU wait.
+- On Direct3D 11, depth prepass triangles stays at zero. The material count and total both equal the full mesh submission regardless of visibility. The two source meshes each use one direct material draw.
