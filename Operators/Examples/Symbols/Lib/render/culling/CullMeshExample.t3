@@ -5,35 +5,21 @@
   "Children": [
     {
       "Id": "8c8c98aa-ce90-5ff0-bda1-b864b0d2d4d4",
-      "SymbolId": "c47ab830-aae7-4f8f-b67c-9119bcbaf7df",
-      "SymbolName": "Lib.mesh.generate.CubeMesh",
+      "SymbolId": "5fb3dafe-aed4-4fff-a5b9-c144ea023d35",
+      "SymbolName": "Lib.mesh.generate.SphereMesh",
       "Name": "Candidate",
       "InputValues": [
         {
-          "Id": "f4a78f77-8d8c-4b7b-8545-ea80947b428d",
-          "Type": "System.Numerics.Vector3",
-          "Value": {
-            "X": 0,
-            "Y": 0,
-            "Z": 0
-          }
+          "Id": "24a1e643-3e52-4a8b-97b6-7c6f1706d14c",
+          "Type": "System.Single",
+          "Value": 0.85
         },
         {
-          "Id": "97c9849e-751c-49a9-823d-0af839fa503e",
-          "Type": "System.Numerics.Vector3",
+          "Id": "6f327667-9054-4952-9f8f-570fa5497b13",
+          "Type": "T3.Core.DataTypes.Vector.Int2",
           "Value": {
-            "X": 1.5,
-            "Y": 1.5,
-            "Z": 1.5
-          }
-        },
-        {
-          "Id": "e445a6da-0b66-46ae-ad2b-650e9cc50798",
-          "Type": "T3.Core.DataTypes.Vector.Int3",
-          "Value": {
-            "X": 12,
-            "Y": 12,
-            "Z": 12
+            "X": 32,
+            "Y": 16
           }
         }
       ],
@@ -49,7 +35,7 @@
           "Id": "f4a78f77-8d8c-4b7b-8545-ea80947b428d",
           "Type": "System.Numerics.Vector3",
           "Value": {
-            "X": 2,
+            "X": 1.55,
             "Y": 0,
             "Z": 2.0
           }
@@ -159,7 +145,7 @@
   "Connections": [
     {
       "SourceParentOrChildId": "8c8c98aa-ce90-5ff0-bda1-b864b0d2d4d4",
-      "SourceSlotId": "35660e2b-5005-44a2-bf57-db9a3f1b791d",
+      "SourceSlotId": "322717ef-3a76-4e23-845f-a12a03d73969",
       "TargetParentOrChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
       "TargetSlotId": "e5ef4ff9-92a7-57aa-97be-33379b9520b2"
     },

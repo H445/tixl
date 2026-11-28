@@ -5,7 +5,7 @@
   "SymbolChildUis": [
     {
       "ChildId": "8c8c98aa-ce90-5ff0-bda1-b864b0d2d4d4",
-      "SymbolName": "Lib.mesh.generate.CubeMesh",
+      "SymbolName": "Lib.mesh.generate.SphereMesh",
       "Position": {
         "X": 0,
         "Y": 0
@@ -61,5 +61,5 @@
       }
     }
   ],
-  "Description": "Move the wall across the detailed cube to test depth occlusion. Move the candidate beyond the camera edge to test frustum culling."
+  "Description": "Slide the cube wall across the sphere to test depth occlusion. Pan the camera across the sphere to test frustum culling."
 }
