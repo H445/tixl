@@ -34,6 +34,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
     private BufferWithViews? _vertices, _parts;
     private readonly BufferWithViews _commands = new(), _tiles = new();
     private Buffer? _indices, _parameters;
+    private RasterizerState? _rasterizer;
     private ShaderResourceView? _depthView;
     private string? _warning;
 
@@ -169,7 +170,11 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
             dc.VertexShader.SetShaderResource(4, _vertices!.Srv);
             dc.GeometryShader.Set(null);
             dc.PixelShader.Set(ps);
-            dc.Rasterizer.State = DefaultRenderingStates.DefaultRasterizerState;
+            // GeometryToMesh and DrawMeshUnlit treat counterclockwise geometry faces as front-facing.
+            dc.Rasterizer.State = _rasterizer ??= new RasterizerState(ResourceManager.Device, new RasterizerStateDescription
+            {
+                FillMode = FillMode.Solid, CullMode = CullMode.Back, IsFrontCounterClockwise = true, IsDepthClipEnabled = true
+            });
             dc.OutputMerger.DepthStencilState = DefaultRenderingStates.DefaultDepthStencilState;
             dc.OutputMerger.BlendState = DefaultRenderingStates.DisabledBlendState;
             dc.DrawIndexedInstancedIndirect(_commands.Buffer!, 0, _partCount, DeviceContext.DrawIndexedInstancedIndirectArgsStride);
@@ -280,6 +285,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         _indices?.Dispose();
         _parameters?.Dispose();
         _depthView?.Dispose();
+        _rasterizer?.Dispose();
     }
 
     IStatusProvider.StatusLevel IStatusProvider.GetStatusLevel() => _warning == null ? IStatusProvider.StatusLevel.Success : IStatusProvider.StatusLevel.Warning;

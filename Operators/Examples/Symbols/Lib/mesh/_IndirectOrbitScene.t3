@@ -1,0 +1,12 @@
+{
+  "FormatVersion": 3,
+  "Id": "d13d7e22-04f4-4d03-8af6-000000001100",
+  "Inputs": [
+    {
+      "Id": "d13d7e22-04f4-4d03-8af6-000000001107",
+      "DefaultValue": 4
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}

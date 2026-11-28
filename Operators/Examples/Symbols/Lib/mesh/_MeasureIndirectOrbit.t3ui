@@ -1,0 +1,32 @@
+{
+  "FormatVersion": 3,
+  "Id": "d13d7e22-04f4-4d03-8af6-000000001200",
+  "Description": "Measures the example render target across identical camera samples and records GPU timestamps.",
+  "InputUis": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001202"
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001203",
+      "Description": "Turn on to replay five identical camera orbits per mode and save per-frame Vulkan GPU timestamps to a CSV in the system temp folder. The Log window shows the path. Turn off to reset."
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001201"
+    }
+  ]
+}

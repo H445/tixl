@@ -1,0 +1,60 @@
+{
+  "FormatVersion": 3,
+  "Id": "d13d7e22-04f4-4d03-8af6-000000001100",
+  "Description": "Generates matching fine and coarse ring geometry and the example camera orbit.",
+  "InputUis": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001107",
+      "Description": "Select the standard DrawMeshUnlit path or an indexed indirect configuration. Play the timeline to orbit the field."
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001101"
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001102"
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001103"
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001104"
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001105"
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001106"
+    }
+  ]
+}

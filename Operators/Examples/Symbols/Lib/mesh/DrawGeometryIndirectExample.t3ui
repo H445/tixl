@@ -1,0 +1,122 @@
+{
+  "FormatVersion": 3,
+  "Id": "d13d7e22-04f4-4d03-8af6-000000001000",
+  "Description": "Play the timeline to orbit a field of 225 rings and an opaque wall. Select a draw mode for a live comparison, or enable Benchmark for a repeatable five-mode GPU timing run at 1280 \u00d7 720.",
+  "InputUis": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001002",
+      "Description": "Select the standard DrawMeshUnlit path or an indexed indirect configuration. Play the timeline to orbit the field."
+    },
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "InputId": "d13d7e22-04f4-4d03-8af6-000000001003",
+      "Description": "Turn on to replay five identical camera orbits per mode and save per-frame Vulkan GPU timestamps to a CSV in the system temp folder. The Log window shows the path. Turn off to reset."
+    }
+  ],
+  "SymbolChildUis": [
+    {
+      "ChildId": "4ff792e8-3c8a-557b-9aa8-45078ff00296",
+      "SymbolName": "Examples.Lib.mesh._IndirectOrbitScene",
+      "Position": {
+        "X": 0,
+        "Y": 230
+      }
+    },
+    {
+      "ChildId": "7954ed0a-6786-5bbd-95f3-1bc6edd3ee96",
+      "SymbolName": "Lib.mesh.generate.CubeMesh",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "c7f14825-b1a6-5b0a-ba5d-63b698568d8e",
+      "SymbolName": "Lib.mesh.draw.DrawMeshUnlit",
+      "Position": {
+        "X": 230,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "686338f1-1d74-5553-9188-426331545f70",
+      "SymbolName": "Lib.geometry.convert.GeometryToMesh",
+      "Position": {
+        "X": 230,
+        "Y": 155
+      }
+    },
+    {
+      "ChildId": "9397b896-825c-5404-aa41-0c9335117d3b",
+      "SymbolName": "Lib.mesh.draw.DrawMeshUnlit",
+      "Position": {
+        "X": 455,
+        "Y": 155
+      }
+    },
+    {
+      "ChildId": "e1ce4a17-f52a-57e5-8e7c-c647b461edca",
+      "SymbolName": "Lib.mesh.draw.DrawGeometryIndirect",
+      "Position": {
+        "X": 455,
+        "Y": 330
+      }
+    },
+    {
+      "ChildId": "4507119f-61cd-5ae0-b4e8-5deef24fe666",
+      "SymbolName": "Lib.flow.Switch",
+      "Position": {
+        "X": 685,
+        "Y": 220
+      }
+    },
+    {
+      "ChildId": "6be08956-1014-5358-8712-8ef5a803291b",
+      "SymbolName": "Lib.flow.Execute",
+      "Position": {
+        "X": 900,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "29f7cdd8-e5e3-52f2-acc5-48757c6bbeca",
+      "SymbolName": "Lib.render.camera.Camera",
+      "Position": {
+        "X": 1110,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "c277256d-b31b-5b81-ac9f-478a06ad6cbf",
+      "SymbolName": "Lib.image.generate.basic.RenderTarget",
+      "Position": {
+        "X": 1320,
+        "Y": 0
+      }
+    },
+    {
+      "ChildId": "cce5a835-0626-5c5b-b9fd-d0f021ebd83b",
+      "SymbolName": "Examples.Lib.mesh._MeasureIndirectOrbit",
+      "Position": {
+        "X": 1540,
+        "Y": 0
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "OutputId": "d13d7e22-04f4-4d03-8af6-000000001001"
+    }
+  ]
+}
