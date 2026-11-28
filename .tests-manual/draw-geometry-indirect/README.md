@@ -4,6 +4,8 @@ Pin **DrawGeometryIndirectExample → Image** and play the timeline for an eight
 
 ## LOD, culling and combined examples
 
+[Three matched reference comparisons](three-comparisons.md) · [GPU graph](three-comparisons.png) · [Side-by-side MP4](indexed-examples.mp4)
+
 [Three runnable examples, matched GPU measurements, external baseline and macOS fallback](examples.md)
 
 In the earlier Auto video and tables below, **original indirect** means this branch at `d3ba2162e`. The external H445/tixl-culling-lod comparison is in the linked example report.

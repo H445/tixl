@@ -10,9 +10,9 @@ Pin the Image output and play the timeline. All three named examples use the sam
 
 The full-detail control disables both part rejection and LOD. All paths retain hardware clipping and depth testing. In the benchmark dropdown the controls are IndirectUnculled and IndirectLodOnly. The older IndirectLod mode includes frustum rejection. IndirectDepth and IndirectLodAndDepth force current-frame depth culling on; Auto is measured separately.
 
-[Watch the 18-second GPU comparison](indexed-examples.mp4)
+[All three comparisons against H445/tixl-culling-lod](three-comparisons.md) · [Updated MP4](indexed-examples.mp4) · [Graph](three-comparisons.png)
 
-## Matched comparison with H445/tixl-culling-lod
+## Earlier culling-only comparison with H445/tixl-culling-lod
 
 The comparison uses the reference repository at f5d5558db328cf3c7f8a1b8daa82f4022c2bffcc and its culling component at 3b9a27f8f6f8b278b1220ff6555a012794a98e79. We ran its DepthCullPass and static triangle classifier against the same wall and full-detail field. Both paths use the same unlit appearance and the same camera. The reference compacts triangle groups into a draw. The new path rejects mesh parts and issues indexed multi-draw. The diagnostic log confirmed selection of the reference MarkDepth shader on the active depth attachment.
 
