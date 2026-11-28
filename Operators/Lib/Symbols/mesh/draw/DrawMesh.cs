@@ -39,9 +39,24 @@ internal sealed class DrawMesh : Instance<DrawMesh>, ICustomDropdownHolder, ICom
             }
         }
             
-        // Inner update
-        Output.ConnectedUpdate(context);
-        context.PbrMaterial = previousMaterial;
+        var filter = context.MeshDepthCommandFilter;
+        try
+        {
+            if (filter != null)
+            {
+                if (!WritesOpaqueDepth(context) || !EnableZTest.GetValue(context)
+                    || FragmentField.HasInputConnections || !string.IsNullOrEmpty(ShaderDefines.GetValue(context)))
+                    return;
+                // Evaluate this draw's own shader and rasterizer setup for the prepass.
+                context.MeshDepthCommandFilter = static _ => true;
+            }
+            Output.ConnectedUpdate(context);
+        }
+        finally
+        {
+            context.MeshDepthCommandFilter = filter;
+            context.PbrMaterial = previousMaterial;
+        }
     }
 
     internal bool TryDrawWithOcclusion(EvaluationContext context, int vertexCount)
@@ -53,13 +68,13 @@ internal sealed class DrawMesh : Instance<DrawMesh>, ICustomDropdownHolder, ICom
         if (mesh == null || mesh.FaceCount <= 0 || mesh.FaceCount * 3L != vertexCount)
             return false;
 
-        // Only solid, depth-writing geometry may act as its own occluder.
-        // Other draws test against depth already present in the camera target.
-        bool opaque = BlendMode.GetValue(context) == (int)SharedEnums.BlendModes.None
-                      && AlphaCutOff.GetValue(context) <= 0 && EnableZWrite.GetValue(context);
-        context.DrawMeshWithOcclusion(context, mesh, opaque);
+        context.DrawMeshWithOcclusion(context, mesh);
         return true;
     }
+
+    private bool WritesOpaqueDepth(EvaluationContext context)
+        => BlendMode.GetValue(context) == (int)SharedEnums.BlendModes.None
+           && AlphaCutOff.GetValue(context) <= 0 && EnableZWrite.GetValue(context);
 
     #region custom material dropdown
     string ICustomDropdownHolder.GetValueForInput(Guid inputId)

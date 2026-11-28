@@ -46,18 +46,31 @@ internal sealed class Camera : Instance<Camera>, ICamera, ICameraPropertiesProvi
         // The innermost camera claims the rendered image for the render op's bundle.
         var renderedCameraSerial = context.RenderPass.RenderedCameraSerial;
         var previousOcclusion = context.DrawMeshWithOcclusion;
+        var previousFilter = context.MeshDepthCommandFilter;
         try
         {
             bool enabled = MeshOcclusionCulling.GetValue(context);
             if (enabled) RenderStatsCollector.MarkMeshOcclusionEnabled();
-            context.DrawMeshWithOcclusion = enabled && MeshDepthPyramid.IsVulkanDevice(ResourceManager.Device)
-                                                ? (_occlusion ??= new MeshOcclusionRenderer(this)).Draw
-                                                : null;
+            context.DrawMeshWithOcclusion = null;
+            if (enabled && !context.RenderPass.IsShadowPass && MeshDepthPyramid.IsVulkanDevice(ResourceManager.Device))
+            {
+                var renderer = _occlusion ??= new MeshOcclusionRenderer(this);
+                if (renderer.Begin(context, Command))
+                {
+                    context.MeshDepthCommandFilter = renderer.VisitsMesh;
+                    context.DrawMeshWithOcclusion = renderer.DrawDepth;
+                    Command.GetValue(context);
+                    context.MeshDepthCommandFilter = previousFilter;
+                    renderer.FinishDepth();
+                    context.DrawMeshWithOcclusion = renderer.Draw;
+                }
+            }
             Command.GetValue(context);
             context.RenderPass.RecordCamera(renderedCameraSerial, this);
         }
         finally
         {
+            context.MeshDepthCommandFilter = previousFilter;
             context.DrawMeshWithOcclusion = previousOcclusion;
             context.RenderPass.ProjectionJitter = prevProjectionJitter;
             context.CameraToClipSpace = prevCameraToClipSpace;

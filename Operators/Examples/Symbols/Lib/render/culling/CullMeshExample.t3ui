@@ -1,7 +1,7 @@
 {
   "FormatVersion": 3,
   "Id": "b9fbad68-bf5a-5782-a862-5f64a6a45920",
-  "Description": "Four spheres and an animated wall each have a DrawMesh command. Move Draw wall to the first or last input of Draw order. Compare Triangles and Triangles drawn in Performance with Mesh Occlusion Culling enabled on Camera.",
+  "Description": "Four spheres and an animated wall each have a DrawMesh command. Move Draw wall to the first or last input of Draw order. With Mesh Occlusion Culling enabled on Camera, the same animation pose gives the same material triangle count in either order.",
   "InputUis": [],
   "SymbolChildUis": [
     {

@@ -47,6 +47,8 @@ internal sealed class Draw : Instance<Draw>, IRenderStatsProvider
             && Parent is Lib.mesh.draw.DrawMesh drawMesh && drawMesh.TryDrawWithOcclusion(context, vertexCount))
             return;
 
+        if (context.MeshDepthCommandFilter != null) return;
+
         _vertexCount += vertexCount;
         _drawCallCount++;
 

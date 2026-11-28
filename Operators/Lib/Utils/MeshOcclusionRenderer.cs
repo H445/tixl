@@ -32,7 +32,54 @@ internal sealed class MeshOcclusionRenderer : IDisposable
         public uint Padding;
     }
 
-    public void Draw(EvaluationContext context, MeshBuffers mesh, bool opaque)
+    private readonly Dictionary<ISlot, bool> _depthCommands = new();
+
+    public bool Begin(EvaluationContext context, ISlot command)
+    {
+        _depthCommands.Clear();
+        return VisitsMesh(command) && _meshDepth.Begin(context, _owner);
+    }
+
+    // Follow command connections, including the selected branches of flow operators
+    // when they evaluate. Independent commands and nested camera passes run only in
+    // the normal traversal. Cache reachability for this evaluation (graphs are editable).
+    public bool VisitsMesh(ISlot slot)
+    {
+        if (_depthCommands.TryGetValue(slot, out bool visits)) return visits;
+        _depthCommands[slot] = false;
+        if (slot is MultiInputSlot<Command> multi)
+        {
+            foreach (var child in multi.GetCollectedTypedInputs())
+                if (VisitsMesh(child)) { visits = true; break; }
+        }
+        else if (slot is IInputSlot)
+        {
+            visits = slot.TryGetFirstConnection(out var source) && VisitsMesh(source);
+        }
+        else if (slot.Parent is Lib.mesh.draw.DrawMesh)
+        {
+            visits = true;
+        }
+        else if (slot.Parent is not ICamera)
+        {
+            visits = slot.TryGetFirstConnection(out var source) && VisitsMesh(source);
+            if (!visits)
+                foreach (var input in slot.Parent.Inputs)
+                    if (input.ValueType == typeof(Command) && VisitsMesh(input)) { visits = true; break; }
+        }
+        _depthCommands[slot] = visits;
+        return visits;
+    }
+
+    public void FinishDepth() => _meshDepth.Reduce();
+
+    public void DrawDepth(EvaluationContext context, MeshBuffers mesh)
+    {
+        if (_meshDepth.AddOpaqueDraw(context, mesh.FaceCount))
+            _stats.CountDepthDraw();
+    }
+
+    public void Draw(EvaluationContext context, MeshBuffers mesh)
     {
         var dc = ResourceManager.Device.ImmediateContext;
         int faceCount = mesh.FaceCount;
@@ -56,7 +103,7 @@ internal sealed class MeshOcclusionRenderer : IDisposable
         var prefix = (_prefix ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, _owner, () => "Prefix")).Value;
         var scatter = (_scatter ??= ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, _owner, () => "Scatter")).Value;
         if (builder == null || mark == null || prefix == null || scatter == null || !PrepareBuffers(faceCount, groups)
-            || !_meshDepth.Build(context, _owner, faceCount, opaque))
+            || !_meshDepth.MatchesDraw(context))
         {
             FullDraw(dc, faceCount);
             return;
@@ -101,15 +148,15 @@ internal sealed class MeshOcclusionRenderer : IDisposable
         {
             dc.VertexShader.SetShaderResource(1, _visible.Srv);
             dc.DrawInstancedIndirect(_indirect!, 0);
-            _stats.CountIndirect(dc, _indirect!, faceCount, opaque ? faceCount : 0);
+            _stats.CountIndirect(dc, _indirect!, faceCount);
         }
         finally { dc.PopState(); }
     }
 
-    private void FullDraw(DeviceContext dc, int faces, int depthFaces = 0)
+    private void FullDraw(DeviceContext dc, int faces)
     {
         dc.Draw(checked(faces * 3), 0);
-        _stats.CountDirect(faces, depthFaces);
+        _stats.CountDirect(faces);
     }
 
     private bool PrepareBuffers(int faces, int groups)

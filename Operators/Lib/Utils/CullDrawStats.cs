@@ -18,17 +18,22 @@ internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
     private int _inputFaces, _drawCalls, _indirectFaces, _indirectDraws;
     private int _completedInput, _completedDraws, _completedSkipped;
 
-    public void CountDirect(int faces, int depthFaces)
+    public void CountDepthDraw()
+    {
+        if (RenderStatsCollector.IsCollecting) _drawCalls++;
+    }
+
+    public void CountDirect(int faces)
     {
         if (!RenderStatsCollector.IsCollecting) return;
         _inputFaces += faces;
-        _drawCalls += depthFaces > 0 ? 2 : 1;
+        _drawCalls++;
     }
 
-    public void CountIndirect(DeviceContext context, Buffer arguments, int faces, int depthFaces)
+    public void CountIndirect(DeviceContext context, Buffer arguments, int faces)
     {
         if (!RenderStatsCollector.IsCollecting) return;
-        CountDirect(faces, depthFaces);
+        CountDirect(faces);
         _indirectDraws++;
         _indirectFaces += faces;
 

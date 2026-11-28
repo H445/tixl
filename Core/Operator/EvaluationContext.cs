@@ -49,6 +49,7 @@ public sealed class EvaluationContext
         LocalTime = Playback.TimeInBars;
         LocalFxTime = Playback.FxTimeInBars;
         DrawMeshWithOcclusion = null;
+        MeshDepthCommandFilter = null;
         Lights.Clear();
         FloatVariables.Clear();
         BoolVariables.Clear();
@@ -327,7 +328,8 @@ public sealed class EvaluationContext
     
     public StructuredList IteratedList { get; set; }
     public int IteratedListIndex { get; set; }
-    public Action<EvaluationContext, MeshBuffers, bool> DrawMeshWithOcclusion { get; set; }
+    public Func<Slots.ISlot, bool> MeshDepthCommandFilter { get; set; }
+    public Action<EvaluationContext, MeshBuffers> DrawMeshWithOcclusion { get; set; }
 
     public bool BypassCameras { get; set; }
 

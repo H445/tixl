@@ -257,8 +257,34 @@ public class Slot<T> : ISlot, ITimeClipRemapTarget
 
     public T? GetValue(EvaluationContext context)
     {
-        Update(context);
+        if (context.MeshDepthCommandFilter is { } visit)
+            return GetDepthPassValue(context, visit);
 
+        Update(context);
+        return Value;
+    }
+
+    private T? GetDepthPassValue(EvaluationContext context, Func<ISlot, bool> visit)
+    {
+        if (_valueIsCommand)
+        {
+            if (!visit(this)) return default;
+            Update(context);
+        }
+        else if (_dirtyFlag.IsDirty)
+        {
+            // A mesh or material input can render a texture of its own. Evaluate
+            // data dependencies normally; only camera commands belong to its prepass.
+            var draw = context.DrawMeshWithOcclusion;
+            context.MeshDepthCommandFilter = null;
+            context.DrawMeshWithOcclusion = null;
+            try { Update(context); }
+            finally
+            {
+                context.DrawMeshWithOcclusion = draw;
+                context.MeshDepthCommandFilter = visit;
+            }
+        }
         return Value;
     }
 

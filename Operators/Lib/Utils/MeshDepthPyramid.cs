@@ -3,7 +3,7 @@ using T3.Graphics.Compat;
 
 namespace Lib.render.culling;
 
-// Builds a private forward-depth hierarchy for the bound opaque mesh draw.
+// One private depth attachment and one reduction for the current camera evaluation.
 internal sealed class MeshDepthPyramid : IDisposable
 {
     internal static bool IsVulkanDevice(Device device) =>
@@ -46,32 +46,37 @@ internal sealed class MeshDepthPyramid : IDisposable
 
     private static int Half(int x) => (x + 1) / 2;
 
-    public bool Build(EvaluationContext context, Instance owner, int faceCount, bool opaque)
+    private Matrix4x4 _view, _projection;
+
+    public bool MatchesDraw(EvaluationContext context)
     {
         var dc = ResourceManager.Device.ImmediateContext;
-        var attachment = dc.OutputMerger.DepthStencilTarget;
         var vp = dc.Rasterizer.GetViewport();
-        var projection = context.CameraToClipSpace;
-        if (attachment?.Resource is not T3.Graphics.Compat.Texture2D source || source.IsDisposed)
-        {
+        if (!ReferenceEquals(dc.OutputMerger.DepthStencilTarget?.Resource, _sceneDepthTexture)
+            || context.WorldToCamera != _view || context.CameraToClipSpace != _projection
+            || vp.X != 0 || vp.Y != 0 || vp.MinDepth != 0 || vp.MaxDepth != 1
+            || vp.Width != Width || vp.Height != Height)
             return false;
-        }
-        var d = source.Description;
-        int w = d.Width, h = d.Height, samples = d.SampleDescription.Count;
-        if (d.Format is not (Format.R32_Typeless or Format.D32_Float) || d.ArraySize != 1 || d.MipLevels != 1
-            || w <= 0 || h <= 0 || samples < 1 || vp.X != 0 || vp.Y != 0 || vp.MinDepth != 0 || vp.MaxDepth != 1
-            || vp.Width != w || vp.Height != h || !(projection.M43 * projection.M34 - projection.M33 * projection.M44 > 0))
-        {
-            return false;
-        }
 
         var state = dc.OutputMerger.DepthStencilState?.Description;
         var rasterizer = dc.Rasterizer.State?.Description;
-        if (state.HasValue && (!state.Value.IsDepthEnabled || state.Value.IsStencilEnabled
-                               || state.Value.DepthWriteMask != DepthWriteMask.All
-                               || state.Value.DepthComparison is not (Comparison.Less or Comparison.LessEqual)))
+        return (!state.HasValue || state.Value.IsDepthEnabled && !state.Value.IsStencilEnabled
+                                && state.Value.DepthComparison is Comparison.Less or Comparison.LessEqual)
+               && (!rasterizer.HasValue || rasterizer.Value.DepthBias == 0 && rasterizer.Value.SlopeScaledDepthBias == 0);
+    }
+
+    public bool Begin(EvaluationContext context, Instance owner)
+    {
+        var dc = ResourceManager.Device.ImmediateContext;
+        if (dc.OutputMerger.DepthStencilTarget?.Resource is not T3.Graphics.Compat.Texture2D source || source.IsDisposed)
             return false;
-        if (rasterizer.HasValue && (rasterizer.Value.DepthBias != 0 || rasterizer.Value.SlopeScaledDepthBias != 0))
+
+        var d = source.Description;
+        _view = context.WorldToCamera;
+        _projection = context.CameraToClipSpace;
+        if (d.Format is not (Format.R32_Typeless or Format.D32_Float) || d.ArraySize != 1 || d.MipLevels != 1
+            || d.Width <= 0 || d.Height <= 0 || d.SampleDescription.Count < 1
+            || !(_projection.M43 * _projection.M34 - _projection.M33 * _projection.M44 > 0))
             return false;
 
         // Depth attachment support alone does not guarantee a sampled D32 view.
@@ -87,33 +92,44 @@ internal sealed class MeshDepthPyramid : IDisposable
             return false;
         }
 
+        int samples = d.SampleDescription.Count;
         var seed = samples == 1
-            ? (_seed ??= ResourceManager.CreateShaderResource<ComputeShader>(Shader, owner, () => "Seed")).Value
-            : (_seedMS ??= ResourceManager.CreateShaderResource<ComputeShader>(Shader, owner, () => "SeedMS")).Value;
+                       ? (_seed ??= ResourceManager.CreateShaderResource<ComputeShader>(Shader, owner, () => "Seed")).Value
+                       : (_seedMS ??= ResourceManager.CreateShaderResource<ComputeShader>(Shader, owner, () => "SeedMS")).Value;
         var reduce = (_reduce ??= ResourceManager.CreateShaderResource<ComputeShader>(Shader, owner, () => "ReduceLevels")).Value;
-        if (seed == null || reduce == null || !Prepare(source, d))
-        {
-            return false;
-        }
+        if (seed == null || reduce == null || !Prepare(source, d)) return false;
 
-        // Start from depth already written to the target. Opaque geometry may also
-        // occlude faces within this draw. Use its bound vertex shader to rasterize
-        // that geometry into the private copy, preserving the scene attachment.
+        Width = d.Width;
+        Height = d.Height;
         dc.CopyResource(source, _meshDepthTexture!);
-        if (opaque)
+        return true;
+    }
+
+    public bool AddOpaqueDraw(EvaluationContext context, int faces)
+    {
+        var dc = ResourceManager.Device.ImmediateContext;
+        if (!MatchesDraw(context) || dc.OutputMerger.DepthStencilState?.Description.DepthWriteMask == DepthWriteMask.Zero)
+            return false;
+
+        // Use the material vertex shader and rasterizer so each occluder has its authored silhouette.
+        dc.PushState(StateGroups.OutputMerger | StateGroups.PixelShader);
+        try
         {
-            dc.PushState(StateGroups.OutputMerger | StateGroups.PixelShader);
-            try
-            {
-                dc.OutputMerger.SetTargets(_depthTarget);
-                dc.PixelShader.Set(null);
-                dc.Draw(checked(faceCount * 3), 0);
-            }
-            finally
-            {
-                dc.PopState();
-            }
+            dc.OutputMerger.SetTargets(_depthTarget);
+            dc.PixelShader.Set(null);
+            dc.Draw(checked(faces * 3), 0);
         }
+        finally { dc.PopState(); }
+        return true;
+    }
+
+    public void Reduce()
+    {
+        var dc = ResourceManager.Device.ImmediateContext;
+        int samples = _sceneDepthTexture!.Description.SampleDescription.Count;
+        int w = Width, h = Height;
+        var seed = samples == 1 ? _seed!.Value : _seedMS!.Value;
+        var reduce = _reduce!.Value;
         dc.PushState(StateGroups.ComputeShader);
         try
         {
@@ -153,10 +169,6 @@ internal sealed class MeshDepthPyramid : IDisposable
             }
         }
         finally { dc.PopState(); }
-        Width = w;
-        Height = h;
-
-        return true;
     }
 
     private bool Prepare(T3.Graphics.Compat.Texture2D source, Texture2DDescription d)

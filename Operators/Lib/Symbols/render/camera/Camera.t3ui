@@ -107,7 +107,7 @@
     {
       "InputId": "b9c174ee-57bb-4ef3-a69b-b21a203234fd",
       "Position": { "X": 0.0, "Y": 585.0 },
-      "Description": "Use scene depth to skip hidden DrawMesh triangles on Vulkan. Opaque draws can also build depth from their own geometry. Performance shows the surviving material submissions."
+      "Description": "Use scene depth to skip hidden DrawMesh triangles on Vulkan. The camera builds shared depth from opaque DrawMesh commands before their material passes. Performance shows the surviving material submissions."
     },
     {
       "InputId": "fee19916-846f-491a-a2ee-1e7b1ac8e533"/*PositionOffset*/,

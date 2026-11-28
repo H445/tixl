@@ -13,22 +13,30 @@ prerequisites:
 
 ## Step: Compare the camera toggle and draw order
 
-**Action:** Pin Preview and open Performance. Pause playback. Set Amplitude and Offset on the wall's AnimValue to zero and set Wall mesh Center to (0, 0, 2). Leave the Vector3 and all sphere transforms as authored. Disable Mesh Occlusion Culling on Camera and capture the preview. Enable the toggle and allow several frames for GPU readback.
+**Action:** Pin Preview and open Performance. Pause playback and turn off Idle Motion so the wall holds the same pose between captures. Keep the authored wall animation and all sphere transforms. With the example's default tempo, seek to each time below. Compare Mesh Occlusion Culling off and on, allowing several frames for GPU readback. Repeat after moving only Draw wall to the last input of Draw order.
 
-**Expected:** Triangles reads 4,236 throughout (12 wall triangles and 1,056 per sphere). With culling disabled, five direct draws render the scene and the material-pass counter is hidden. With culling enabled, the preview matches the reference image. The order of the inputs on Draw order controls how much depth is available when each mesh draws.
+**Expected:** Triangles stays at 4,236 (12 wall triangles and 1,056 per sphere). With culling off, five direct draws render the scene and the material-pass counter is hidden. At each pose the output pixels match across draw order and camera toggle settings.
 
-| Vulkan, centered wall | Indirect material submissions in execution order | Triangles drawn (material pass) |
-| --- | --- | ---: |
-| Draw wall first (example default) | 8, 0, 512, 0, 0 | 520 |
-| Move only Draw wall to the last input | 1,056, 1,056, 1,056, 1,056, 8 | 4,232 |
+| Animation time (seconds) | Vulkan material triangles, wall first | Vulkan material triangles, wall last |
+| ---: | ---: | ---: |
+| 0.0 | 1,672 | 1,672 |
+| 0.5 | 1,670 | 1,670 |
+| 1.0 | 1,830 | 1,830 |
+| 1.5 | 2,086 | 2,086 |
 
-**GPU verification:** Capture each order with RenderDoc. For each of the five material draws, divide the indirect vertex count by three and multiply by the instance count. Sum the five results and compare to Performance. The five private depth draws submit another 4,236 triangles in each order. Captures for both orders should have identical output pixels.
+**GPU verification:** Capture each order with RenderDoc at 1.5 seconds. All five private depth draws (4,236 triangles) precede the depth reduction and all five indirect material draws. For each indirect draw, divide the vertex count by three and multiply by the instance count. The sum should equal the material-pass counter in both orders.
 
 ## Step: Camera, topology and animation
 
-**Action:** In each order move Wall mesh Center to (100, 0, 2). Pan the camera and target together to X = -100. Restore the camera and change one sphere from 32 by 16 segments to 8 by 4. Resume the wall animation with its original values. Repeat the silhouette comparison at 1 and 4 samples on hardware supporting 4x MSAA.
+**Action:** In each order move Wall mesh Center to (100, 0, 2). Pan the camera and target together to X = -100. Restore the camera and change one sphere from 32 by 16 segments to 8 by 4. Resume playback. Repeat the silhouette comparison at 1 and 4 samples on hardware supporting 4x MSAA.
 
 **Expected:** With the wall outside the camera, the material count reads 4,224. With every mesh outside, it reads zero. Reducing one sphere changes Triangles to 3,252. GPU readback can trail the animation. After pausing, compare the settled count to a capture at that pose.
+
+## Step: Transparent wall
+
+**Action:** At 0.5 seconds, set Draw wall to Normal blending, disable its depth writes and set its color alpha to 0.35. Compare the preview with culling off and on.
+
+**Expected:** The four opaque spheres contribute four depth draws, followed by five material draws. The wall remains translucent and the pixels match the unculled reference.
 
 ## Step: Direct3D 11 fallback
 
