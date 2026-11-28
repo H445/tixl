@@ -14,6 +14,8 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
 
     [Output(Guid = "5f280164-2577-50f9-8267-486628daee70", DirtyFlagTrigger = DirtyFlagTrigger.Always)] public readonly Slot<Command> Draw = new();
 
+    private readonly CullDrawStats _stats = new();
+
     private const string ShaderPath = "Lib:shaders/3d/mesh/culling/Frustum triangles.hlsl";
     private Resource<ComputeShader>? _mark, _prefix, _scatter, _small, _buildBounds, _markStatic, _markDepth;
     private readonly BufferWithViews _masks = new(), _offsets = new(), _visible = new(), _args = new(), _bounds = new();
@@ -35,6 +37,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
 
     public _DrawFrustumTriangles()
     {
+        RenderStatsCollector.RegisterProvider(_stats);
         Draw.UpdateAction = Render;
     }
 
@@ -158,6 +161,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
             _lastFaces = indexView;
             _cached = cache && depth == null;
         }
+        _stats.CountIndirect(dc, _args.Buffer!);
         dc.PushState(StateGroups.VertexShader);
         try
         {
@@ -172,6 +176,7 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
         _cached = false;
         _hasBounds = false;
         dc.Draw(checked(faces * 3), 0);
+        _stats.CountDirect(faces);
     }
 
     private bool PrepareBuffers(int faces, int groups)
@@ -215,6 +220,8 @@ internal sealed class _DrawFrustumTriangles : Instance<_DrawFrustumTriangles>
     {
         if (disposing)
         {
+            RenderStatsCollector.UnregisterProvider(_stats);
+            _stats.Dispose();
             _masks.Dispose(); _offsets.Dispose(); _visible.Dispose(); _args.Dispose(); _bounds.Dispose();
             _indirect?.Dispose(); _constants?.Dispose();
             _mark?.Dispose(); _small?.Dispose(); _prefix?.Dispose(); _scatter?.Dispose(); _markStatic?.Dispose(); _markDepth?.Dispose(); _buildBounds?.Dispose();

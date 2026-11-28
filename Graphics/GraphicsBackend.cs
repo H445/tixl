@@ -129,6 +129,10 @@ public interface IGraphicsBackend : IDisposable
     /// </summary>
     Task<ReadbackResult> ReadbackAsync(GpuTexture texture, int mipLevel, int arraySlice, CancellationToken cancellation = default);
 
+    /// <summary>Reads the prefix of a CPU readback buffer after its last buffer copy has finished.
+    /// Returns false when polling is unsupported or the GPU has not finished. Never submits or waits.</summary>
+    bool TryReadCompletedBuffer(GpuBuffer buffer, Span<byte> destination) => false;
+
     Task<ReadbackResult> ReadbackAsync(GpuBuffer buffer, CancellationToken cancellation = default);
 
     /// <summary>

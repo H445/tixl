@@ -46,3 +46,12 @@ Open the same example on Direct3D 11. Move the wall from X = 100 to X = 0 and ba
 **Expected:**
 - The wall covers the sphere and reveals it again. Clipping at the camera edge matches ordinary mesh drawing.
 - A frame capture shows a direct candidate draw. The GPU culling kernels and indirect draw are bypassed. The console reports no shader errors for the example.
+
+## Step: Render statistics
+
+**Action:**
+Move the wall out of view, center the sphere, and inspect Triangles in the render statistics. Compare 8 × 4 and 32 × 16 sphere segments. Pan the sphere out of view on Vulkan and wait several frames at each setting.
+
+**Expected:**
+- The sphere adds 72 or 1,056 submitted triangles, respectively, to the other draws. On Vulkan its contribution drops to zero outside the view. Indirect counts follow completed GPU frames.
+- On Direct3D 11 the fallback reports the full sphere submission even when the camera clips it.
