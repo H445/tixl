@@ -3,10 +3,6 @@
   "Id": "64cd0588-51c2-5716-ab93-6fcaa0babde8",
   "Inputs": [
     {
-      "Id": "1ffcb480-cac3-5e5f-be7b-ee0ef3d90dd0",
-      "DefaultValue": null
-    },
-    {
       "Id": "85dc5b6a-fe05-5606-9c2f-fd1f20c90b83",
       "DefaultValue": null
     },

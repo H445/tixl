@@ -6,7 +6,6 @@ namespace Lib.render.culling;
 [Guid("64cd0588-51c2-5716-ab93-6fcaa0babde8")]
 internal sealed class DepthCullPass : Instance<DepthCullPass>
 {
-    [Input(Guid = "1ffcb480-cac3-5e5f-be7b-ee0ef3d90dd0")] public readonly InputSlot<Command> Occluders = new();
     [Input(Guid = "85dc5b6a-fe05-5606-9c2f-fd1f20c90b83")] public readonly InputSlot<Command> Candidates = new();
     [Input(Guid = "bde3a9df-83ec-5921-a67e-731d91e6848d")] public readonly InputSlot<bool> Enabled = new();
     [Input(Guid = "5c195918-a7fc-51c0-adc6-0b5d0f71b92b")] public readonly InputSlot<float> DepthBias = new();
@@ -84,7 +83,6 @@ internal sealed class DepthCullPass : Instance<DepthCullPass>
         values.Remove(ContextKey);
         try
         {
-            Occluders.GetValue(context);
             if (Enabled.GetValue(context))
             {
                 if (Build(context)) values[ContextKey] = _snapshot;

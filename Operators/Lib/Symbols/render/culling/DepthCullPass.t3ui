@@ -1,16 +1,8 @@
 {
   "FormatVersion": 3,
   "Id": "64cd0588-51c2-5716-ab93-6fcaa0babde8",
-  "Description": "Draw opaque occluders, then test later static mesh groups against a shared current-camera depth pyramid. Each candidate uses its regular frustum path if depth is unavailable.",
+  "Description": "Build a depth pyramid from the current depth attachment before evaluating the candidate draw.",
   "InputUis": [
-    {
-      "InputId": "1ffcb480-cac3-5e5f-be7b-ee0ef3d90dd0",
-      "Description": "Opaque, depth-writing geometry. Drawn once into the current render target.",
-      "Position": {
-        "X": -240,
-        "Y": 0
-      }
-    },
     {
       "InputId": "85dc5b6a-fe05-5606-9c2f-fd1f20c90b83",
       "Description": "DrawCulledTriangles nodes with CacheStaticMesh enabled, or an Execute containing them.",
