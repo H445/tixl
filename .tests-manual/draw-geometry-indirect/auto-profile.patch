@@ -1,0 +1,258 @@
+diff --git a/Operators/Examples/Symbols/Lib/mesh/_IndirectOrbitScene.cs b/Operators/Examples/Symbols/Lib/mesh/_IndirectOrbitScene.cs
+index bd47023b5..f00b48cb5 100644
+--- a/Operators/Examples/Symbols/Lib/mesh/_IndirectOrbitScene.cs
++++ b/Operators/Examples/Symbols/Lib/mesh/_IndirectOrbitScene.cs
+@@ -50,8 +50,8 @@ internal sealed class _IndirectOrbitScene : Instance<_IndirectOrbitScene>
+         var angle = (float)(turns * Math.Tau);
+         Eye.Value = new Vector3(22 * MathF.Sin(angle), 6 - 3 * MathF.Cos(angle), 22 * MathF.Cos(angle));
+         PathIndex.Value = mode == 0 ? 0 : 1;
+-        LodPixels.Value = mode is 2 or 4 or 5 ? 100 : 0;
+-        UseDepth.Value = mode is 3 or 4 or 5;
++        LodPixels.Value = mode != 0 ? 100 : 0;
++        UseDepth.Value = mode is 1 or 3 or 4 or 5;
+         AutoDepth.Value = mode == 5;
+         AutoDepth.DirtyFlag.Clear();
+         Eye.DirtyFlag.Clear();
+diff --git a/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs b/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs
+index 35071f630..95d027a75 100644
+--- a/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs
++++ b/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs
+@@ -20,6 +20,10 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+     private const int Warmup = 24, Modes = 6, Passes = 5, Steps = _IndirectOrbitScene.Steps;
+     private const int FramesPerMode = Warmup + Steps;
+     private readonly double[] _times = new double[Passes * Modes * Steps];
++    private readonly int[] _choice = new int[Passes * Modes * Steps];
++    private static readonly int[][] Orders = [
++        [5,1,2,4,3,0], [2,4,3,0,5,1], [4,3,0,5,1,2], [3,0,5,1,2,4], [0,5,1,2,4,3]
++    ];
+     private readonly Timers[] _ring = new Timers[8];
+     private int _frame;
+     private bool _complete, _paired;
+@@ -50,7 +54,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+         }
+ 
+         int block = _frame / FramesPerMode, pass = block / Modes;
+-        int mode = (block + 2 * pass) % Modes, step = _frame % FramesPerMode - Warmup;
++        int mode = Orders[pass][block % Modes], step = _frame % FramesPerMode - Warmup;
+         if (_paired)
+         {
+             // Two adjacent frames use the same pose. Reverse their order across poses and passes.
+@@ -109,6 +113,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+         {
+             dc.End(q.End);
+             dc.End(q.Clock);
++            if (context.FloatVariables.TryGetValue("OrbitProfiler.Choice", out var choice)) _choice[sample] = (int)choice;
+             q.Sample = sample;
+         }
+     }
+@@ -145,12 +150,12 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+         try
+         {
+             using var csv = new StreamWriter(path);
+-            csv.WriteLine("pass,mode,step,degrees,gpu_ms");
++            csv.WriteLine("pass,mode,step,degrees,gpu_ms,depth_used");
+             for (var i = 0; i < _times.Length; i++)
+             {
+                 int pass = i / (Steps * Modes), mode = i / Steps % Modes, step = i % Steps;
+                 if (_paired && mode is not (2 or 4)) continue;
+-                csv.WriteLine(FormattableString.Invariant($"{pass + 1},{(DrawGeometryIndirectExample.DrawMode)mode},{step},{360 * step / Steps},{_times[i]:F6}"));
++                csv.WriteLine(FormattableString.Invariant($"{pass + 1},{mode},{step},{360 * step / Steps},{_times[i]:F6},{_choice[i]}"));
+             }
+             Log.Info($"Indirect orbit benchmark on {ResourceManager.Device.Backend.AdapterName} saved to {path}", this);
+         }
+diff --git a/Operators/Lib/Assets/shaders/3d/mesh/OrbitReference.hlsl b/Operators/Lib/Assets/shaders/3d/mesh/OrbitReference.hlsl
+new file mode 100644
+index 000000000..b9e46ef60
+--- /dev/null
++++ b/Operators/Lib/Assets/shaders/3d/mesh/OrbitReference.hlsl
+@@ -0,0 +1,124 @@
++cbuffer Parameters : register(b0)
++{
++    float4 ObjectToClipRows[4];
++    float2 ViewSize;
++    float LodPixels;
++    uint PartCount;
++    uint TilesX;
++    uint UseDepth;
++    uint GroupsX;
++    uint Padding;
++};
++
++float4 project(float3 p)
++{
++    return p.x * ObjectToClipRows[0] + p.y * ObjectToClipRows[1]
++         + p.z * ObjectToClipRows[2] + ObjectToClipRows[3];
++}
++
++Texture2D<float> Depth : register(t1);
++Texture2DMS<float> DepthMS : register(t2);
++RWStructuredBuffer<float> TileOutput : register(u1);
++groupshared float tileDepth[64];
++
++void reduceTile(uint2 tile, uint lane, float value)
++{
++    tileDepth[lane] = value;
++    GroupMemoryBarrierWithGroupSync();
++    [unroll] for (uint step = 32; step > 0; step >>= 1)
++    {
++        if (lane < step)
++            tileDepth[lane] = max(tileDepth[lane], tileDepth[lane + step]);
++        GroupMemoryBarrierWithGroupSync();
++    }
++    if (lane == 0)
++        TileOutput[tile.y * TilesX + tile.x] = tileDepth[0];
++}
++
++[numthreads(8, 8, 1)]
++void reduceDepth(uint3 pixel : SV_DispatchThreadID, uint3 tile : SV_GroupID, uint lane : SV_GroupIndex)
++{
++    uint2 p = min(pixel.xy, (uint2)ViewSize - 1);
++    reduceTile(tile.xy, lane, Depth.Load(int3(p, 0)));
++}
++
++[numthreads(8, 8, 1)]
++void reduceDepthMS(uint3 pixel : SV_DispatchThreadID, uint3 tile : SV_GroupID, uint lane : SV_GroupIndex)
++{
++    uint width, height, samples;
++    DepthMS.GetDimensions(width, height, samples);
++    uint2 p = min(pixel.xy, uint2(width, height) - 1);
++    float farthest = 0;
++    for (uint s = 0; s < samples; s++)
++        farthest = max(farthest, DepthMS.Load(p, s));
++    reduceTile(tile.xy, lane, farthest);
++}
++
++struct Part { float4 lower; float4 upper; uint4 ranges; };
++struct IndexedCommand { uint indexCount, instanceCount, firstIndex; int vertexOffset; uint firstInstance; };
++StructuredBuffer<Part> Parts : register(t0);
++StructuredBuffer<float> TileMax : register(t3);
++RWStructuredBuffer<IndexedCommand> Commands : register(u0);
++
++bool hidden(float2 lo, float2 hi, float nearest)
++{
++    // Include the border pixels even when a projected edge rounds onto a tile boundary.
++    int2 first = (int2)clamp(floor(lo - 1), 0, ViewSize - 1) / 8;
++    int2 last = (int2)clamp(ceil(hi + 1), 0, ViewSize - 1) / 8;
++    for (int y = first.y; y <= last.y; y++)
++        for (int x = first.x; x <= last.x; x++)
++            if (!(nearest > TileMax[y * TilesX + x] + 0.00001))
++                return false;
++    return true;
++}
++
++[numthreads(64, 1, 1)]
++void classify(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
++{
++    uint id = (group.x + group.y * GroupsX) * 64 + lane;
++    if (id >= PartCount) return;
++    Part part = Parts[id];
++    float2 lo = 1e30, hi = -1e30;
++    float nearest = 1;
++    uint common = 63;
++    bool crossesNear = false;
++    [unroll] for (uint i = 0; i < 8; ++i)
++    {
++        float3 p = float3((i & 1) ? part.upper.x : part.lower.x,
++                          (i & 2) ? part.upper.y : part.lower.y,
++                          (i & 4) ? part.upper.z : part.lower.z);
++        float4 h = project(p);
++        // A part is outside only when all eight corners are beyond the same plane.
++        common &= (h.x < -h.w ? 1 : 0) | (h.x > h.w ? 2 : 0)
++                | (h.y < -h.w ? 4 : 0) | (h.y > h.w ? 8 : 0)
++                | (h.z < 0 ? 16 : 0) | (h.z > h.w ? 32 : 0);
++        crossesNear = crossesNear || h.z <= 0 || h.w <= 1e-6;
++        float3 ndc = h.xyz / max(h.w, 1e-6);
++        float2 pixel = (ndc.xy * float2(.5, -.5) + .5) * ViewSize;
++        lo = min(lo, pixel);
++        hi = max(hi, pixel);
++        nearest = min(nearest, ndc.z);
++    }
++    bool visible = common == 0;
++    if (visible && !crossesNear && UseDepth)
++        visible = !hidden(lo, hi, nearest);
++    bool coarse = !crossesNear && max(hi.x - lo.x, hi.y - lo.y) < LodPixels && part.ranges.w > 0;
++    IndexedCommand cmd;
++    cmd.firstIndex = coarse ? part.ranges.z : part.ranges.x;
++    cmd.indexCount = coarse ? part.ranges.w : part.ranges.y;
++    cmd.instanceCount = visible ? 1 : 0;
++    cmd.vertexOffset = 0;
++    cmd.firstInstance = 0;
++    Commands[id] = cmd;
++}
++
++StructuredBuffer<float4> Vertices : register(t4);
++struct Varyings { float4 position : SV_Position; float4 color : COLOR0; };
++Varyings vsMain(uint id : SV_VertexID)
++{
++    Varyings o;
++    o.position = project(Vertices[2 * id].xyz);
++    o.color = Vertices[2 * id + 1];
++    return o;
++}
++float4 psMain(Varyings input) : SV_Target { return input.color; }
+diff --git a/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs b/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs
+index 1182da158..fa74c7406 100644
+--- a/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs
++++ b/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs
+@@ -24,6 +24,8 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+     [Input(Guid = "ef95c50b-ee30-47fc-9231-f6e4584cd642")]
+     public readonly InputSlot<bool> AutoDepth = new();
+ 
++    private readonly bool[] _replay = new bool[120];
++    private readonly Resource<ComputeShader> _oldClassify, _oldReduce;
+     private readonly AdaptiveDepth _adaptive = new();
+     private const string ShaderPath = "Lib:shaders/3d/mesh/DrawGeometryIndirect.hlsl";
+     private readonly Resource<ComputeShader> _classify, _classifyDepth, _reduce, _reduceMs;
+@@ -44,6 +46,8 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+ 
+     public DrawGeometryIndirect()
+     {
++        _oldClassify = ResourceManager.CreateShaderResource<ComputeShader>("Lib:shaders/3d/mesh/OrbitReference.hlsl", this, () => "classify");
++        _oldReduce = ResourceManager.CreateShaderResource<ComputeShader>("Lib:shaders/3d/mesh/OrbitReference.hlsl", this, () => "reduceDepth");
+         Output.UpdateAction = Update;
+         _classify = ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "classify");
+         _classifyDepth = ResourceManager.CreateShaderResource<ComputeShader>(ShaderPath, this, () => "classifyDepth");
+@@ -111,14 +115,23 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+                         && (depth.Description.BindFlags & BindFlags.ShaderResource) != 0
+                         && view.X == 0 && view.Y == 0 && view.MinDepth == 0 && view.MaxDepth == 1
+                         && view.Width == depth.Description.Width && view.Height == depth.Description.Height;
++        context.FloatVariables.TryGetValue("DrawGeometryIndirectExample.Sample", out var sample);
++        int policy = (int)sample / 120, step = (int)sample % 120;
++        bool legacy = policy == 3;
+         var automatic = canSample && AutoDepth.GetValue(context);
+         if (automatic)
+             canSample = _adaptive.SelectPath(dc);
+         else
+             _adaptive.Suspend();
++        if (automatic)
++        {
++            _replay[step] = canSample;
++            context.FloatVariables["OrbitProfiler.Choice"] = canSample ? 1 : 0;
++        }
++        if (policy == 1) canSample &= _replay[step];
+         var ms = canSample && depth!.Description.SampleDescription.Count > 1;
+-        var reducer = canSample ? (ms ? _reduceMs : _reduce).GetValue(context) : null;
+-        var cs = (reducer == null ? _classify : _classifyDepth).GetValue(context);
++        var reducer = canSample ? (legacy ? _oldReduce : ms ? _reduceMs : _reduce).GetValue(context) : null;
++        var cs = (legacy ? _oldClassify : reducer == null ? _classify : _classifyDepth).GetValue(context);
+         if (cs == null)
+         {
+             _warning = "The indirect classification shader could not be loaded.";
+@@ -130,7 +143,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+             GraphicsUtilities.Dispose(ref _depthView);
+         var tilesX = ((int)width + 7) / 8;
+         var tilesY = ((int)height + 7) / 8;
+-        var groups = reducer == null ? (_partCount + 63) / 64 : _partCount;
++        var groups = legacy || reducer == null ? (_partCount + 63) / 64 : _partCount;
+         var groupsX = Math.Min(groups, 65535);
+         var parameters = new Parameters
+         {
+@@ -167,7 +180,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+                 stage.Set(reducer);
+                 stage.SetShaderResource(ms ? 2 : 1, _depthView);
+                 stage.SetUnorderedAccessView(1, _tiles.Uav);
+-                dc.Dispatch((tilesX + 7) / 8, tilesY, 1);
++                dc.Dispatch(legacy ? tilesX : (tilesX + 7) / 8, tilesY, 1);
+                 stage.SetUnorderedAccessView(1, null);
+                 stage.SetShaderResource(ms ? 2 : 1, null);
+             }

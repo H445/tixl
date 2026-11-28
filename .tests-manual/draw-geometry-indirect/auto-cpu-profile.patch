@@ -1,0 +1,91 @@
+diff --git a/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs b/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs
+index 35071f630..5678b8c44 100644
+--- a/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs
++++ b/Operators/Examples/Symbols/Lib/mesh/_MeasureIndirectOrbit.cs
+@@ -17,9 +17,10 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+     [Input(Guid = "d13d7e22-04f4-4d03-8af6-000000001204")]
+     public readonly InputSlot<bool> PairDepthModes = new();
+ 
+-    private const int Warmup = 24, Modes = 6, Passes = 5, Steps = _IndirectOrbitScene.Steps;
++    private const int Warmup = 24, Modes = 1, Passes = 3, Steps = _IndirectOrbitScene.Steps;
+     private const int FramesPerMode = Warmup + Steps;
+     private readonly double[] _times = new double[Passes * Modes * Steps];
++    private readonly float[] _cpu = new float[Passes * Steps];
+     private readonly Timers[] _ring = new Timers[8];
+     private int _frame;
+     private bool _complete, _paired;
+@@ -64,7 +65,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+         }
+         var variables = context.FloatVariables;
+         var hadPrevious = variables.TryGetValue(_IndirectOrbitScene.SampleVariable, out var previous);
+-        variables[_IndirectOrbitScene.SampleVariable] = mode * Steps + (step + Steps) % Steps;
++        variables[_IndirectOrbitScene.SampleVariable] = 5 * Steps + (step + Steps) % Steps;
+         try
+         {
+             if (step < 0)
+@@ -109,6 +110,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+         {
+             dc.End(q.End);
+             dc.End(q.Clock);
++            _cpu[sample] = context.FloatVariables["OrbitProfiler.CpuUs"];
+             q.Sample = sample;
+         }
+     }
+@@ -145,12 +147,12 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
+         try
+         {
+             using var csv = new StreamWriter(path);
+-            csv.WriteLine("pass,mode,step,degrees,gpu_ms");
++            csv.WriteLine("pass,mode,step,degrees,gpu_ms,cpu_us");
+             for (var i = 0; i < _times.Length; i++)
+             {
+                 int pass = i / (Steps * Modes), mode = i / Steps % Modes, step = i % Steps;
+                 if (_paired && mode is not (2 or 4)) continue;
+-                csv.WriteLine(FormattableString.Invariant($"{pass + 1},{(DrawGeometryIndirectExample.DrawMode)mode},{step},{360 * step / Steps},{_times[i]:F6}"));
++                csv.WriteLine(FormattableString.Invariant($"{pass + 1},{(DrawGeometryIndirectExample.DrawMode)mode},{step},{360 * step / Steps},{_times[i]:F6},{_cpu[i]:F6}"));
+             }
+             Log.Info($"Indirect orbit benchmark on {ResourceManager.Device.Backend.AdapterName} saved to {path}", this);
+         }
+diff --git a/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs b/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs
+index 1182da158..f766b5468 100644
+--- a/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs
++++ b/Operators/Lib/Symbols/mesh/draw/DrawGeometryIndirect.cs
+@@ -112,8 +112,13 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+                         && view.X == 0 && view.Y == 0 && view.MinDepth == 0 && view.MaxDepth == 1
+                         && view.Width == depth.Description.Width && view.Height == depth.Description.Height;
+         var automatic = canSample && AutoDepth.GetValue(context);
++        long ticks = 0, tickStart = 0;
+         if (automatic)
++        {
++            tickStart = System.Diagnostics.Stopwatch.GetTimestamp();
+             canSample = _adaptive.SelectPath(dc);
++            ticks = System.Diagnostics.Stopwatch.GetTimestamp() - tickStart;
++        }
+         else
+             _adaptive.Suspend();
+         var ms = canSample && depth!.Description.SampleDescription.Count > 1;
+@@ -147,7 +152,11 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+         try
+         {
+             if (automatic)
++            {
++                tickStart = System.Diagnostics.Stopwatch.GetTimestamp();
+                 _adaptive.BeginProbe(dc);
++                ticks += System.Diagnostics.Stopwatch.GetTimestamp() - tickStart;
++            }
+             var stage = dc.ComputeShader;
+             stage.SetConstantBuffer(0, _parameters);
+             if (reducer != null)
+@@ -199,7 +208,12 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
+         finally
+         {
+             if (automatic)
++            {
++                tickStart = System.Diagnostics.Stopwatch.GetTimestamp();
+                 _adaptive.EndProbe(dc);
++                ticks += System.Diagnostics.Stopwatch.GetTimestamp() - tickStart;
++                context.FloatVariables["OrbitProfiler.CpuUs"] = (float)(ticks * 1e6 / System.Diagnostics.Stopwatch.Frequency);
++            }
+             dc.PopState();
+         }
+     }

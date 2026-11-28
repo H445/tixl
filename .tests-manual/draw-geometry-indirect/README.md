@@ -2,7 +2,49 @@
 
 Pin **DrawGeometryIndirectExample → Image** and play the timeline for an eight-bar orbit. The Mode dropdown selects the draw path. Enable **Benchmark** for a deterministic replay. For an adjacent-frame comparison of LOD with and without depth culling, enable **PairDepthModes** before starting the benchmark. The Log window prints the CSV path. Disable Benchmark between runs.
 
-## Break-even on a GTX 1660 Ti
+## Adaptive depth on the moving camera
+
+Enable **DepthCulling** and **AutoDepth** on DrawGeometryIndirect, or select **IndirectLodAuto** in the example. Auto times an off/on pair in alternating order, polls for completed GPU timestamps without flushing, and keeps the incumbent unless the other path wins by roughly 2.5%. It waits eight evaluations before probing again. Turning DepthCulling off forces the LOD-only path.
+
+[Watch the 20-second comparison](auto-depth.mp4) · [All 28,800 GPU timings and per-pose choices](auto-sweep.csv)
+
+| Hidden post-LOD triangles | Samples per path | Standard (ms) | Original indirect (ms) | Always off (ms) | Always on (ms) | Auto (ms) | Auto used depth | Auto − replay (µs) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0% | 2095 | 0.151 | 0.113 | 0.066 | 0.072 | 0.066 | 13% | +0.1 |
+| >0–10% | 1285 | 0.150 | 0.118 | 0.067 | 0.074 | 0.068 | 10% | +0.2 |
+| >10–20% | 655 | 0.152 | 0.128 | 0.072 | 0.078 | 0.072 | 8% | +0.0 |
+| >20–30% | 110 | 0.149 | 0.133 | 0.072 | 0.077 | 0.074 | 14% | +0.3 |
+| >30–50% | 265 | 0.145 | 0.140 | 0.070 | 0.074 | 0.070 | 10% | +0.2 |
+| >50–75% | 170 | 0.146 | 0.139 | 0.078 | 0.080 | 0.079 | 18% | +0.4 |
+| >75–100% | 220 | 0.126 | 0.164 | 0.070 | 0.063 | 0.063 | 81% | +0.0 |
+| All | 4800 | 0.150 | 0.118 | 0.068 | 0.074 | 0.068 | 15% | +0.1 |
+
+The median paired difference between Auto and a forced replay of the exact same decisions was **+0.1 µs** over the sweep. Individual pass medians ranged from +0.0 to +0.4 µs. This is an end-to-end GPU estimate with run-to-run variation. It includes timestamp commands and their effects on rendering. CPU submission time is outside the GPU interval. Exploration and delayed switching are included in Auto’s reported frame times.
+
+Every wall uses five passes and the same 120 camera angles and 24 warm-up poses as the previous sweep. Each policy follows a continuous orbit, rotating the order of the five blocks between passes. The replay block immediately follows Auto and forces its recorded choice for each angle. Standard is TiXL DrawMeshUnlit at full detail. Original indirect is the LOD-plus-depth reducer, classifier and dispatch dimensions from d3ba2162e. All four indirect comparisons use matching LOD settings. All columns report median full-scene GPU times at 1280 × 720 on the GTX 1660 Ti, excluding presentation and editor UI. The hidden fraction uses the earlier GPU command counts at the identical wall and pose.
+
+| Wall | Standard (ms) | Original indirect (ms) | Always off (ms) | Always on (ms) | Auto (ms) | Auto used depth |
+|---|---:|---:|---:|---:|---:|---:|
+| original | 0.147 | 0.119 | 0.066 | 0.072 | 0.066 | 9% |
+| none | 0.146 | 0.109 | 0.062 | 0.068 | 0.062 | 9% |
+| narrow | 0.152 | 0.116 | 0.067 | 0.073 | 0.067 | 9% |
+| medium | 0.151 | 0.114 | 0.067 | 0.072 | 0.067 | 30% |
+| wide | 0.154 | 0.119 | 0.071 | 0.076 | 0.070 | 32% |
+| innerSmall | 0.149 | 0.117 | 0.068 | 0.074 | 0.068 | 9% |
+| inner | 0.151 | 0.131 | 0.074 | 0.080 | 0.074 | 9% |
+| innerOffset | 0.152 | 0.127 | 0.070 | 0.078 | 0.071 | 9% |
+
+### Switching cost and crossover
+
+The CPU controller took **0.3 µs median, 0.74 µs mean and 1.9 µs at P95**. A separate replay timed path selection, query polling and both probe timestamp hooks using Stopwatch on three orbits per wall. The measurement includes timer-call overhead and excludes the mesh draw and result logging. CPU and GPU durations can overlap. [2,880 CPU samples](auto-cpu.csv)
+
+Across all poses, Auto used 55% less median GPU time than standard draw and 43% less than the original indirect implementation. Above 75% hidden, always-on beat always-off by a median 6.0–7.4 µs in each of the five passes. Auto used depth on 81% of those frames. At 50–75% hidden, keeping depth off still won in each pass. The observed crossover is a band for this scene and clock regime. Sparse coverage, the cost of the surviving triangles, and camera motion all affect it.
+
+VSync was disabled in the study profile. Every one of the 49 clock checks for the included orbits reported P2, 5,750 MHz memory and 1,560–1,950 MHz graphics. A first run crossed power states and was discarded. Earlier measurements below used different clock conditions and show a different crossover. For image verification, the Auto replay was captured at 120 poses. RGB output matched the LOD-only path pixel-for-pixel at 0°, 90°, 180° and 270°. [Clock samples](auto-clocks.csv)
+
+To reproduce the six-path comparison, apply [the GPU diagnostic patch](auto-profile.patch) to a disposable checkout of this branch, build Lib and Examples, and run the example benchmark once for each wall in the table below with PairDepthModes disabled. Mode IDs in the diagnostic CSV are 0 standard, 1 forced decision replay, 2 always off, 3 original indirect, 4 always on and 5 Auto. The depth_used field records the sampled decision on mode 5. For CPU timings, start with another clean checkout and apply [the CPU diagnostic patch](auto-cpu-profile.patch). It runs three Auto-only orbits per wall.
+
+## Earlier paired break-even on a GTX 1660 Ti
 
 Across eight wall configurations and 120 camera angles, the first 10-percentage-point band with positive median savings on every pass was **over 10% through 20% of post-LOD triangles rejected**. Median savings were 0.035 ms in that band and 0.287 ms above 75% rejected. The original wall rejected just 4.6% at the median camera position, which explains why LOD alone remained slightly faster for its complete orbit.
 
