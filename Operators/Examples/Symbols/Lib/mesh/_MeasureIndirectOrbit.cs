@@ -17,7 +17,7 @@ internal sealed class _MeasureIndirectOrbit : Instance<_MeasureIndirectOrbit>
     [Input(Guid = "d13d7e22-04f4-4d03-8af6-000000001204")]
     public readonly InputSlot<bool> PairDepthModes = new();
 
-    private const int Warmup = 24, Modes = 5, Passes = 5, Steps = _IndirectOrbitScene.Steps;
+    private const int Warmup = 24, Modes = 6, Passes = 5, Steps = _IndirectOrbitScene.Steps;
     private const int FramesPerMode = Warmup + Steps;
     private readonly double[] _times = new double[Passes * Modes * Steps];
     private readonly Timers[] _ring = new Timers[8];

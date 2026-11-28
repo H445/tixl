@@ -35,6 +35,14 @@
         "Y": 0
       },
       "Description": "Cull against depth already drawn in the active full-viewport D32 target, including MSAA samples. Disable when earlier draws used a different camera."
+    },
+    {
+      "InputId": "ef95c50b-ee30-47fc-9231-f6e4584cd642",
+      "Position": {
+        "X": 0,
+        "Y": 0
+      },
+      "Description": "While DepthCulling is enabled, periodically time both paths and use the faster one as the camera moves."
     }
   ],
   "SymbolChildUis": [],

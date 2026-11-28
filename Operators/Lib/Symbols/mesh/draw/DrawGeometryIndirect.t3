@@ -17,6 +17,10 @@
     {
       "Id": "6789bf1b-79de-4718-9b76-c84ebcc5d715",
       "DefaultValue": true
+    },
+    {
+      "Id": "ef95c50b-ee30-47fc-9231-f6e4584cd642",
+      "DefaultValue": false
     }
   ],
   "Children": [],

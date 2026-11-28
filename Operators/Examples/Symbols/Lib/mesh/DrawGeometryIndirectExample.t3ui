@@ -1,7 +1,7 @@
 {
   "FormatVersion": 3,
   "Id": "d13d7e22-04f4-4d03-8af6-000000001000",
-  "Description": "Play the timeline to orbit a field of 225 rings and an opaque wall. Select a draw mode for a live comparison, or enable Benchmark for a repeatable five-mode GPU timing run at 1280 × 720.",
+  "Description": "Play the timeline to orbit a field of 225 rings and an opaque wall. Select a draw mode for a live comparison, or enable Benchmark for a repeatable six-mode GPU timing run at 1280 × 720.",
   "InputUis": [
     {
       "Position": {

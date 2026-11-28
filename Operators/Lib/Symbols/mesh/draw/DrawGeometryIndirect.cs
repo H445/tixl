@@ -21,6 +21,10 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
     [Input(Guid = "6789bf1b-79de-4718-9b76-c84ebcc5d715")]
     public readonly InputSlot<bool> DepthCulling = new();
 
+    [Input(Guid = "ef95c50b-ee30-47fc-9231-f6e4584cd642")]
+    public readonly InputSlot<bool> AutoDepth = new();
+
+    private readonly AdaptiveDepth _adaptive = new();
     private const string ShaderPath = "Lib:shaders/3d/mesh/DrawGeometryIndirect.hlsl";
     private readonly Resource<ComputeShader> _classify, _classifyDepth, _reduce, _reduceMs;
     private readonly Resource<VertexShader> _vertexShader;
@@ -107,6 +111,11 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
                         && (depth.Description.BindFlags & BindFlags.ShaderResource) != 0
                         && view.X == 0 && view.Y == 0 && view.MinDepth == 0 && view.MaxDepth == 1
                         && view.Width == depth.Description.Width && view.Height == depth.Description.Height;
+        var automatic = canSample && AutoDepth.GetValue(context);
+        if (automatic)
+            canSample = _adaptive.SelectPath(dc);
+        else
+            _adaptive.Suspend();
         var ms = canSample && depth!.Description.SampleDescription.Count > 1;
         var reducer = canSample ? (ms ? _reduceMs : _reduce).GetValue(context) : null;
         var cs = (reducer == null ? _classify : _classifyDepth).GetValue(context);
@@ -115,7 +124,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
             _warning = "The indirect classification shader could not be loaded.";
             return;
         }
-        if (useDepth && reducer == null)
+        if (useDepth && (!automatic || canSample) && reducer == null)
             _warning ??= "Depth culling needs a sampleable full-viewport D32 render target. Frustum culling and LOD are active.";
         if (_depthView != null && _depthView.Resource != depth)
             GraphicsUtilities.Dispose(ref _depthView);
@@ -137,6 +146,8 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         dc.PushState(StateGroups.All);
         try
         {
+            if (automatic)
+                _adaptive.BeginProbe(dc);
             var stage = dc.ComputeShader;
             stage.SetConstantBuffer(0, _parameters);
             if (reducer != null)
@@ -187,7 +198,107 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         }
         finally
         {
+            if (automatic)
+                _adaptive.EndProbe(dc);
             dc.PopState();
+        }
+    }
+
+    // Two adjacent GPU measurements compare the same moving workload. Alternate their
+    // order each round and keep the incumbent for differences below the noise margin.
+    private sealed class AdaptiveDepth : IDisposable
+    {
+        private readonly Probe?[] _probes = new Probe?[2];
+        private int _phase, _cooldown;
+        private bool _enabled, _reverse, _discard;
+        private Probe? _current;
+
+        public bool SelectPath(DeviceContext dc)
+        {
+            if (_phase == 2 || _discard)
+            {
+                foreach (var probe in _probes)
+                    if (probe != null && !probe.TryCollect(dc))
+                        return _enabled;
+
+                if (!_discard)
+                {
+                    var off = _probes[0]!.Seconds;
+                    var on = _probes[1]!.Seconds;
+                    if (on > 0 && off > 0)
+                        _enabled = _enabled ? on < off * 1.025 : on < off * .975;
+                    _cooldown = 8;
+                }
+                _phase = 0;
+                _discard = false;
+                _reverse = !_reverse;
+            }
+            if (_cooldown > 0)
+            {
+                _cooldown--;
+                return _enabled;
+            }
+            bool trial = (_phase != 0) ^ _reverse;
+            _current = _probes[trial ? 1 : 0] ??= new Probe(ResourceManager.Device);
+            return trial;
+        }
+
+        public void BeginProbe(DeviceContext dc)
+        {
+            if (_current == null) return;
+            dc.Begin(_current.Clock);
+            dc.End(_current.Start);
+        }
+
+        public void EndProbe(DeviceContext dc)
+        {
+            if (_current == null) return;
+            dc.End(_current.End);
+            dc.End(_current.Clock);
+            _current.Pending = true;
+            _current = null;
+            _phase++;
+        }
+
+        public void Suspend()
+        {
+            _discard |= _phase != 0;
+            _phase = _cooldown = 0;
+            _enabled = false;
+            _current = null;
+        }
+
+        public void Dispose()
+        {
+            foreach (var probe in _probes) probe?.Dispose();
+        }
+
+        private sealed class Probe(Device device) : IDisposable
+        {
+            public readonly Query Clock = new(device, new QueryDescription { Type = QueryType.TimestampDisjoint });
+            public readonly Query Start = new(device, new QueryDescription { Type = QueryType.Timestamp });
+            public readonly Query End = new(device, new QueryDescription { Type = QueryType.Timestamp });
+            public bool Pending;
+            public double Seconds;
+
+            public bool TryCollect(DeviceContext dc)
+            {
+                if (!Pending) return true;
+                if (!dc.GetData(Clock, AsynchronousFlags.DoNotFlush, out QueryDataTimestampDisjoint clock)
+                    || !dc.GetData(Start, AsynchronousFlags.DoNotFlush, out long start)
+                    || !dc.GetData(End, AsynchronousFlags.DoNotFlush, out long end))
+                    return false;
+                Seconds = !clock.Disjoint && clock.Frequency > 0 && end > start ? (end - start) / (double)clock.Frequency : 0;
+                Pending = false;
+                return true;
+            }
+
+            public void Dispose()
+            {
+                Clock.Dispose();
+                Start.Dispose();
+                End.Dispose();
+            }
         }
     }
 
@@ -291,6 +402,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
         _indices?.Dispose();
         _parameters?.Dispose();
         _depthView?.Dispose();
+        _adaptive.Dispose();
         _rasterizer?.Dispose();
     }
 
