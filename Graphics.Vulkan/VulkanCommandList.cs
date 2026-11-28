@@ -758,8 +758,6 @@ internal sealed unsafe class VulkanCommandList(VulkanBackend backend) : ICommand
                                   };
 
         backend.Api.vkCmdCopyBuffer(_commandBuffer, from.Buffer, to.Buffer, 1, &region);
-        if (to.Description.Memory == MemoryKind.Readback)
-            to.LastReadbackCopySerial = backend.RecordingFrameSerial;
     }
 
     public void CopyTextureRegion(GpuTexture source, int sourceSubresource, GpuTexture destination, int destinationSubresource, int x, int y, int z)

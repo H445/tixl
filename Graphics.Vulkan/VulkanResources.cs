@@ -126,8 +126,6 @@ internal sealed unsafe class VulkanBuffer(VulkanBackend backend, VkBuffer buffer
     /// <summary>Upload and readback memory stays mapped: Vulkan allows it, and remapping per frame is wasted work.</summary>
     internal void* Mapped;
 
-    internal long LastReadbackCopySerial;
-
     /// <summary>
     /// An upload buffer holds one copy per frame in flight and rotates between them, so writing this frame's
     /// constants cannot overwrite what a frame still on the GPU is reading. D3D11 calls this renaming.

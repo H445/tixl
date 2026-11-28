@@ -140,14 +140,6 @@
         }
       ],
       "Outputs": []
-    },
-    {
-      "Id": "79f7ca2f-c8a1-537d-aac6-0fe16fe287ac",
-      "SymbolId": "936e4324-bea2-463a-b196-6064a2d8a6b2",
-      "SymbolName": "Lib.flow.Execute",
-      "Name": "Scene draw order",
-      "InputValues": [],
-      "Outputs": []
     }
   ],
   "Connections": [
@@ -156,6 +148,12 @@
       "SourceSlotId": "322717ef-3a76-4e23-845f-a12a03d73969",
       "TargetParentOrChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
       "TargetSlotId": "e5ef4ff9-92a7-57aa-97be-33379b9520b2"
+    },
+    {
+      "SourceParentOrChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
+      "SourceSlotId": "ce61b3ce-3e77-557a-973b-eaa3f0f3c341",
+      "TargetParentOrChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
+      "TargetSlotId": "047B8FAE-468C-48A7-8F3A-5FAC8DD5B3C6"
     },
     {
       "SourceParentOrChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
@@ -178,20 +176,8 @@
     {
       "SourceParentOrChildId": "255b4b1f-f645-5b7d-9829-4dbb1a07ef7b",
       "SourceSlotId": "53b3fdca-9d5e-4808-a02f-4aa743cd8456",
-      "TargetParentOrChildId": "79f7ca2f-c8a1-537d-aac6-0fe16fe287ac",
-      "TargetSlotId": "5d73ebe6-9aa0-471a-ae6b-3f5bfd5a0f9c"
-    },
-    {
-      "SourceParentOrChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
-      "SourceSlotId": "ce61b3ce-3e77-557a-973b-eaa3f0f3c341",
-      "TargetParentOrChildId": "79f7ca2f-c8a1-537d-aac6-0fe16fe287ac",
-      "TargetSlotId": "5d73ebe6-9aa0-471a-ae6b-3f5bfd5a0f9c"
-    },
-    {
-      "SourceParentOrChildId": "79f7ca2f-c8a1-537d-aac6-0fe16fe287ac",
-      "SourceSlotId": "e81c99ce-fcee-4e7c-a1c7-0aa3b352b7e1",
-      "TargetParentOrChildId": "c8efeff8-e50a-5c98-854f-0128917acc85",
-      "TargetSlotId": "047B8FAE-468C-48A7-8F3A-5FAC8DD5B3C6"
+      "TargetParentOrChildId": "4a91de68-d6ed-5627-9b03-e5656e4b0190",
+      "TargetSlotId": "9d2a8cf8-12d8-555b-8c7f-0e1c13606134"
     }
   ]
 }

@@ -1377,18 +1377,6 @@ public sealed unsafe class VulkanBackend : IGraphicsBackend, IDisposable
         return Task.FromResult(new ReadbackResult(bytes, description.Width * FormatSizes.BytesPerPixel(description.Format), size, null));
     }
 
-    public bool TryReadCompletedBuffer(GpuBuffer buffer, Span<byte> destination)
-    {
-        if (buffer is not VulkanBuffer staging || staging.IsDisposed || staging.Description.Memory != MemoryKind.Readback
-            || staging.Mapped == null || destination.Length > staging.Description.SizeInBytes
-            || staging.LastReadbackCopySerial == 0 || staging.LastReadbackCopySerial > _completedFrameSerial)
-            return false;
-
-        // Readback allocations are host-coherent. BeginFrame advanced the serial after waiting on the slot fence.
-        new ReadOnlySpan<byte>(staging.Mapped, destination.Length).CopyTo(destination);
-        return true;
-    }
-
     public Task<ReadbackResult> ReadbackAsync(GpuBuffer buffer, CancellationToken cancellation = default)
     {
         if (buffer is not VulkanBuffer source)

@@ -20,10 +20,10 @@ Move the Occluder cube to X = 100. Leave the Candidate at the origin with 32 × 
 - The detailed sphere disappears and returns. The candidate indirect draw has a positive vertex count at the origin and zero vertices outside the view.
 - Pan slowly until the sphere crosses the camera edge. The visible portion reaches the edge without holes or early disappearance.
 
-## Step: Automatic scene depth and multisampling
+## Step: Opaque depth and multisampling
 
 **Action:**
-Keep the Candidate at the origin. In Scene draw order, the ordinary wall draw runs before CullMesh and writes into the same render target. Set the Occluder center to (0, 0, 2) and capture a frame. Move the wall sideways until part of the sphere appears, then move it back to X = 100. Repeat with the render target set to 4 samples on a device that supports 4x MSAA.
+Keep the Candidate at the origin. Set the Occluder center to (0, 0, 2) and capture a frame. Move the wall sideways until part of the sphere appears, then move it back to X = 100. Repeat with the render target set to 4 samples on a device that supports 4x MSAA.
 
 **Expected:**
 - The wall stays visible. Full coverage reduces the candidate indirect vertex count below the uncovered count. Moving the wall away restores the sphere and its original count.
@@ -36,7 +36,7 @@ With the wall out of view, turn off StaticMesh. Set Candidate Segments to 8 × 4
 
 **Expected:**
 - Both meshes follow the edits on the next rendered frame. Neither leaves stale geometry behind.
-- The 8 × 4 sphere submits 216 vertices when the whole sphere is inside the view. Both meshes submit zero vertices outside.
+- The 8 × 4 sphere uses the small compute path. Its indirect vertex count is 216 when the whole sphere is inside the view. Both meshes submit zero vertices outside.
 
 ## Step: Direct3D 11 fallback on Windows
 
@@ -46,12 +46,3 @@ Open the same example on Direct3D 11. Move the wall from X = 100 to X = 0 and ba
 **Expected:**
 - The wall covers the sphere and reveals it again. Clipping at the camera edge matches ordinary mesh drawing.
 - A frame capture shows a direct candidate draw. The GPU culling kernels and indirect draw are bypassed. The console reports no shader errors for the example.
-
-## Step: Render statistics
-
-**Action:**
-Move the wall out of view, center the sphere, and inspect Triangles in the render statistics. Compare 8 × 4 and 32 × 16 sphere segments. Pan the sphere out of view on Vulkan and wait several frames at each setting.
-
-**Expected:**
-- The sphere adds 72 or 1,056 submitted triangles, respectively, to the other draws. On Vulkan its contribution drops to zero outside the view. Indirect counts follow completed GPU frames.
-- On Direct3D 11 the fallback reports the full sphere submission even when the camera clips it.

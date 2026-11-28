@@ -1,7 +1,7 @@
 {
   "FormatVersion": 3,
   "Id": "a9801dd7-f7f7-57d8-a573-bea3d12eeb7b",
-  "Description": "Cull against the camera frustum and the current render target depth. Draw opaque geometry first to use it for occlusion.",
+  "Description": "Cull and draw a mesh using the enclosing camera and opaque occluders.",
   "InputUis": [
     {
       "InputId": "e5ef4ff9-92a7-57aa-97be-33379b9520b2",
@@ -18,6 +18,14 @@
         "Y": 80
       },
       "Description": "Cache bounds for unchanged vertex and index data. Disable this when geometry is rewritten in place."
+    },
+    {
+      "InputId": "9d2a8cf8-12d8-555b-8c7f-0e1c13606134",
+      "Position": {
+        "X": -250,
+        "Y": 160
+      },
+      "Description": "Opaque draws that write forward depth. The pass draws these first and tests the candidate against their depth."
     }
   ],
   "SymbolChildUis": [
