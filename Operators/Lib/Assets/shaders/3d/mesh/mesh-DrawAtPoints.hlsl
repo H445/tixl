@@ -131,25 +131,11 @@ float4 PlaceAtPoint(float3 vertexPosition, Point p, out float4x4 orientationMatr
     return posInObject + float4(p.Position, 0);
 }
 
-psInput vsMain(uint id
-               : SV_VertexID)
+// Both submissions index the original point stream for color, atlas UVs and velocity.
+psInput shadePointVertex(uint meshVertex, uint instanceIndex)
 {
     psInput output;
-
-    uint faceCount, meshStride;
-    FaceIndices.GetDimensions(faceCount, meshStride);
-
-    int verticesPerInstance = faceCount * 3;
-
-    int faceIndex = (id % verticesPerInstance) / 3;
-    int faceVertexIndex = id % 3;
-
-    uint instanceCount, instanceStride;
-    Points.GetDimensions(instanceCount, instanceStride);
-
-    int instanceIndex = id / verticesPerInstance;
-
-    PbrVertex vertex = PbrVertices[FaceIndices[faceIndex][faceVertexIndex]];
+    PbrVertex vertex = PbrVertices[meshVertex];
     Point currentPoint = Points[instanceIndex];
 
     float4x4 orientationMatrix;
@@ -220,6 +206,31 @@ psInput vsMain(uint id
 
     return output;
 }
+
+psInput vsMain(uint id : SV_VertexID)
+{
+    uint faces, stride;
+    FaceIndices.GetDimensions(faces, stride);
+    uint verticesPerMesh = faces * 3;
+    return shadePointVertex(FaceIndices[(id % verticesPerMesh) / 3][id % 3], id / verticesPerMesh);
+}
+
+// The private prepass needs only position. Use the same point placement and clip
+// transform as the material shader, without fetching velocity, atlas or PBR data.
+float4 vsPointDepth(uint vertex : SV_VertexID, uint instance : SV_InstanceID) : SV_POSITION
+{
+    float4x4 orientation;
+    float4 position = PlaceAtPoint(PbrVertices[vertex].Position, Points[instance], orientation);
+    return mul(position, ObjectToClipSpace);
+}
+
+// The indirect packet draws one shared mesh per surviving point.
+StructuredBuffer<uint> VisiblePoints : register(t10);
+psInput vsVisiblePoints(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
+{
+    return shadePointVertex(vertex, VisiblePoints[instance]);
+}
+
 
 //=== Global functions ==============================================
 /*{GLOBALS}*/

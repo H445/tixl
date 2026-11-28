@@ -3,10 +3,46 @@ using T3.Core.Utils;
 namespace Lib.mesh.draw;
 
 [Guid("42cb88bc-beb8-4d89-ac99-44b77be5f03e")]
-internal sealed class DrawMeshAtPoints : Instance<DrawMeshAtPoints>
+internal sealed class DrawMeshAtPoints : Instance<DrawMeshAtPoints>, ICompoundWithUpdate
 {
     [Output(Guid = "774a96e4-24e2-4e1a-a70d-63794d24dd51", DirtyFlagTrigger = DirtyFlagTrigger.Always)]
     public readonly Slot<Command> Output = new();
+
+    public DrawMeshAtPoints() => Output.UpdateAction += Update;
+
+    private void Update(EvaluationContext context)
+    {
+        var filter = context.MeshDepthCommandFilter;
+        try
+        {
+            if (filter != null)
+            {
+                if (!EnableZTest.GetValue(context) || !EnableZWrite.GetValue(context)
+                    || BlendMode.GetValue(context) != (int)SharedEnums.BlendModes.None
+                    || AlphaCutOff.GetValue(context) > 0 || ColorField.HasInputConnections)
+                    return;
+                context.MeshDepthCommandFilter = static _ => true;
+            }
+            Output.ConnectedUpdate(context);
+        }
+        finally { context.MeshDepthCommandFilter = filter; }
+    }
+
+    internal bool TryDrawWithOcclusion(EvaluationContext context, int vertexCount)
+    {
+        if (!EnableZTest.GetValue(context) || ColorField.HasInputConnections)
+            return false;
+        var points = GPoints.GetValue(context);
+        var mesh = Mesh.GetValue(context);
+        if (points?.Srv is not { IsDisposed: false } || points.ElementStride != T3.Core.DataTypes.Point.Stride
+            || points.Srv.Description.Buffer.ElementCount != points.ElementCount
+            || mesh?.IndicesBuffer?.ElementStride != 12 || mesh == null || mesh.FaceCount <= 0
+            || points.ElementCount <= 0 || mesh.FaceCount * 3L * points.ElementCount != vertexCount)
+            return false;
+        context.DrawMeshWithOcclusion(context, mesh, points, Size.GetValue(context),
+                                      ScaleFactor.GetValue(context), UsePointScale.GetValue(context));
+        return true;
+    }
 
         [Input(Guid = "408ae7c7-9aa8-4537-8c55-b5689f8f9b56")]
         public readonly InputSlot<T3.Core.DataTypes.BufferWithViews> GPoints = new InputSlot<T3.Core.DataTypes.BufferWithViews>();

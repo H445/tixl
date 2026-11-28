@@ -49,7 +49,9 @@ internal sealed class CullDrawStats : IRenderStatsProvider, IDisposable
                 CpuAccessFlags = CpuAccessFlags.Read
             }));
         }
-        context.CopyResource(arguments, _current.Packets[_current.Draws++]);
+        // Indexed and non-indexed packets begin with the element count and instance count.
+        context.CopySubresourceRegion(arguments, 0, new ResourceRegion(0, 0, 0, DeviceContext.DrawInstancedIndirectArgsStride, 1, 1),
+                                      _current.Packets[_current.Draws++], 0);
         _current.InputFaces += faces;
     }
 

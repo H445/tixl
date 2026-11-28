@@ -44,7 +44,8 @@ internal sealed class Draw : Instance<Draw>, IRenderStatsProvider
         }
 
         if (context.DrawMeshWithOcclusion != null && !context.RenderPass.IsShadowPass && startVertexLocation == 0
-            && Parent is Lib.mesh.draw.DrawMesh drawMesh && drawMesh.TryDrawWithOcclusion(context, vertexCount))
+            && (Parent is Lib.mesh.draw.DrawMesh drawMesh && drawMesh.TryDrawWithOcclusion(context, vertexCount)
+                || Parent is Lib.mesh.draw.DrawMeshAtPoints atPoints && atPoints.TryDrawWithOcclusion(context, vertexCount)))
             return;
 
         if (context.MeshDepthCommandFilter != null) return;

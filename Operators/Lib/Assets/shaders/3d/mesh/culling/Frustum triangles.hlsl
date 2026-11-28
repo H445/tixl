@@ -25,6 +25,8 @@ cbuffer CullParameters : register(b0)
     uint DepthWidth, DepthHeight;
     float DepthBias;
     uint CopyCount;
+    float PointSize;
+    int ScaleFactorMode, UsePointScale, Padding;
 };
 StructuredBuffer<PbrVertex> Vertices : register(t0);
 StructuredBuffer<uint3> Faces : register(t1);
@@ -39,7 +41,7 @@ struct Bounds
 };
 RWStructuredBuffer<Bounds> GroupBounds : register(u4);
 
-// Signed distances use homogeneous clip coordinates: left/right and bottom/top are ±w, near/far are 0 and w.
+// Signed distances use homogeneous clip coordinates: left/right and bottom/top are Ã‚Â±w, near/far are 0 and w.
 float distanceToPlane(float4 v, uint p)
 {
     if (p == 0)
@@ -386,5 +388,78 @@ uint exclusiveSum(uint lane, uint value)
         uint j = firstbitlow(bits);
         Visible[offset++] = Faces[start + j];
         bits &= bits - 1;
+    }
+}
+
+#include "shared/point.hlsl"
+#include "shared/quat-functions.hlsl"
+
+StructuredBuffer<Point> InstancePoints : register(t3);
+groupshared uint written;
+
+// BuildBounds ran on the source mesh once, independent of the number of copies.
+// Merge its partial boxes, then project a conservative rotated box for each point.
+// Each tile is emitted in input order to preserve blending and point identity.
+[numthreads(128, 1, 1)]
+void CullPoints(uint lane : SV_GroupIndex)
+{
+    float3 lo = 3.4e38, hi = -3.4e38;
+    for (uint g = lane; g < GroupCount; g += 128)
+    {
+        lo = min(lo, GroupBounds[g].low.xyz);
+        hi = max(hi, GroupBounds[g].high.xyz);
+    }
+    minimums[lane] = lo;
+    maximums[lane] = hi;
+    if (lane == 0)
+        written = 0;
+    GroupMemoryBarrierWithGroupSync();
+    [unroll] for (uint stride = 64; stride > 0; stride /= 2)
+    {
+        if (lane < stride)
+        {
+            minimums[lane] = min(minimums[lane], minimums[lane + stride]);
+            maximums[lane] = max(maximums[lane], maximums[lane + stride]);
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+    float3 center = minimums[0] * .5 + maximums[0] * .5;
+    float3 extent = maximums[0] * .5 - minimums[0] * .5;
+    for (uint first = 0; first < CopyCount; first += 128)
+    {
+        uint index = first + lane;
+        bool keep = false;
+        if (index < CopyCount)
+        {
+            Point p = InstancePoints[index];
+            float factor = ScaleFactorMode == 0 ? 1 : (ScaleFactorMode == 1 ? p.FX1 : p.FX2);
+            float3 scale = PointSize * factor * (UsePointScale ? p.Scale : 1);
+            float3x3 rotation = (float3x3)transpose(qToMatrix(normalize(p.Rotation)));
+            float3 c = mul(center * scale, rotation) + p.Position;
+            float3 e = mul(extent * abs(scale), abs(rotation));
+            // Account for cancellation in the placement transform before projection.
+            e += 8e-6 * (abs(p.Position) + mul((abs(center) + extent) * abs(scale), abs(rotation)));
+            Bounds box;
+            box.low = float4(c - e, 0);
+            box.high = float4(c + e, 0);
+            keep = classifyGroup(box) >= 0 && !hiddenByDepth(box);
+        }
+        // Each lane writes directly into its stable position in the visible list.
+        uint offset = exclusiveSum(lane, keep ? 1 : 0);
+        uint tileStart = written;
+        GroupMemoryBarrierWithGroupSync();
+        if (keep)
+            Offsets[tileStart + offset] = index;
+        if (lane == 127)
+            written = tileStart + offset + (keep ? 1 : 0);
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if (lane == 0)
+    {
+        Arguments[0] = FaceCount * 3;
+        Arguments[1] = written;
+        Arguments[2] = 0;
+        Arguments[3] = 0; // base vertex
+        Arguments[4] = 0; // first instance
     }
 }

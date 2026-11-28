@@ -329,7 +329,9 @@ public sealed class EvaluationContext
     public StructuredList IteratedList { get; set; }
     public int IteratedListIndex { get; set; }
     public Func<Slots.ISlot, bool> MeshDepthCommandFilter { get; set; }
-    public Action<EvaluationContext, MeshBuffers> DrawMeshWithOcclusion { get; set; }
+    public delegate void OcclusionDraw(EvaluationContext context, MeshBuffers mesh, BufferWithViews points = null,
+                                       float size = 1, int scaleMode = 0, bool usePointScale = false);
+    public OcclusionDraw DrawMeshWithOcclusion { get; set; }
 
     public bool BypassCameras { get; set; }
 

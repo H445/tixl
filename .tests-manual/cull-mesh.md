@@ -43,3 +43,9 @@ prerequisites:
 **Action:** Repeat the draw-order and visibility tests with Direct3D 11 and the original 32 by 16 sphere segments.
 
 **Expected:** Five direct draws render in either order. With the toggle enabled both triangle counts read 4,236, including with every mesh outside the view. Disabling the toggle hides the material-pass count. The console reports no shader errors.
+
+## Step: Camera culling with DrawMeshAtPoints
+
+**Action:** Replace the four sphere draws with one [DrawMeshAtPoints] connected to the 32 by 16 sphere and a [GridPoints] with counts (129, 1, 1), zero Size and center at the origin. Set the draw size to 0.2 and blending to None. Connect the cube directly to its [DrawMesh], set Stretch to (1.2, 1.2, 0.25) and Center to (0, 0, 2). Compare the preview with camera culling off and on. Move the wall to (100, 0, 2) and repeat, then move the wall draw to the end of the command list and check both positions again.
+
+**Expected:** Both orders report 136,236 input triangles (129 × 1,056 plus 12). On Vulkan the centered wall hides every instance and submits 12 material triangles. Moving the wall outside the frustum exposes all 129 instances and submits 136,224 triangles. In each case the enabled and disabled images match. Direct3D 11 reports 136,236 material triangles at both positions.

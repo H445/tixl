@@ -105,19 +105,34 @@ internal sealed class MeshDepthPyramid : IDisposable
         return true;
     }
 
-    public bool AddOpaqueDraw(EvaluationContext context, int faces)
+    // Vulkan structured mesh indices are packed uint3 values and can also serve as an index buffer.
+    internal static void BindMeshIndices(DeviceContext dc, MeshBuffers mesh)
+    {
+        var indices = mesh.IndicesBuffer;
+        int offset = indices.Srv!.Description.Buffer.FirstElement * 12;
+        dc.InputAssembler.SetIndexBuffer(indices.Buffer, Format.R32_UInt, offset);
+    }
+
+    public bool AddOpaqueDraw(EvaluationContext context, MeshBuffers mesh, int copies, VertexShader? pointDepthShader)
     {
         var dc = ResourceManager.Device.ImmediateContext;
         if (!MatchesDraw(context) || dc.OutputMerger.DepthStencilState?.Description.DepthWriteMask == DepthWriteMask.Zero)
             return false;
 
-        // Use the material vertex shader and rasterizer so each occluder has its authored silhouette.
-        dc.PushState(StateGroups.OutputMerger | StateGroups.PixelShader);
+        // Preserve the authored rasterizer and placement. Point batches use the indexed, position-only entry.
+        dc.PushState(StateGroups.OutputMerger | StateGroups.PixelShader | StateGroups.VertexShader | StateGroups.InputAssembler);
         try
         {
             dc.OutputMerger.SetTargets(_depthTarget);
             dc.PixelShader.Set(null);
-            dc.Draw(checked(faces * 3), 0);
+            if (pointDepthShader != null)
+            {
+                dc.VertexShader.Set(pointDepthShader);
+                BindMeshIndices(dc, mesh);
+                dc.DrawIndexedInstanced(checked(mesh.FaceCount * 3), copies, 0, 0, 0);
+            }
+            else
+                dc.Draw(checked(mesh.FaceCount * 3 * copies), 0);
         }
         finally { dc.PopState(); }
         return true;
