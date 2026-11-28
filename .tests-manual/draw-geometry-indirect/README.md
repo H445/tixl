@@ -2,6 +2,12 @@
 
 Pin **DrawGeometryIndirectExample → Image** and play the timeline for an eight-bar orbit. The Mode dropdown selects the draw path. Enable **Benchmark** for a deterministic replay. For an adjacent-frame comparison of LOD with and without depth culling, enable **PairDepthModes** before starting the benchmark. The Log window prints the CSV path. Disable Benchmark between runs.
 
+## LOD, culling and combined examples
+
+[Three runnable examples, matched GPU measurements, external baseline and macOS fallback](examples.md)
+
+In the earlier Auto video and tables below, **original indirect** means this branch at `d3ba2162e`. The external H445/tixl-culling-lod comparison is in the linked example report.
+
 ## Adaptive depth on the moving camera
 
 Enable **DepthCulling** and **AutoDepth** on DrawGeometryIndirect, or select **IndirectLodAuto** in the example. Auto times an off/on pair in alternating order, polls for completed GPU timestamps without flushing, and keeps the incumbent unless the other path wins by roughly 2.5%. It waits eight evaluations before probing again. Turning DepthCulling off forces the LOD-only path.
@@ -42,7 +48,7 @@ Across all poses, Auto used 55% less median GPU time than standard draw and 43% 
 
 VSync was disabled in the study profile. Every one of the 49 clock checks for the included orbits reported P2, 5,750 MHz memory and 1,560–1,950 MHz graphics. A first run crossed power states and was discarded. Earlier measurements below used different clock conditions and show a different crossover. For image verification, the Auto replay was captured at 120 poses. RGB output matched the LOD-only path pixel-for-pixel at 0°, 90°, 180° and 270°. [Clock samples](auto-clocks.csv)
 
-To reproduce the six-path comparison, apply [the GPU diagnostic patch](auto-profile.patch) to a disposable checkout of this branch, build Lib and Examples, and run the example benchmark once for each wall in the table below with PairDepthModes disabled. Mode IDs in the diagnostic CSV are 0 standard, 1 forced decision replay, 2 always off, 3 original indirect, 4 always on and 5 Auto. The depth_used field records the sampled decision on mode 5. For CPU timings, start with another clean checkout and apply [the CPU diagnostic patch](auto-cpu-profile.patch). It runs three Auto-only orbits per wall.
+To reproduce the six-path comparison, apply [the GPU diagnostic patch](auto-profile.patch) to a disposable checkout of commit `2f9243270`, build Lib and Examples, and run the example benchmark once for each wall in the table below with PairDepthModes disabled. Mode IDs in the diagnostic CSV are 0 standard, 1 forced decision replay, 2 always off, 3 original indirect, 4 always on and 5 Auto. The depth_used field records the sampled decision on mode 5. For CPU timings, start with another clean checkout of `2f9243270` and apply [the CPU diagnostic patch](auto-cpu-profile.patch). It runs three Auto-only orbits per wall.
 
 ## Earlier paired break-even on a GTX 1660 Ti
 

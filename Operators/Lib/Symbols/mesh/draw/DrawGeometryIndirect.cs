@@ -134,14 +134,15 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
             _adaptive.Suspend();
         var ms = canSample && depth!.Description.SampleDescription.Count > 1;
         var reducer = canSample ? (ms ? _reduceMs : _reduce).GetValue(context) : null;
-        var cs = (reducer == null ? _classify : _classifyDepth).GetValue(context);
-        if (cs == null && (!CpuCommands || reducer != null))
+        var needsClassifier = !CpuCommands || reducer != null;
+        var cs = needsClassifier ? (reducer == null ? _classify : _classifyDepth).GetValue(context) : null;
+        if (needsClassifier && cs == null)
         {
             _warning = "The indirect classification shader could not be loaded.";
             return;
         }
         if (useDepth && (!automatic || canSample) && reducer == null)
-            _warning ??= "Depth culling needs a sampleable full-viewport D32 render target. Frustum culling and LOD are active.";
+            _warning ??= "Depth culling needs a sampleable full-viewport D32 render target. Drawing without depth rejection.";
         if (_depthView != null && _depthView.Resource != depth)
             GraphicsUtilities.Dispose(ref _depthView);
         var tilesX = ((int)width + 7) / 8;
@@ -191,7 +192,7 @@ internal sealed class DrawGeometryIndirect : Instance<DrawGeometryIndirect>, ISt
                 stage.SetShaderResource(ms ? 2 : 1, null);
             }
 
-            if (!CpuCommands || reducer != null)
+            if (cs != null)
             {
                 stage.Set(cs);
                 stage.SetShaderResource(0, _parts!.Srv);
